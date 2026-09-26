@@ -1,0 +1,84 @@
+{
+  "cands": [
+    {
+      "id": "c1",
+      "name": "Eficiencia y rendimiento",
+      "desc": "Capacidad de procesamiento y optimización de recursos",
+      "qmide": "Mide el rendimiento operacional del sistema.",
+      "ind": "Independiente de los costos de implementación.",
+      "dec": "Se mantiene como criterio principal.",
+      "sq": [5, 5, 5, 5, 5],
+      "just": "Requisito fundamental para la escalabilidad.",
+      "se": [5, 5, 5, 5],
+      "stage": "keep",
+      "target": null,
+      "at": ""
+    },
+    {
+      "id": "c2",
+      "name": "Calidad y precisión",
+      "desc": "Nivel de exactitud y confiabilidad en los resultados",
+      "qmide": "Métrica de calidad del servicio.",
+      "ind": "Medición independiente de la infraestructura.",
+      "dec": "Se mantiene como criterio principal.",
+      "sq": [5, 5, 4, 5, 5],
+      "just": "Asegura la satisfacción del usuario final.",
+      "se": [4, 4.5, 5, 5],
+      "stage": "keep",
+      "target": null,
+      "at": ""
+    },
+    {
+      "id": "c3",
+      "name": "Costo de infraestructura",
+      "desc": "Recursos de hardware, nube y licencias",
+      "qmide": "Inversión requerida para puesta en marcha.",
+      "ind": "Depende de la arquitectura elegida.",
+      "dec": "Se mantiene como criterio independiente.",
+      "sq": [4, 4, 5, 4, 4],
+      "just": "Límite presupuestal del proyecto.",
+      "se": [4, 4, 4, 4],
+      "stage": "keep",
+      "target": null,
+      "at": ""
+    },
+    {
+      "id": "c4",
+      "name": "Madurez tecnológica",
+      "desc": "Soporte comunitario y estabilidad de las herramientas",
+      "qmide": "Nivel de adopción en la industria.",
+      "ind": "No depende de los datos específicos del piloto.",
+      "dec": "Se mantiene como criterio independiente.",
+      "sq": [5, 4, 4, 4, 5],
+      "just": "Reduce el riesgo tecnológico.",
+      "se": [4, 4, 4.5, 4],
+      "stage": "keep",
+      "target": null,
+      "at": ""
+    },
+    {
+      "id": "c5",
+      "name": "Facilidad de integración",
+      "desc": "Compatibilidad con sistemas existentes y APIs",
+      "qmide": "Tiempo estimado de despliegue e interoperabilidad.",
+      "ind": "Diferente a los costos de infraestructura.",
+      "dec": "Se mantiene como criterio independiente.",
+      "sq": [4, 4, 4, 4, 4],
+      "just": "Clave para la adopción ágil.",
+      "se": [4, 4, 4, 4],
+      "stage": "keep",
+      "target": null,
+      "at": ""
+    }
+  ],
+  "questions": [
+    "¿Existe evidencia técnica documentada para evaluar las alternativas?",
+    "¿Es un parámetro cuantitativo o verificable?",
+    "¿La información es consistente y actualizada?",
+    "¿Es independiente de los demás criterios?",
+    "¿Es crítico para el objetivo del proyecto?"
+  ],
+  "objective": "Seleccionar la alternativa óptima para el despliegue del sistema piloto",
+  "note": "Corte de ejemplo >= 4.0 para conjunto de pruebas sintéticas.",
+  "indnote": "Validación de independencia y consistencia entre criterios."
+}

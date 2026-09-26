@@ -1,21 +1,29 @@
+# Node & Next.js
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Python & Jupyter
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .venv/
 venv/
 .DS_Store
+.claude/
 
-# Material de referencia local (PDF de sesiones, plantillas, Excel de
-# ejemplo): no debe versionarse, ver CLAUDE.md
+# Temporary local files
 /*.pdf
 /*.docx
 /*.xlsx
-/MCDA_ASR_Harold.html
-/MCDA_plantilla_en_blanco.html
 
-# Notebook 07 (AHP+SIG): datos geoespaciales descargados/cacheados, se
-# regeneran corriendo el notebook, no tiene sentido versionarlos (cientos
-# de MB: DEM, tiles Sentinel-2, WorldClim, SoilGrids)
-/data/ahp_sig_snsm/cache/
-/data/ahp_sig_snsm/dem_tiles/
-/data/ahp_sig_snsm/runap_extracted/
+# Caches pesados de validación geoespacial
+/notebooks/data/ahp_sig_snsm/cache/
+/notebooks/data/ahp_sig_snsm/dem_tiles/
+/notebooks/data/ahp_sig_snsm/runap_extracted/

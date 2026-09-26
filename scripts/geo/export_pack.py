@@ -29,8 +29,8 @@ import rasterio
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-CACHE = ROOT / "data" / "ahp_sig_snsm" / "cache"
-OUT = ROOT / "plataforma" / "public" / "geo-packs" / "snsm-cacao-v1"
+CACHE = ROOT / "notebooks" / "data" / "ahp_sig_snsm" / "cache"
+OUT = ROOT / "public" / "geo-packs" / "snsm-cacao-v1"
 (OUT / "layers").mkdir(parents=True, exist_ok=True)
 
 
