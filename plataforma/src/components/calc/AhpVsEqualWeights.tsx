@@ -56,6 +56,7 @@ export default function AhpVsEqualWeights({ mode, criteria, weights, alternative
 
   return (
     <CalcSection title="AHP frente a pesos iguales" accent="var(--m-ahp)" mode={mode}
+      summary={same ? 'El ranking no cambia con pesos iguales: la elección no depende de cuánto se pondere cada criterio' : bestA === bestE ? 'Mismo ganador con pesos iguales; cambian las posiciones intermedias' : 'Con pesos iguales cambia la alternativa ganadora'}
       intro="¿Se necesitaba comparar de a pares, o bastaba con darle el mismo peso a cada criterio? Se compara con las mismas prioridades locales de las alternativas; lo único que cambia son los pesos de los criterios.">
       <CalcStep no={1} mode={mode} defaultOpen title="Los pesos: juicios de los expertos frente a 1/n"
         meaning={`Pesos iguales significa asignar 1/n = 1/${nC} = ${pct(eq)} a cada criterio, sin comparar. Los pesos AHP salen de los juicios por pares.`}

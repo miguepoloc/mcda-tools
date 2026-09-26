@@ -90,6 +90,13 @@ for (const method of ['ahp', 'topsis', 'vikor', 'promethee', 'electre', 'saw']) 
   ok(/id="desglose"/.test(html), `Results ${method}: ancla «desglose» presente`);
   ok(/Selección de criterios/.test(t), `Results ${method}: muestra la selección de criterios (Parte A)`);
   ok(/Análisis de sensibilidad|Sensibilidad|sensibilidad/.test(t), `Results ${method}: muestra sensibilidad`);
+  ok(!/<details class="calc-sec calc-sec-fold"[^>]* open/.test(html) && /<details class="calc-sec calc-sec-fold"/.test(html), `Results ${method}: los bloques del desglose empiezan CERRADOS`);
+  ok(/<nav class="calc-index"/.test(html), `Results ${method}: índice fijo del desglose presente`);
+  {
+    const iM = html.search(/id="desglose-metodo"/), iP = html.search(/id="desglose-pesos"/), iS = html.search(/id="desglose-seleccion"/), iSens = html.search(/id="desglose-sensibilidad"/);
+    const seq = [iM, iP, iS, iSens].filter((x) => x >= 0);
+    ok(seq.every((x, i) => i === 0 || x > seq[i - 1]) && iSens >= 0, `Results ${method}: orden método → pesos → selección → sensibilidad`);
+  }
   if (method === 'ahp') ok(/Matriz de comparación|comparación pareada|Matriz agregada|λ ?max/i.test(t) && /pesos iguales|1\/n/i.test(t), 'Results ahp: matrices, λmax y comparación con pesos iguales');
   if (method === 'topsis') ok(/ideal/i.test(t) && /ponderada/i.test(t) && /D⁺|D\+/.test(t), 'Results topsis: matriz ponderada, ideales y distancias');
   if (method === 'vikor') ok(/ΔQ|DQ/.test(t) && /más corta/i.test(t), 'Results vikor: condiciones C1/C2 y barra «más corta = mejor»');
@@ -146,6 +153,12 @@ for (const method of ['ahp', 'topsis', 'vikor', 'promethee', 'electre']) {
   ok(/Selección de Criterios/.test(t) && /Estructura de la Decisión/.test(t), `Informe ${method}: selección de criterios y estructura de la decisión`);
   ok(/Apéndice de Cálculo/.test(t) && /Análisis de Sensibilidad/.test(t) && /Comparación con Otros Métodos/.test(t), `Informe ${method}: apéndice de cálculo, sensibilidad y comparación`);
   ok(!/<details/.test(html), `Informe ${method}: sin <details> (todo abierto para imprimir)`);
+  ok(!/id="desglose-/.test(html), `Informe ${method}: sin anclas duplicadas con la página de fondo`);
+  if (method !== 'ahp') {
+    const iM = t.search(method === 'topsis' ? /Cómo se calculó TOPSIS/ : method === 'vikor' ? /Cómo se calculó VIKOR/ : method === 'promethee' ? /Cálculo de PROMETHEE/ : /Cálculo de ELECTRE/);
+    const iW = t.search(/Cómo se obtuvieron los pesos con AHP/);
+    ok(iM >= 0 && iW > iM, `Informe ${method}: en el apéndice va primero el método y después los pesos AHP`);
+  }
   ok(!/no incluye un análisis de sensibilidad/.test(t), `Informe ${method}: ya no dice que carece de sensibilidad`);
   if (process.env.DUMP_DIR) writeFileSync(join(process.env.DUMP_DIR, `informe-${method}.html`), html);
   const nums = [...html.matchAll(/<h3 class="rpt-h"[^>]*>(\d+)\./g)].map((m) => Number(m[1]));

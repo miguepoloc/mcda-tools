@@ -66,6 +66,8 @@ export default function TopsisBreakdown({ mode, criteria, alternatives, decision
     <CalcSection
       mode={mode}
       accent={ACCENT}
+      id="desglose-metodo"
+      summary={tops.length === 1 ? `Gana ${names[win]} · cercanía C = ${num(cs[win], 4)} · pasos: matriz normalizada → ponderada → ideales → distancias → C` : 'Empate en el 1.er lugar: los datos no distinguen entre las alternativas'}
       title="Cómo se calculó TOPSIS, paso a paso"
       intro={<>TOPSIS (Hwang &amp; Yoon, 1981) construye una alternativa <b>ideal</b> (lo mejor de cada criterio) y una <b>anti-ideal</b> (lo peor) y elige la que queda más cerca de la primera y más lejos de la segunda. Los pesos {weightsSource ? <>vienen de {weightsSource}</> : 'son datos de entrada'}: TOPSIS no los calcula. {alts.length} alternativas × {m} criterios.</>}
     >

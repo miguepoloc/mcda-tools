@@ -869,10 +869,8 @@ export default function ExecutiveReportModal({
           {/* Apéndice de cálculo: cada matriz y cada paso con los números del proyecto, para justificar el resultado sin asumir nada */}
           <Sec no={secNo('calc')} title="Apéndice de Cálculo (paso a paso)">
             <div style={{ display: 'grid', gap: 14 }}>
-              {!isAhp && (wm === 'critic' || wm === 'entropy') && (
-                <WeightsBreakdown method={wm} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="report" />
-              )}
-              {ahpBreakdown && <AhpBreakdown mode="report" data={ahpBreakdown} showProcess />}
+              {/* Del resultado a lo que lo sustenta: primero el método, luego de dónde salieron los pesos */}
+              {isAhp && ahpBreakdown && <AhpBreakdown mode="report" data={ahpBreakdown} showProcess />}
               {isAhp && ahpBreakdown?.synthesis && (
                 <AhpVsEqualWeights
                   mode="report" criteria={criteria.map((c) => c.name)} weights={ahpBreakdown.synthesis.synth.wr} alternatives={alternatives.map((a) => a.name)}
@@ -883,6 +881,10 @@ export default function ExecutiveReportModal({
               {method === 'vikor' && <VikorBreakdown mode="report" criteria={criteria} alternatives={alternatives} decisionMatrix={decisionMatrix} weights={weights} v={vikorV ?? 0.5} weightsSource={weightsSource} showChart />}
               {method === 'promethee' && <PrometheeBreakdown mode="report" criteria={criteria} alternatives={alternatives} dm={dmEff} weights={weights} />}
               {method === 'electre' && electre && <ElectreBreakdown mode="report" criteria={criteria} alternatives={alternatives} dm={dmEff} weights={weights} cStar={electre.cStar} dStar={electre.dStar} />}
+              {!isAhp && ahpBreakdown && <AhpBreakdown mode="report" data={ahpBreakdown} showProcess />}
+              {!isAhp && (wm === 'critic' || wm === 'entropy') && (
+                <WeightsBreakdown method={wm} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="report" />
+              )}
               {(method === 'saw' || method === 'fuzzy_topsis') && (
                 <p className="rpt-note" style={NOTE_P}>El desglose paso a paso de {methodLabel} está descrito en la sección de justificación metodológica (fórmulas); la plataforma aún no genera sus matrices intermedias.</p>
               )}

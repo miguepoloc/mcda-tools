@@ -37,6 +37,7 @@ import PrioBreakdown from './calc/PrioBreakdown';
 import WeightsBreakdown from './calc/WeightsBreakdown';
 import SensitivityReport from './calc/SensitivityReport';
 import MethodComparisonReport, { type CompareMethod } from './calc/MethodComparisonReport';
+import CalcIndex from './calc/CalcIndex';
 import ContributionBars from './ContributionBars';
 import VikorRankBar from './VikorRankBar';
 
@@ -496,11 +497,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
           {kernelNote.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
       </div>
-      {mode === 'single' ? (
-        <div className="card res" id="desglose">
-          <ElectreBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} cStar={cEff} dStar={dEff} />
-        </div>
-      ) : (
+      {mode === 'compare' && (
         <div className="card res">
           <h3>Cómo se decide quién supera a quién</h3>
           <details open>
@@ -692,7 +689,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                 })}
               </div>
               )}
-              <details open style={{ marginTop: 12 }}>
+              <details style={{ marginTop: 12 }}>
                 <summary>Ver matriz de decisión y pesos usados</summary>
                 <h4>{objective ? `Peso de cada criterio (${WEIGHTING_SHORT[weighting]}, calculado de esta matriz)` : 'Peso de cada criterio (de la hoja Criterios)'}</h4>
                 <div className="tbl" style={{ marginTop: 8 }}>
@@ -888,11 +885,6 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
             derivedWeights={objective ? WEIGHTING_SHORT[weighting] : undefined}
           />
 
-      <SensitivityReport
-        mode="screen" method={method} criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights}
-        ahpRows={method === 'ahp' ? ahpRows : undefined} accent={METHOD_ACCENT[method].color}
-      />
-
       {/* Detalle por hoja = juicios por pares, CR, λmax y consenso de los expertos: con pesos objetivos no existe nada de eso que mostrar. */}
       {!objective && (
       <div className="card res">
@@ -940,18 +932,40 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       </div>
       )}
 
-      {/* Desglose de cálculo paso a paso (como en las diapositivas 1 a 4 del curso): de dónde salen los criterios, cómo se obtuvieron los
-          pesos y cada matriz intermedia del método. Los mismos componentes con los mismos números van en el apéndice del informe. */}
-      <div id="desglose" style={{ display: 'grid', gap: 14 }}>
-        {prio && prio.cands.length > 0 && <PrioBreakdown prio={prio} mode="screen" criteriaCount={criteria.length} />}
-        {objective && (weighting === 'critic' || weighting === 'entropy') && method !== 'ahp' && (
-          <WeightsBreakdown method={weighting} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="screen" />
-        )}
-        {ahpBreakdown && <AhpBreakdown mode="screen" data={ahpBreakdown} current={6} />}
-        {method === 'topsis' && <TopsisBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
-        {method === 'vikor' && <VikorBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} v={vEff} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
-        {method === 'promethee' && <PrometheeBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} />}
-      </div>
+      {/* Desglose de cálculo paso a paso (como en las diapositivas 1 a 4 del curso), de lo que el estudiante viene a justificar a lo que lo
+          sustenta: el método → de dónde salieron los pesos → de dónde salieron los criterios → qué tan estable es. Cada bloque es una tarjeta
+          CERRADA con su resultado en una línea (la página queda corta); el índice fijo abre y salta al bloque. Los mismos componentes con los
+          mismos números van, todos abiertos, en el apéndice del informe. */}
+      {(() => {
+        const hasMethodBlock = method === 'ahp' ? !!ahpBreakdown : ['topsis', 'vikor', 'promethee', 'electre'].includes(method);
+        const hasWeightsBlock = method !== 'ahp' && (!!ahpBreakdown || (objective && (weighting === 'critic' || weighting === 'entropy')));
+        const hasPrioBlock = !!prio && prio.cands.length > 0;
+        const items = [
+          ...(hasMethodBlock ? [{ id: 'desglose-metodo', label: `Método (${METHOD_LABEL[method]})` }] : []),
+          ...(hasWeightsBlock ? [{ id: 'desglose-pesos', label: `Pesos (${WEIGHTING_SHORT[weighting]})` }] : []),
+          ...(hasPrioBlock ? [{ id: 'desglose-seleccion', label: 'Selección de criterios' }] : []),
+          { id: 'desglose-sensibilidad', label: 'Sensibilidad' },
+        ];
+        return (
+          <div id="desglose" style={{ display: 'grid', gap: 14 }}>
+            <CalcIndex items={items} />
+            {method === 'ahp' && ahpBreakdown && <AhpBreakdown mode="screen" data={ahpBreakdown} current={6} />}
+            {method === 'topsis' && <TopsisBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
+            {method === 'vikor' && <VikorBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} v={vEff} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
+            {method === 'promethee' && <PrometheeBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} />}
+            {method === 'electre' && <ElectreBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} cStar={cEff} dStar={dEff} />}
+            {method !== 'ahp' && ahpBreakdown && <AhpBreakdown mode="screen" data={ahpBreakdown} />}
+            {objective && (weighting === 'critic' || weighting === 'entropy') && method !== 'ahp' && (
+              <WeightsBreakdown method={weighting} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="screen" />
+            )}
+            {hasPrioBlock && prio && <PrioBreakdown prio={prio} mode="screen" criteriaCount={criteria.length} />}
+            <SensitivityReport
+              mode="screen" method={method} criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights}
+              ahpRows={method === 'ahp' ? ahpRows : undefined} accent={METHOD_ACCENT[method].color}
+            />
+          </div>
+        );
+      })()}
 
       {showReportModal && (
         <ExecutiveReportModal

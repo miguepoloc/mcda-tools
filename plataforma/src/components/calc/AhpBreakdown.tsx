@@ -244,7 +244,15 @@ export default function AhpBreakdown({ mode, data, showProcess = true, current }
   const aggFails = sheets.filter((s) => !s.agg.ok).map((s) => s.short);
 
   return (
-    <CalcSection title="Cómo se calculó el AHP, paso a paso" accent="var(--m-ahp)" mode={mode}
+    <CalcSection title={fullAhp ? 'Cómo se calculó el AHP, paso a paso' : 'Cómo se obtuvieron los pesos con AHP, paso a paso'} accent="var(--m-ahp)" mode={mode}
+      id={fullAhp ? 'desglose-metodo' : 'desglose-pesos'}
+      summary={(() => {
+        const w = crit.agg.w; const jm = w.indexOf(Math.max(...w));
+        const cr = crit.agg.n <= 2 ? 'CR n/a (n ≤ 2)' : `CR ${crit.agg.cr.toFixed(3)} ${crit.agg.ok ? '✓' : '✗'}`;
+        const top = `criterio con más peso: ${crit.items[jm]?.name} (${(w[jm] * 100).toFixed(1)} %)`;
+        const win = fullAhp && sy ? sy.synth.rows.find((r) => r.rank === 1) : null;
+        return `${win ? `Gana ${win.name} · prioridad global ${win.g.toFixed(4)} · ` : ''}${top} · ${cr}`;
+      })()}
       intro={`Los mismos pasos del curso con los números de tu proyecto: ${experts.length} experto${experts.length === 1 ? '' : 's'}, ${crit.items.length} criterios${fullAhp ? ` y ${altSheets[0].items.length} alternativas (una matriz por criterio)` : ''}. ${fullAhp ? 'Los pasos «A» y «B» son de contexto' : 'El paso «B» es de contexto: los pesos de los criterios salen de esta comparación por pares, y las alternativas se evalúan con la matriz de decisión del método elegido'}; cada hoja repite los 8 pasos de la matriz al peso y su consistencia${fullAhp ? '; al final, la síntesis' : ''}.`}>
       {/* El proceso de 6 pasos y su glosario hablan de comparar alternativas por pares: solo aplican cuando AHP es el método de ranking. */}
       {showProcess && fullAhp && (

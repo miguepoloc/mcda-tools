@@ -66,7 +66,7 @@ export default function SensitivityReport({ mode, method, criteria, alternatives
   // ---------------------------------------------------------------- ELECTRE: umbrales, no ranking
   if (isElectre) {
     return (
-      <CalcSection title={TITLE} mode={mode} accent={accent}
+      <CalcSection title={TITLE} mode={mode} accent={accent} id="desglose-sensibilidad" summary={electreText?.headline}
         intro="ELECTRE no ordena las alternativas, así que no tiene sentido decir «quién gana con otros pesos». Lo que sí se puede probar es cuánto cambian las relaciones de superación, los pares incomparables y el núcleo si se mueven los umbrales c* y d* (que los elige quien decide, no salen de los datos).">
         {electreRows && electreText && (
           <>
@@ -125,7 +125,7 @@ export default function SensitivityReport({ mode, method, criteria, alternatives
   const base = res.scenarios[0];
 
   return (
-    <CalcSection title={TITLE} mode={mode} accent={accent}
+    <CalcSection title={TITLE} mode={mode} accent={accent} id="desglose-sensibilidad" summary={text.headline}
       intro={`Se repite el cálculo del método con otros pesos de criterio (mismos datos), para ver si el ganador se sostiene. Cuando un peso se mueve, los demás se reescalan proporcionalmente para seguir sumando 1. Variación de los escenarios: ±${pctTxt} del peso de cada criterio.`}>
       <div className="sens-case">
         <p className="sens-case-h">Qué dice tu caso</p>

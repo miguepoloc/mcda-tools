@@ -50,6 +50,8 @@ export default function PrioBreakdown({ prio, mode, criteriaCount }: {
 
   return (
     <CalcSection
+      id="desglose-seleccion"
+      summary={`${f.total} → ${f.afterTamiz} → ${f.toPanel} → ${f.finalists} finalistas (corte ${cutTxt})`}
       title="Selección de criterios (Sesión 1): de la lluvia de ideas a los finalistas"
       intro="Seis pasos, con tus datos, para poder explicar por escrito por qué estos criterios y no otros. Cada paso dice qué significa, muestra la tabla o la cuenta y cierra con «Qué dice tu caso»."
       mode={mode}

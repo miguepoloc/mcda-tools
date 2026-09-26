@@ -70,6 +70,10 @@ export default function VikorBreakdown({ mode, criteria, alternatives, decisionM
     <CalcSection
       mode={mode}
       accent={ACCENT}
+      id="desglose-metodo"
+      summary={verdict && verdict.kind !== 'unique'
+        ? `Sin ganador único: conjunto de compromiso ${setNames.join(', ')} · v = ${num(v, 2)}`
+        : `Gana ${names[win]} · Q = ${num(res.q[win], 4)} (menor es mejor) · v = ${num(v, 2)}`}
       title="Cómo se calculó VIKOR, paso a paso"
       intro={<>VIKOR (Opricovic &amp; Tzeng, 2004) busca una solución de <b>compromiso</b>: mide qué tan bien le va a cada alternativa <b>en promedio</b> (S) y qué tan mal le va en su <b>peor criterio</b> (R), y las combina en Q con el parámetro v = {f2(v)}. <b>Menor Q es mejor</b> (al revés que TOPSIS). Los pesos {weightsSource ? <>vienen de {weightsSource}</> : 'son datos de entrada'}. {n} alternativas × {m} criterios.</>}
     >

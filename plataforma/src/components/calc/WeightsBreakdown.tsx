@@ -59,7 +59,8 @@ function Critic({ title, intro, foot, criteria, alternatives, dm, mode }: P) {
   const why = (j: number) => `σ = ${num(S.sigma[j], 3)} (${S.sigma[j] >= avgSigma ? 'por encima' : 'por debajo'} del promedio ${num(avgSigma, 3)}) y Σ(1 − ρ) = ${num(S.conflict[j], 3)} (${S.conflict[j] >= avgConf ? 'por encima' : 'por debajo'} del promedio ${num(avgConf, 3)})`;
 
   return (
-    <CalcSection title={title} intro={intro} mode={mode} accent={ACCENT}>
+    <CalcSection title={title} intro={intro} mode={mode} accent={ACCENT} id="desglose-pesos"
+      summary={`Criterio con más peso: ${cn[top.j]} (${(top.w * 100).toFixed(1)} %) · el de menos: ${cn[bottom.j]} (${(bottom.w * 100).toFixed(1)} %)`}>
       <CalcStep no={1} title="Matriz de decisión de partida" mode={mode} defaultOpen
         meaning="Los valores tal cual están en la «Matriz de decisión». CRITIC solo mira cómo varían y se relacionan las columnas, no quién es «bueno» o «malo»: por eso el tipo (beneficio/costo) solo importa para orientar la normalización."
         formula="x_ij = valor de la alternativa i en el criterio j">
@@ -141,7 +142,8 @@ function Entropy({ title, intro, foot, criteria, alternatives, dm, mode }: P) {
   const negative = S.raw.some((r) => r.some((x) => x < 0));
 
   return (
-    <CalcSection title={title} intro={intro} mode={mode} accent={ACCENT}>
+    <CalcSection title={title} intro={intro} mode={mode} accent={ACCENT} id="desglose-pesos"
+      summary={`Criterio con más peso: ${cn[top.j]} (${(top.w * 100).toFixed(1)} %) · el de menos: ${cn[bottom.j]} (${(bottom.w * 100).toFixed(1)} %)`}>
       <CalcStep no={1} title="Matriz de decisión de partida" mode={mode} defaultOpen
         meaning="Los valores tal cual están en la «Matriz de decisión». La entropía necesita valores positivos: reparte cada columna como si fuera un 100 % entre las alternativas."
         formula="x_ij = valor de la alternativa i en el criterio j">

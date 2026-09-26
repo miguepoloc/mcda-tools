@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /** Piezas comunes del «desglose de cálculo» (paso a paso, como en las diapositivas del curso). Se usan igual en Resultados
  * (`mode="screen"`: cada paso es un <details> que se abre a demanda) y en el Informe ejecutivo (`mode="report"`: todo abierto, porque
@@ -13,20 +15,71 @@ export function num(x: number | null | undefined, d = 4): string {
   return x.toFixed(d);
 }
 
-/** Contenedor de un método: título, una línea de contexto y la lista de pasos. `accent` = color de familia (p. ej. 'var(--m-topsis)'). */
-export function CalcSection({ title, intro, accent = 'var(--pa)', mode, children }: { title: string; intro?: ReactNode; accent?: string; mode: CalcMode; children: ReactNode }) {
+/** Contenedor de un bloque de desglose (un método, la derivación de los pesos, la selección de criterios, la sensibilidad).
+ * - `mode="screen"`: una tarjeta CERRADA por defecto, con título, nº de pasos y `summary` (el resultado clave en una línea), para que la
+ *   página quede corta; los pasos de dentro también empiezan cerrados y hay «Expandir / Contraer todos». `id` es el ancla del índice fijo
+ *   (CalcIndex): si la URL trae `#id` el bloque se abre solo.
+ * - `mode="report"`: siempre abierto y sin ancla (un <details> cerrado no se imprime; y el mismo id no debe repetirse con la página de fondo). */
+export function CalcSection({ title, intro, accent = 'var(--pa)', mode, id, summary, children }: {
+  title: string; intro?: ReactNode; accent?: string; mode: CalcMode; id?: string; summary?: ReactNode; children: ReactNode;
+}) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  const [steps, setSteps] = useState(0);
+  const anchor = mode === 'screen' ? id : undefined;
+
+  useEffect(() => {
+    if (mode !== 'screen' || !ref.current) return;
+    setSteps(ref.current.querySelectorAll('details.calc-step').length);
+  }, [mode, children]);
+
+  useEffect(() => {
+    if (!anchor) return;
+    const openIfHash = () => {
+      if (window.location.hash === '#' + anchor && ref.current) { ref.current.open = true; ref.current.scrollIntoView(); }
+    };
+    openIfHash();
+    window.addEventListener('hashchange', openIfHash);
+    return () => window.removeEventListener('hashchange', openIfHash);
+  }, [anchor]);
+
+  const setAll = (open: boolean) => ref.current?.querySelectorAll<HTMLDetailsElement>('details.calc-step').forEach((d) => { d.open = open; });
+  const style = { ['--calc-accent' as string]: accent };
+
+  if (mode === 'report') {
+    return (
+      <section className="calc-sec calc-report" style={style}>
+        <h3 className="calc-sec-title">{title}</h3>
+        {intro && <p className="calc-intro">{intro}</p>}
+        <div className="calc-steps">{children}</div>
+      </section>
+    );
+  }
   return (
-    <section className={'calc-sec' + (mode === 'report' ? ' calc-report' : '')} style={{ ['--calc-accent' as string]: accent }}>
-      <h3 className="calc-sec-title">{title}</h3>
-      {intro && <p className="calc-intro">{intro}</p>}
-      <div className="calc-steps">{children}</div>
-    </section>
+    <details className="calc-sec calc-sec-fold" id={anchor} ref={ref} style={style}>
+      <summary className="calc-sec-sum">
+        <span className="calc-chev" aria-hidden="true">▸</span>
+        <h3 className="calc-sec-title">{title}</h3>
+        {steps > 1 && <span className="calc-sec-meta">{steps} pasos</span>}
+        {summary && <span className="calc-sec-result">{summary}</span>}
+      </summary>
+      <div className="calc-sec-body">
+        {intro && <p className="calc-intro">{intro}</p>}
+        {steps > 1 && (
+          <div className="calc-bulk">
+            <button type="button" className="btn sm" onClick={() => setAll(true)}>Expandir todos los pasos</button>
+            <button type="button" className="btn sm" onClick={() => setAll(false)}>Contraer todos</button>
+          </div>
+        )}
+        <div className="calc-steps">{children}</div>
+      </div>
+    </details>
   );
 }
 
 /** Un paso numerado. `formula` y `meaning` son opcionales: fórmula general, y «qué significa» en lenguaje llano. Los hijos llevan
- * las tablas/gráficas con los números del proyecto. En `report` siempre abierto; en `screen` abierto solo si `defaultOpen`. */
-export function CalcStep({ no, title, mode, formula, meaning, defaultOpen = false, children }: {
+ * las tablas/gráficas con los números del proyecto. En `report` siempre abierto; en `screen` siempre CERRADO al cargar (el bloque
+ * entero ya empieza cerrado y hay «Expandir todos»): `defaultOpen` se conserva por compatibilidad y ya no abre nada. */
+export function CalcStep({ no, title, mode, formula, meaning, children }: {
   no: number | string; title: string; mode: CalcMode; formula?: ReactNode; meaning?: ReactNode; defaultOpen?: boolean; children?: ReactNode;
 }) {
   const body = (
@@ -45,7 +98,7 @@ export function CalcStep({ no, title, mode, formula, meaning, defaultOpen = fals
     );
   }
   return (
-    <details className="calc-step" open={defaultOpen}>
+    <details className="calc-step">
       <summary className="calc-step-h"><span className="calc-no">{no}</span>{title}</summary>
       {body}
     </details>

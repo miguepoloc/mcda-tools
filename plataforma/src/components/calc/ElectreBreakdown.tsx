@@ -209,6 +209,8 @@ export default function ElectreBreakdown({ mode, criteria, alternatives, dm, wei
 
   return (
     <CalcSection
+      id="desglose-metodo"
+      summary={`${relations} ${relations === 1 ? 'relación' : 'relaciones'} de superación de ${totalPairs} pares · ${kernelOf(result).winner != null ? `única alternativa del núcleo: ${names[kernelOf(result).winner as number]}` : 'sin ganador único'} · c* = ${cStar.toFixed(2)}, d* = ${dStar.toFixed(2)}`}
       title="Cálculo de ELECTRE I, paso a paso"
       accent="var(--m-electre)" mode={mode}
       intro="ELECTRE compara las alternativas de a pares y decide si una «supera» a otra. No compensa: un criterio muy malo puede bloquear la superación sin importar lo bien que le vaya en los demás, y a veces ninguna supera a la otra. Todo lo de abajo sale de tu matriz de decisión y de los pesos de tus criterios."

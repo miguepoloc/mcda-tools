@@ -167,6 +167,8 @@ export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, w
 
   return (
     <CalcSection
+      id="desglose-metodo"
+      summary={order.filter((i) => rank[i] === 1).length === 1 ? `Gana ${names[order[0]]} · flujo neto φ = ${(res.phi[order[0]] >= 0 ? '+' : '') + res.phi[order[0]].toFixed(4)} · pasos: preferencias → matriz π → φ⁺, φ⁻, φ` : 'Empate en el 1.er lugar: los datos no distinguen entre las alternativas'}
       title="Cálculo de PROMETHEE, paso a paso"
       accent="var(--m-promethee)" mode={mode}
       intro="PROMETHEE no solo dice si A supera a B: mide QUÉ TANTO se prefiere A sobre B, con un número entre 0 y 1 por criterio. A diferencia de ELECTRE sí es compensatorio: un criterio muy favorable puede compensar uno desfavorable. Todo lo de abajo sale de tu matriz de decisión y de los pesos de tus criterios."
