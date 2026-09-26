@@ -11,8 +11,22 @@ import WeightBars from './WeightBars';
 import VikorSensitivityChart from './VikorSensitivityChart';
 import VikorSRQChart from './VikorSRQChart';
 import { METHOD_SPECS, WEIGHTING_SPECS, type MethodKey } from './ScientificMethodModal';
-import { getCell, getKind, getTarget } from '@/lib/topsis';
-import { LINGUISTIC_ALT } from '@/lib/fuzzy_topsis';
+import { getCell, getKind, getTarget, resolveTargets } from '@/lib/topsis';
+import { LINGUISTIC_ALT, defuzzifyMatrix } from '@/lib/fuzzy_topsis';
+import type { PrioState } from '@/lib/prio';
+import type { AhpBreakdownData } from '@/lib/ahpBreakdown';
+import type { ElectreCompareInfo } from '@/lib/rankCompare';
+import AhpBreakdown from './calc/AhpBreakdown';
+import AhpVsEqualWeights from './calc/AhpVsEqualWeights';
+import HierarchyTree from './calc/HierarchyTree';
+import TopsisBreakdown from './calc/TopsisBreakdown';
+import VikorBreakdown from './calc/VikorBreakdown';
+import ElectreBreakdown from './calc/ElectreBreakdown';
+import PrometheeBreakdown from './calc/PrometheeBreakdown';
+import PrioBreakdown from './calc/PrioBreakdown';
+import WeightsBreakdown from './calc/WeightsBreakdown';
+import SensitivityReport from './calc/SensitivityReport';
+import MethodComparisonReport, { type CompareMethod } from './calc/MethodComparisonReport';
 import { METHOD_EXTRA_REFS, REFS, WEIGHTING_REFS, apa, isObjectiveWeighting } from '@/lib/references';
 import type { WeightMethod } from '@/lib/ahp';
 
@@ -26,6 +40,8 @@ const REPORT_VARS = {
   '--s1': '#2563EB', '--s2': '#EA580C', '--s3': '#059669', '--s4': '#A16207', '--s5': '#DB2777',
   '--m-topsis': '#0891B2', '--m-vikor': '#059669', '--m-electre': '#B45309', '--m-promethee': '#E11D48', '--m-saw': '#EA580C',
   '--m-fuzzy': '#0F766E', '--m-ahp': '#7C3AED',
+  // los componentes de desglose (components/calc) usan también estas: sin ellas heredarían los tonos claros del tema oscuro sobre papel blanco
+  '--pa': '#4F46E5', '--warn-t': '#B45309', '--pass-t': '#047857',
 } as CSSProperties;
 
 /** El informe recibe los datos de ELECTRE sueltos; la tabla por pares espera el mismo objeto que devuelve electre(). */
@@ -143,6 +159,12 @@ interface ExecutiveReportModalProps {
   charts?: MethodChartData;
   /** Solo ELECTRE: relación de superación. ELECTRE no da ranking total, así que en vez de `rankingRows` el informe usa esto. */
   electre?: { names: string[]; outranks: boolean[][]; concordance: number[][]; discordance: number[][]; cStar: number; dStar: number };
+  /** Parte A (priorización de criterios), si el proyecto la tiene: de dónde salen los criterios. */
+  prio?: PrioState;
+  /** Matrices y pasos de AHP (agregada, por experto, normalizada, λmax, CI, RI, CR, síntesis). Solo AHP o pesos por AHP. */
+  ahpBreakdown?: AhpBreakdownData;
+  /** Rankings de los métodos calculados sobre las mismas alternativas, para contrastarlos (Spearman/Kendall, incomparables de ELECTRE). */
+  comparison?: { methods: CompareMethod[]; electre?: ElectreCompareInfo; weightsNote?: string };
   onClose: () => void;
 }
 
@@ -163,6 +185,9 @@ export default function ExecutiveReportModal({
   vikorChart,
   charts,
   electre,
+  prio,
+  ahpBreakdown,
+  comparison,
   onClose,
 }: ExecutiveReportModalProps) {
   // El fallback solo protege de un `method` inesperado en la base; con los 7 valores del tipo Method siempre existe su ficha.
@@ -183,8 +208,20 @@ export default function ExecutiveReportModal({
   const weightsFromJudgments = wm === 'ahp';
   const wRef = WEIGHTING_REFS[wm];
   // Secciones que existen para este método, en orden: la numeración se deriva de aquí para que siga siendo consecutiva.
-  const sections = ['weights', ...(isAhp ? ['consistency', 'local'] : ['matrix']), electre ? 'outranking' : 'ranking', 'method', 'limits', 'refs'];
+  const hasPrio = !!prio && prio.cands.length > 0;
+  // Comparación entre métodos: solo si hay al menos dos rankings con datos (o la relación de ELECTRE) que contrastar.
+  const showComparison = !!comparison && (comparison.methods.filter((m) => m.ranks).length >= 2 || !!comparison.electre);
+  const sections = [
+    ...(hasPrio ? ['selection'] : []), 'hierarchy', 'weights', ...(isAhp ? ['consistency', 'local'] : ['matrix']), electre ? 'outranking' : 'ranking',
+    'sensitivity', ...(showComparison ? ['comparison'] : []), 'calc', 'method', 'limits', 'refs',
+  ];
   const secNo = (k: string) => sections.indexOf(k) + 1;
+  // Matriz numérica con la que se calcularon todos los métodos: criterios «objetivo» ya convertidos en distancia (resolveTargets es idempotente)
+  // y, en Fuzzy TOPSIS, las etiquetas desdifusificadas (solo CRITIC/Entropía las necesitan como números).
+  const dmEff = resolveTargets(criteria, alternatives, decisionMatrix);
+  const dmNum = isFuzzy ? defuzzifyMatrix(dmEff, criteria, alternatives) : dmEff;
+  const weightsSource = wm === 'ahp' ? 'la hoja Criterios (AHP)' : WEIGHTING_REFS[wm].label;
+  const rankedAlts = rankingRows.length ? rankingRows.map((r) => ({ name: r.name, score: r.score, rank: r.rank })) : alternatives.map((a) => ({ name: a.name }));
 
   /** Regla de lectura del criterio. Fuzzy TOPSIS no tiene tipo «objetivo» (la matriz lingüística no lo admite) y trata cualquier
    * tipo que no sea max como costo, igual que `getType` en la biblioteca. */
@@ -473,7 +510,7 @@ export default function ExecutiveReportModal({
           )}
           {vikorV != null && (
             <p style={{ fontSize: 12.5, color: '#475569', margin: 0 }}>
-              <b>Parámetro v de VIKOR = {vikorV.toFixed(2)}.</b> No se deriva de los datos: lo fija quien decide (0.5 = «consenso», convención). El ranking puede cambiar con otros valores de v; ver la sensibilidad en la plataforma.
+              <b>Parámetro v de VIKOR = {vikorV.toFixed(2)}.</b> No se deriva de los datos: lo fija quien decide (0.5 = «consenso», convención). El ranking puede cambiar con otros valores de v; ver la sección de sensibilidad de este informe.
             </p>
           )}
 
@@ -482,6 +519,25 @@ export default function ExecutiveReportModal({
               <b>Umbrales de ELECTRE: c* = {electre.cStar.toFixed(2)} (concordancia mínima), d* = {electre.dStar.toFixed(2)} (discordancia máxima).</b> No se derivan de los datos: los fija quien decide, y con otros valores cambian las relaciones y los pares incomparables (convención del curso: c* = 0.65, d* = 0.30).
             </p>
           )}
+
+          {/* De dónde salen los criterios (Sesión 1): lluvia de ideas → tamizaje → independencia → panel y corte */}
+          {hasPrio && prio && (
+            <Sec no={secNo('selection')} title="Selección de Criterios">
+              <PrioBreakdown prio={prio} mode="report" criteriaCount={criteria.length} />
+            </Sec>
+          )}
+
+          {/* Estructura de la decisión: objetivo → criterios (con su peso) → alternativas (con su puntaje si el método lo da) */}
+          <Sec no={secNo('hierarchy')} title="Estructura de la Decisión">
+            <div className="rpt-fig" style={{ breakInside: 'avoid' }}>
+              <HierarchyTree
+                goal={projectObjective || projectTitle}
+                criteria={criteria.map((c, i) => ({ name: c.name, weight: weights[i] }))}
+                alternatives={rankedAlts}
+                scoreLabel={score.short}
+              />
+            </div>
+          </Sec>
 
           {/* Ponderación de criterios */}
           <Sec no={secNo('weights')} title={`Ponderación de Criterios (${criteria.length})`}>
@@ -697,7 +753,7 @@ export default function ExecutiveReportModal({
                   onlyOutranking={electre.names.length > 6}
                 />
                 {electre.names.length > 6 && (
-                  <p className="rpt-note" style={NOTE_P}>Con {electre.names.length} alternativas la lista completa tiene {electre.names.length * (electre.names.length - 1)} pares; aquí solo se muestran los pares donde la primera supera a la segunda. La plataforma muestra la lista completa.</p>
+                  <p className="rpt-note" style={NOTE_P}>Con {electre.names.length} alternativas la lista completa tiene {electre.names.length * (electre.names.length - 1)} pares; aquí solo se muestran los pares donde la primera supera a la segunda. Las matrices completas de concordancia y discordancia (todos los pares) van en el apéndice de cálculo.</p>
                 )}
               </div>
               {el.incomparable.length > 0 && (
@@ -796,6 +852,43 @@ export default function ExecutiveReportModal({
             </Sec>
           )}
 
+          {/* Sensibilidad: tablas fijas (el informe se imprime, no hay controles) de qué tan estable es el resultado ante otros pesos y parámetros */}
+          <Sec no={secNo('sensitivity')} title="Análisis de Sensibilidad">
+            <SensitivityReport
+              mode="report" method={method} criteria={criteria} alternatives={alternatives} dm={decisionMatrix} weights={weights}
+              ahpRows={isAhp ? rankingRows.map((r, i) => ({ name: r.name, loc: ahp?.local[i] })) : undefined}
+            />
+          </Sec>
+
+          {showComparison && comparison && (
+            <Sec no={secNo('comparison')} title="Comparación con Otros Métodos">
+              <MethodComparisonReport mode="report" alternatives={alternatives.map((a) => a.name)} {...comparison} />
+            </Sec>
+          )}
+
+          {/* Apéndice de cálculo: cada matriz y cada paso con los números del proyecto, para justificar el resultado sin asumir nada */}
+          <Sec no={secNo('calc')} title="Apéndice de Cálculo (paso a paso)">
+            <div style={{ display: 'grid', gap: 14 }}>
+              {!isAhp && (wm === 'critic' || wm === 'entropy') && (
+                <WeightsBreakdown method={wm} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="report" />
+              )}
+              {ahpBreakdown && <AhpBreakdown mode="report" data={ahpBreakdown} showProcess />}
+              {isAhp && ahpBreakdown?.synthesis && (
+                <AhpVsEqualWeights
+                  mode="report" criteria={criteria.map((c) => c.name)} weights={ahpBreakdown.synthesis.synth.wr} alternatives={alternatives.map((a) => a.name)}
+                  local={ahpBreakdown.synthesis.synth.rows.map((r) => r.loc)} scores={ahpBreakdown.synthesis.synth.rows.map((r) => r.g)}
+                />
+              )}
+              {method === 'topsis' && <TopsisBreakdown mode="report" criteria={criteria} alternatives={alternatives} decisionMatrix={decisionMatrix} weights={weights} weightsSource={weightsSource} />}
+              {method === 'vikor' && <VikorBreakdown mode="report" criteria={criteria} alternatives={alternatives} decisionMatrix={decisionMatrix} weights={weights} v={vikorV ?? 0.5} weightsSource={weightsSource} showChart />}
+              {method === 'promethee' && <PrometheeBreakdown mode="report" criteria={criteria} alternatives={alternatives} dm={dmEff} weights={weights} />}
+              {method === 'electre' && electre && <ElectreBreakdown mode="report" criteria={criteria} alternatives={alternatives} dm={dmEff} weights={weights} cStar={electre.cStar} dStar={electre.dStar} />}
+              {(method === 'saw' || method === 'fuzzy_topsis') && (
+                <p className="rpt-note" style={NOTE_P}>El desglose paso a paso de {methodLabel} está descrito en la sección de justificación metodológica (fórmulas); la plataforma aún no genera sus matrices intermedias.</p>
+              )}
+            </div>
+          </Sec>
+
           {/* Justificación metodológica y procedimiento (fórmulas), para quien revisa el informe sin abrir la plataforma */}
           <Sec no={secNo('method')} title="Justificación Metodológica y Procedimiento">
             <p style={{ fontSize: 12.5, color: '#334155', margin: '0 0 6px' }}>
@@ -831,7 +924,7 @@ export default function ExecutiveReportModal({
               <li>La plataforma no verifica el origen de los datos {weightsFromJudgments ? 'ni la idoneidad de los expertos' : ''}: la calidad del dictamen es la de su información de entrada.</li>
               {methodDoc.limits.map((l, i) => <li key={'m' + i}>{l}</li>)}
               {!isAhp && <li><b>Ponderación ({wRef.label}):</b> {wRef.caveat}</li>}
-              <li>Este documento no incluye un análisis de sensibilidad a los pesos ni a los parámetros; la plataforma tiene un simulador para explorarlo antes de decidir.</li>
+              <li>El análisis de sensibilidad de este documento mueve los pesos {method === 'vikor' ? 'y el parámetro v' : method === 'electre' ? 'y los umbrales c* y d*' : ''} de los criterios; no prueba cambios en los datos de la matriz ni en los juicios individuales de cada experto. La plataforma tiene un simulador interactivo para explorar otros escenarios.</li>
             </ul>
           </Sec>
 

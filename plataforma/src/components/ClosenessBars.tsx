@@ -4,25 +4,33 @@
  * (--m-topsis, --ink, --muted, --line) que el informe redefine en claro. */
 type Row = { name: string; value: number; rank: number };
 
-const W = 640, L = 170, R = 96, T = 22, ROW = 34, BAR = 18;
+const W = 640, L = 170, R = 96, T = 26, ROW = 34, BAR = 18;
 const clip = (s: string, n = 24) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 export default function ClosenessBars({ rows }: { rows: Row[] }) {
   if (rows.length === 0) return null;
   // orden estable por posición; con empates conserva el orden original
   const sorted = [...rows].sort((a, b) => a.rank - b.rank);
-  const H = T + sorted.length * ROW + 26;
+  const H = T + sorted.length * ROW + 58;
   const x = (c: number) => L + Math.max(0, Math.min(1, c)) * (W - L - R);
   const summary = `Cercanía relativa C de TOPSIS por alternativa, de mayor a menor. ${sorted.map((r) => `${r.rank}º ${r.name}: ${r.value.toFixed(4)}`).join('; ')}.`;
+  const first = sorted[0], second = sorted[1];
+  const reading = second
+    ? `${first.name} queda 1.ª con C = ${first.value.toFixed(4)}; le saca ${(first.value - second.value).toFixed(4)} a ${second.name}${first.value - second.value < 0.02 ? ' (carrera muy cerrada)' : ''}. Una barra que llega a 1 sería una alternativa idéntica al ideal; una de 0, idéntica al anti-ideal.`
+    : '';
   return (
+    <>
+    <div className="calc-chart" style={{ ['--cw' as string]: W + 'px' }}>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} style={{ width: '100%', maxWidth: 720, display: 'block', margin: '0 auto' }}>
       {[0, 0.25, 0.5, 0.75, 1].map((t) => (
         <g key={t}>
-          <line x1={x(t)} x2={x(t)} y1={T - 6} y2={H - 26} stroke="var(--line)" strokeDasharray="3 4" />
-          <text x={x(t)} y={H - 10} textAnchor="middle" fontSize="11" fill="var(--muted)">{t.toFixed(2)}</text>
+          <line x1={x(t)} x2={x(t)} y1={T - 6} y2={H - 58} stroke="var(--line)" strokeDasharray="3 4" />
+          <text x={x(t)} y={H - 42} textAnchor="middle" fontSize="12" fill="var(--muted)">{t.toFixed(2)}</text>
         </g>
       ))}
-      <text x={L - 8} y={T - 8} textAnchor="end" fontSize="11" fill="var(--muted)">Posición · alternativa</text>
+      <text x={L - 8} y={T - 8} textAnchor="end" fontSize="12" fill="var(--muted)">Posición · alternativa</text>
+      <text x={L + (W - L - R) / 2} y={H - 22} textAnchor="middle" fontSize="12.5" fill="var(--ink)">Cercanía relativa C (0 = en el anti-ideal, 1 = en el ideal)</text>
+      <text x={L + (W - L - R) / 2} y={H - 6} textAnchor="middle" fontSize="12" fill="var(--muted)">barra más larga = mejor · ✓ = 1.ª</text>
       {sorted.map((r, k) => {
         const yy = T + k * ROW;
         const first = r.rank === 1;
@@ -42,5 +50,8 @@ export default function ClosenessBars({ rows }: { rows: Row[] }) {
         );
       })}
     </svg>
+    </div>
+    {reading && <p className="s3-note"><b>Cómo leerlo:</b> {reading}</p>}
+    </>
   );
 }

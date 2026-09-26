@@ -68,6 +68,20 @@ alternatives.forEach((a, i) => {
   ok(!!netCell && netCell.v === expected.netOutdegree[i], `ELECTRE superación neta(${a.name}) = ${netCell?.v} (esperado ${expected.netOutdegree[i]})`);
 });
 
+// Bloque «Núcleo»: filas tras la lista de relaciones e incomparables (ver electreSheet()).
+{
+  const rRelSum = rRel0 + n, rInc = rRelSum + 2 + expected.relations.length;
+  const rKer0 = rInc + 1 + Math.max(1, expected.incomparable.length) + 2;
+  ok(ws['A' + (rKer0 - 2)]?.v === 'Núcleo de la relación de superación', `bloque «Núcleo» en la fila ${rKer0 - 2}`);
+  alternatives.forEach((a, i) => {
+    const out = expected.result.outranks[i].filter(Boolean).length, inn = expected.result.outranks.filter((row) => row[i]).length;
+    ok(ws['B' + (rKer0 + i)]?.v === out && ws['B' + (rKer0 + i)]?.f?.includes('COUNTIF'), `núcleo: «${a.name}» supera a ${ws['B' + (rKer0 + i)]?.v} (esperado ${out}, fórmula viva)`);
+    ok(ws['C' + (rKer0 + i)]?.v === inn && ws['C' + (rKer0 + i)]?.f?.includes('COUNTIF'), `núcleo: «${a.name}» es superada por ${ws['C' + (rKer0 + i)]?.v} (esperado ${inn}, fórmula viva)`);
+    ok(ws['E' + (rKer0 + i)]?.v === (expected.kernel.members.includes(i) ? 'Sí' : 'No'), `núcleo: «${a.name}» en el núcleo = ${ws['E' + (rKer0 + i)]?.v} (esperado ${expected.kernel.members.includes(i) ? 'Sí' : 'No'})`);
+  });
+  ok(typeof ws['A' + (rKer0 + n)]?.v === 'string' && /núcleo|ganador/i.test(ws['A' + (rKer0 + n)].v), 'el bloque trae la frase de resumen del núcleo');
+}
+
 const wb2 = XLSX.read(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), { type: 'array' });
 let t = ''; for (let r = 1; wb2.Sheets['_datos']['A' + r]; r++) t += wb2.Sheets['_datos']['A' + r].v;
 const st = JSON.parse(t);

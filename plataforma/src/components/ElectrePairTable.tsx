@@ -1,4 +1,5 @@
 import { EPS, type ElectreResult } from '@/lib/electre';
+import { fmtVs } from './calc/calcFormat';
 
 const cell = { padding: '7px 10px', borderBottom: '1px solid var(--line)' } as const;
 const head = { padding: '7px 10px', textAlign: 'left', borderBottom: '2px solid var(--line)', fontWeight: 700 } as const;
@@ -37,9 +38,9 @@ export default function ElectrePairTable({ names, result, onlyOutranking = false
         {pairs.map(({ i, k, cOk, dOk, win }) => (
           <tr key={`${i}-${k}`} style={{ background: win ? 'color-mix(in srgb, var(--pass) 18%, var(--surface))' : undefined, fontWeight: win ? 700 : 400 }}>
             <td style={cell}>{names[i]} → {names[k]}</td>
-            <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{concordance[i][k].toFixed(2)}</td>
+            <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{fmtVs(concordance[i][k], cStar, 'c')}</td>
             <td style={{ ...cell, textAlign: 'center' }}>{yn(cOk)}</td>
-            <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{discordance[i][k].toFixed(2)}</td>
+            <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{fmtVs(discordance[i][k], dStar, 'd')}</td>
             <td style={{ ...cell, textAlign: 'center' }}>{yn(dOk)}</td>
             <td style={{ ...cell, textAlign: 'center' }}>{yn(win)}</td>
           </tr>

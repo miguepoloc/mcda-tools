@@ -646,7 +646,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             mode="single"
             criteria={project.criteria}
             alternatives={project.alternatives}
-            experts={experts.map((e) => ({ id: e.id, label: expertLabel(e) }))}
+            experts={experts.map((e) => ({ id: e.id, label: expertLabel(e), role: e.role_desc || undefined }))}
             judgments={judgments}
             method={project.method}
             weightingMethod={project.weighting_method ?? 'ahp'}
@@ -657,6 +657,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             onChangeV={setVikorV}
             onChangeCStar={setElectreCStar}
             onChangeDStar={setElectreDStar}
+            prio={prio}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
           />
@@ -669,7 +670,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             mode="compare"
             criteria={project.criteria}
             alternatives={project.alternatives}
-            experts={experts.map((e) => ({ id: e.id, label: expertLabel(e) }))}
+            experts={experts.map((e) => ({ id: e.id, label: expertLabel(e), role: e.role_desc || undefined }))}
             judgments={judgments}
             method={project.method}
             weightingMethod={project.weighting_method ?? 'ahp'}

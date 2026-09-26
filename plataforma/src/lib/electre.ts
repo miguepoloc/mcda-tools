@@ -216,3 +216,111 @@ export function electreKernelText(names: string[], kernel: ElectreKernel, hasRel
   reasons.push('Núcleo = conjunto de alternativas que ninguna otra del núcleo supera y que, juntas, superan a todas las demás. Puede tener varios elementos: pertenecer al núcleo no es ganar.');
   return { summary, reasons };
 }
+
+// ---- Desglose para pantalla e informe (solo lectura: NO cambian ningún resultado de electre()) ----
+
+/** Matriz de decisión y tipos de criterio tal como los lee `electre()` (mismo patrón que vikorInputs). Pasar la matriz EFECTIVA (con los
+ * criterios «objetivo» ya convertidos a costo por resolveTargets). */
+export function electreInputs(criteria: Criterion[], alternatives: Alternative[], dm: DecisionMatrix): { matrix: number[][]; types: MatrixType[] } {
+  const matrix = alternatives.map((a) => criteria.map((c) => getCell(dm, a.id, c.id) ?? 0));
+  const types = criteria.map((c) => getType(dm, c.id));
+  return { matrix, types };
+}
+
+/** Un criterio dentro de la comparación de un par (a, b), con todo lo que las diapositivas escriben a mano. */
+export type ElectrePairCriterion = {
+  j: number;
+  /** Peso normalizado del criterio (el mismo que usa electre()). */
+  w: number;
+  /** Rango del criterio (máx − mín entre alternativas, o 1 si es 0). */
+  range: number;
+  xa: number;
+  xb: number;
+  /** a es al menos tan buena como b en este criterio (beneficio: xa ≥ xb; costo: xa ≤ xb): su peso cuenta en c(a,b). */
+  aAtLeast: boolean;
+  /** b es al menos tan buena como a (cuenta en c(b,a)). Con empate en el criterio las dos son true. */
+  bAtLeast: boolean;
+  /** b es estrictamente mejor que a: este criterio puede objetar «a supera a b» (entra a d(a,b)). */
+  bWins: boolean;
+  /** a es estrictamente mejor que b (entra a d(b,a)). */
+  aWins: boolean;
+  /** |xa − xb| en la unidad del criterio (0 si empatan). */
+  gap: number;
+  /** gap ÷ range. */
+  norm: number;
+};
+
+/** Comparación completa del par ordenado (a = i, b = k): criterio por criterio, más c(a,b), d(a,b) y el criterio donde ocurre el
+ * máximo de d (dCrit, -1 si b no gana en ninguno). c y d coinciden EXACTAMENTE con electre().concordance/discordance (mismas sumas). */
+export type ElectrePairDetail = {
+  a: number;
+  b: number;
+  rows: ElectrePairCriterion[];
+  /** c(a,b): suma de los pesos donde a es al menos tan buena como b. */
+  c: number;
+  /** c(b,a) (sentido contrario), para la comprobación c(a,b) + c(b,a) = 1 cuando no hay empates. */
+  cRev: number;
+  /** d(a,b): mayor ventaja normalizada de b sobre a. */
+  d: number;
+  /** d(b,a): mayor ventaja normalizada de a sobre b. */
+  dRev: number;
+  /** Índice del criterio donde se alcanza d(a,b); -1 si d = 0. */
+  dCrit: number;
+  /** Ídem para d(b,a). */
+  dCritRev: number;
+  /** TODOS los criterios que alcanzan el máximo de d(a,b) (hay empate cuando dos criterios dan la misma ventaja normalizada, p. ej. 1.00 y 1.00). */
+  dCrits: number[];
+  /** Ídem para d(b,a). */
+  dCritsRev: number[];
+  /** Hay al menos un criterio con empate exacto: en ese caso c(a,b) + c(b,a) > 1. */
+  hasTies: boolean;
+};
+
+export function electrePairDetail(matrix: number[][], types: MatrixType[], result: ElectreResult, a: number, b: number): ElectrePairDetail {
+  const m = result.weights.length;
+  const rows: ElectrePairCriterion[] = [];
+  let c = 0, cRev = 0, d = 0, dRev = 0, dCrit = -1, dCritRev = -1, hasTies = false;
+  for (let j = 0; j < m; j++) {
+    const xa = matrix[a][j], xb = matrix[b][j];
+    const min = types[j] === 'min';
+    const aAtLeast = min ? xa <= xb : xa >= xb;
+    const bAtLeast = min ? xb <= xa : xb >= xa;
+    const bWins = min ? xb < xa : xb > xa;
+    const aWins = min ? xa < xb : xa > xb;
+    const gap = Math.abs(xb - xa);
+    const norm = gap / result.ranges[j];
+    if (aAtLeast) c += result.weights[j];
+    if (bAtLeast) cRev += result.weights[j];
+    if (bWins && norm > d) { d = norm; dCrit = j; }
+    if (aWins && norm > dRev) { dRev = norm; dCritRev = j; }
+    if (xa === xb) hasTies = true;
+    rows.push({ j, w: result.weights[j], range: result.ranges[j], xa, xb, aAtLeast, bAtLeast, bWins, aWins, gap, norm });
+  }
+  const atMax = (flag: 'bWins' | 'aWins', max: number) => (max > 0 ? rows.filter((r) => r[flag] && Math.abs(r.norm - max) <= EPS).map((r) => r.j) : []);
+  return { a, b, rows, c, cRev, d, dRev, dCrit, dCritRev, dCrits: atMax('bWins', d), dCritsRev: atMax('aWins', dRev), hasTies };
+}
+
+/** Qué pasaría con otros umbrales: cuántas relaciones quedan y qué núcleo sale. El curso pide «prueba 2-3 combinaciones y reporta si el
+ * resultado es sensible a esa elección». Recalcula con electre() (mismos datos y pesos). */
+export type ElectreSensitivityRow = { cStar: number; dStar: number; relations: number; incomparable: number; kernelMembers: number[]; winner: number | null; current: boolean };
+
+export function electreSensitivity(matrix: number[][], weights: number[], types: MatrixType[], current: { cStar: number; dStar: number }, combos: [number, number][] = [[0.5, 0.5], [0.65, 0.7], [0.65, 0.3], [0.75, 0.25]]): ElectreSensitivityRow[] {
+  const seen = new Set<string>();
+  const all: [number, number][] = [[current.cStar, current.dStar], ...combos];
+  const out: ElectreSensitivityRow[] = [];
+  for (const [cS, dS] of all) {
+    const key = cS.toFixed(4) + '/' + dS.toFixed(4);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const r = electre(matrix, weights, types, cS, dS);
+    const n = r.n;
+    let relations = 0, incomparable = 0;
+    for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+      if (i !== k && r.outranks[i][k]) relations++;
+      if (i < k && !r.outranks[i][k] && !r.outranks[k][i]) incomparable++;
+    }
+    const kernel = electreKernel(r.outranks);
+    out.push({ cStar: cS, dStar: dS, relations, incomparable, kernelMembers: kernel.members, winner: kernel.winner, current: out.length === 0 });
+  }
+  return out;
+}

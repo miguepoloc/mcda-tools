@@ -78,7 +78,7 @@ export default function ElectreGraph({ names, outranks, concordance, discordance
   const arrow = `url(#${uid}-a)`;
   const halo = { paintOrder: 'stroke' as const, stroke: 'var(--surface)', strokeWidth: 5, strokeLinejoin: 'round' as const };
   const cd = (i: number, k: number) => `c=${concordance[i]?.[k]?.toFixed(2)} · d=${discordance[i]?.[k]?.toFixed(2)}`;
-  const labelSize = big ? 13 : 11.5;
+  const labelSize = big ? 13 : 12;
 
   return (
     <div>
@@ -125,7 +125,7 @@ export default function ElectreGraph({ names, outranks, concordance, discordance
           const k = kernel.winner === i;
           const kin = inKernel.has(i);
           const ls = lines(nm, big ? 13 : 10);
-          const fs = big ? 13.5 : 11.5;
+          const fs = big ? 13.5 : 12;
           return (
             <g key={i}>
               <title>{nm}</title>
@@ -153,6 +153,12 @@ export default function ElectreGraph({ names, outranks, concordance, discordance
           ? ' · ✓ = única alternativa del núcleo (nadie la supera y supera a las demás)'
           : ' · aro verde = núcleo (varios: no hay ganador único)' + (kernel.isolated.length ? ', punteado = aislada (no se relaciona con nadie)' : ''))}
       </p>
+      {/* Con más de 4 alternativas la etiqueta «incomparables» no cabe sobre cada línea punteada: se lista aquí, con nombre y apellido. */}
+      {n > 4 && edges.some((e) => e.kind === 'none') && (
+        <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 0', textAlign: 'center' }}>
+          <b>Incomparables (líneas punteadas, {edges.filter((e) => e.kind === 'none').length}):</b> {edges.filter((e) => e.kind === 'none').map((e) => `${names[e.i]} y ${names[e.k]}`).join('; ')}.
+        </p>
+      )}
     </div>
   );
 }

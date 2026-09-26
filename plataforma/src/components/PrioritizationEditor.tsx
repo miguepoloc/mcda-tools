@@ -6,6 +6,8 @@ import {
   alive, cols, f2, finalists, inIndep, mean, newCand, passes, ranked, scoreOf,
   type Cand, type PrioState,
 } from '@/lib/prio';
+import { funnel } from '@/lib/prioSteps';
+import PrioCutoffChart from './calc/PrioCutoffChart';
 
 type Props = {
   state: PrioState;
@@ -35,7 +37,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
   const cs = cols(A);
   const R = ranked(A), ok = finalists(A), no = R.filter((c) => !passes(A, c));
   const last = ok[ok.length - 1], firstNo = no.find((c) => mean(A, c) != null);
-  const pct = (v: number) => (v / 5) * 100;
+  const fn = funnel(A);
 
   return (
     <div className="partA panel">
@@ -72,7 +74,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
           <p className="muted">Elimina duplicados y candidatos irrelevantes. Un candidato se descarta o se funde con otro; documenta siempre por qué y con qué evidencia.</p>
           <div className="two-col">
             {A.cands.map((c) => {
-              const pass = c.stage === 'keep' || (c.stage === 'merge' && c.at === 'ind');
+              const pass = c.stage === 'keep' || c.at === 'ind';
               const others = A.cands.filter((o) => o.id !== c.id && o.stage === 'keep');
               return (
                 <div key={c.id} className={'card cand' + (pass ? '' : ' out')}>
@@ -102,7 +104,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
               );
             })}
           </div>
-          <div className="count">Pool restante tras tamizaje: {alive(A).length} de {A.cands.length} candidatos</div>
+          <div className="count">Pool restante tras tamizaje: {fn.afterTamiz} de {A.cands.length} candidatos</div>
         </>
       )}
 
@@ -141,6 +143,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
             })}
             {!inIndep(A).length && <div className="card muted">Ningún candidato pasó el tamizaje.</div>}
           </div>
+          <div className="count">{fn.toPanel} de {fn.afterTamiz} se mantienen como ejes independientes y pasan al panel de importancia.</div>
         </>
       )}
 
@@ -211,7 +214,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
         <>
           <p className="muted">Mueve el corte y observa qué criterios quedan. Busca una brecha real entre el último que pasa y el primero que no, y documenta por qué: es una convención del curso, no un estándar de la literatura.</p>
           <div className="card kpis">
-            <div className="flow"><b>{A.cands.length}</b><span>candidatos</span><span className="arrow">→</span><b>{alive(A).length}</b><span>tras tamizaje</span><span className="arrow">→</span><b>{ok.length}</b><span>finalistas</span></div>
+            <div className="flow" role="group" aria-label="Embudo de selección"><b>{fn.total}</b><span>candidatos</span><span className="arrow" aria-hidden="true">→</span><b>{fn.afterTamiz}</b><span>tras tamizaje</span><span className="arrow" aria-hidden="true">→</span><b>{fn.toPanel}</b><span>al panel (independientes)</span><span className="arrow" aria-hidden="true">→</span><b>{ok.length}</b><span>finalistas</span></div>
             <span className={'pill' + (ok.length === criteriaCount ? '' : ' warn')}>
               {ok.length === criteriaCount ? `${ok.length} criterios: coincide con tu AHP` : `Tu AHP tiene ${criteriaCount} criterios; aquí hay ${ok.length}`}
             </span>
@@ -224,25 +227,10 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
               {last && firstNo ? `Brecha: el último que pasa tiene ${f2(mean(A, last))} y el primero fuera tiene ${f2(mean(A, firstNo))} (diferencia ${((mean(A, last) ?? 0) - (mean(A, firstNo) ?? 0)).toFixed(2)}).` : last ? 'Todos los calificados pasan el corte.' : 'Ningún candidato pasa el corte.'}
             </div>
           </div>
-          <div className="card">
-            {R.filter((c) => mean(A, c) != null).map((c) => {
-              const m = mean(A, c) as number, p = passes(A, c);
-              return (
-                <div key={c.id} className={'cbar' + (p ? '' : ' out')}>
-                  <span className="nm">{c.name}</span>
-                  <div className="track">
-                    <div className="fill" style={{ width: `${pct(m)}%` }} />
-                    <span className={'val' + (pct(m) > 10 ? ' in' : '')} style={{ left: `${pct(m)}%` }}>{m.toFixed(2)}</span>
-                    <span className="tick" style={{ left: `${pct(A.cutoff)}%` }} title={`Corte ${A.cutoff.toFixed(1)}`} />
-                  </div>
-                </div>
-              );
-            })}
-            {!R.some((c) => mean(A, c) != null) && <span className="muted">Aún no hay calificaciones en el panel.</span>}
-            <div className="axis"><span /><div><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>
-          </div>
+          <div className="card"><PrioCutoffChart prio={A} /></div>
 
           <h3>Finalistas</h3>
+          <p className="muted" style={{ fontSize: 13.5 }}>Verificación final (diapositiva 18): ¿cada finalista es medible para todas las alternativas? Si no, reformúlalo o vuelve a tamizar.</p>
           <div className="finals">
             {ok.map((c, i) => (
               <div className="card final" key={c.id}>
@@ -250,6 +238,22 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
                 <div className="top"><h3>{c.name}</h3><span className="mono">{f2(mean(A, c))}</span></div>
                 <div><label className="lbl" htmlFor={`j-${c.id}`}>Por qué queda</label>
                   <textarea id={`j-${c.id}`} value={c.just} placeholder="Evidencia y razón de que sea crítico" onChange={(e) => setC(c.id, { just: e.target.value })} /></div>
+                <div className="meas">
+                  <label className="chk" htmlFor={`me-${c.id}`}>
+                    <input id={`me-${c.id}`} type="checkbox" checked={c.measurable === true} disabled={readOnly}
+                      onChange={(e) => setC(c.id, { measurable: e.target.checked ? true : null })} />
+                    <span>Medible para todas las alternativas</span>
+                  </label>
+                  <label className="chk" htmlFor={`mn-${c.id}`}>
+                    <input id={`mn-${c.id}`} type="checkbox" checked={c.measurable === false} disabled={readOnly}
+                      onChange={(e) => setC(c.id, { measurable: e.target.checked ? false : null })} />
+                    <span>No se puede medir para alguna</span>
+                  </label>
+                  {c.measurable != null && (
+                    <input type="text" value={c.measEvid ?? ''} placeholder="Evidencia: fuente o dato que existe para cada alternativa" aria-label={`Evidencia de medibilidad de ${c.name}`}
+                      disabled={readOnly} onChange={(e) => setC(c.id, { measEvid: e.target.value })} />
+                  )}
+                </div>
               </div>
             ))}
             {!ok.length && <div className="card muted">Baja el corte para que pase al menos un criterio.</div>}

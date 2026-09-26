@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import type { Alternative, Criterion, DecisionMatrix } from '@/lib/types';
 import VikorSensitivityChart from './VikorSensitivityChart';
 import VikorSRQChart from './VikorSRQChart';
-import { vikorFirstPlaceChanges, vikorInputs, vikorSensitivity, type VikorSynth } from '@/lib/vikor';
+import { vikorInputs, type VikorSynth } from '@/lib/vikor';
+import { sameV as same, vikorRegimeText, vikorSensView } from '@/lib/vikorBreakdown';
 
 /**
  * Todo lo específico de VIKOR que no es "una lista ordenada": el selector de v, las 2 condiciones de
@@ -22,8 +23,6 @@ const PRESETS: { v: number; label: string; hint: string }[] = [
   { v: 0.75, label: '0.75', hint: 'prima el promedio (S)' },
 ];
 
-const same = (a: number, b: number) => Math.abs(a - b) < 1e-6;
-
 type Props = {
   criteria: Criterion[];
   alternatives: Alternative[];
@@ -40,21 +39,15 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
   const names = alternatives.map((a) => a.name);
   const { matrix, types } = useMemo(() => vikorInputs(criteria, alternatives, dm), [criteria, alternatives, dm]);
 
-  const breaks = useMemo(() => (synth.tie ? [] : vikorFirstPlaceChanges(matrix, weights, types)), [synth.tie, matrix, weights, types]);
-  const vs = useMemo(() => {
-    const all = [0, 0.25, 0.5, 0.75, 1, v, ...breaks.map((b) => b.v)];
-    const sorted = [...all].sort((a, b) => a - b);
-    return sorted.filter((x, i) => i === 0 || !same(x, sorted[i - 1]));
-  }, [v, breaks]);
-  const rows = useMemo(() => vikorSensitivity(matrix, weights, types, vs), [matrix, weights, types, vs]);
-
-  // Curvas para la gráfica: Q es una recta en v, con 2 puntos alcanza (v = 0 y v = 1)
-  const ends = useMemo(() => vikorSensitivity(matrix, weights, types, [0, 1]), [matrix, weights, types]);
+  // Misma lógica que usa el desglose paso a paso (lib/vikorBreakdown): v de la tabla, cruces, extremos para la gráfica y tramos.
+  const sens = useMemo(() => vikorSensView(matrix, weights, types, v, synth.tie), [matrix, weights, types, v, synth.tie]);
+  const { breaks, rows, ends } = sens;
 
   const verdict = synth.verdict;
   const setNames = verdict ? verdict.set.map((i) => names[i]) : [];
   const firstChanges = breaks.map((b) => ({ ...b, fromName: names[b.from], toName: names[b.to] }));
   const winnerRobust = breaks.length === 0;
+  const regimeText = vikorRegimeText(sens, names);
 
   return (
     <>
@@ -125,6 +118,7 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
           <p className="muted" style={{ fontSize: 13, margin: '0 0 10px', maxWidth: '78ch' }}>
             Mira si la mejor por Q (✓) también es la de menor S o la de menor R (★): es la condición de estabilidad. Y si la 2.ª por Q queda a la derecha de la línea punteada: es la ventaja aceptable.
           </p>
+          <h4 className="s3-cap">S, R y Q por alternativa (barra más corta = mejor)</h4>
           <VikorSRQChart rows={synth.rows} v={v} dq={synth.rows.length > 1 ? 1 / (synth.rows.length - 1) : undefined} />
         </div>
       )}
@@ -140,6 +134,7 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
             {winnerRobust
               ? 'Mismos datos y pesos, solo cambia v de 0 a 1: el ganador no cambia, así que la elección de v no decide el resultado (aunque el 2º lugar sí puede cambiar).'
               : firstChanges.map((c) => `Con v = ${c.v.toFixed(2)} el 1er lugar pasa de ${c.fromName} a ${c.toName}.`).join(' ') + ' El ganador depende de haber elegido v: dilo en el informe y presenta las alternativas que se disputan el 1º.'}
+            {regimeText ? <> <b>{regimeText}</b></> : null}
           </p>
 
           <div className="tbl">
@@ -174,6 +169,7 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
           </div>
           <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>◀ v actual · ⇄ v donde cambia el 1er lugar · en verde, el Q más bajo (el 1º) de cada fila.</p>
 
+          <h4 className="s3-cap" style={{ marginTop: 14 }}>Q de cada alternativa al variar v de 0 a 1 (más abajo = mejor)</h4>
           <VikorSensitivityChart names={names} ends={ends} v={v} breaks={firstChanges.map((c) => c.v)} />
         </div>
       )}

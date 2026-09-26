@@ -10,7 +10,7 @@ import { niceScale } from '@/lib/niceScale';
  * redefine en claro. SVG propio sin librerías, igual que ClosenessBars. */
 type Row = { name: string; dPlus: number; dMinus: number; closeness: number; rank: number };
 
-const W = 720, L = 160, BX = 380, T = 26, ROW = 56, BAR = 12, GAP = 5;
+const W = 720, L = 160, BX = 380, T = 30, ROW = 56, BAR = 12, GAP = 5;
 const CX = W - 8; // columna de C, alineada a la derecha
 const clip = (s: string, n = 22) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
@@ -21,13 +21,22 @@ export default function IdealDistances({ rows, closenessLabel = 'C' }: { rows: R
   const rawMax = Math.max(...sorted.flatMap((r) => [r.dPlus, r.dMinus]), 0);
   const { top: scale, ticks } = niceScale(rawMax || 1);
   const axisY = T + sorted.length * ROW;
-  const H = axisY + 62;
+  const H = axisY + 96;
   const x = (d: number) => L + Math.max(0, Math.min(scale, d)) / scale * BX;
   const pat = `${uid}-h`;
   const summary = `Distancias a la solución ideal (d⁺, menor es mejor) y a la anti-ideal (d⁻, mayor es mejor) con la cercanía relativa ${closenessLabel} = d⁻/(d⁺+d⁻), por alternativa y de mejor a peor. `
     + sorted.map((r) => `${r.rank}º ${r.name}: d⁺ ${r.dPlus.toFixed(4)}, d⁻ ${r.dMinus.toFixed(4)}, ${closenessLabel} ${r.closeness.toFixed(4)}`).join('; ') + '.';
-  const ly = axisY + 34;
+  const ly = axisY + 54;
+  // Lectura autogenerada: quién es la más cercana al ideal, la más lejana del anti-ideal, y si son la misma.
+  const first = sorted[0];
+  const minDp = Math.min(...sorted.map((r) => r.dPlus)), maxDm = Math.max(...sorted.map((r) => r.dMinus));
+  const nearest = sorted.find((r) => r.dPlus === minDp) ?? first, farthest = sorted.find((r) => r.dMinus === maxDm) ?? first;
+  const reading = sorted.length < 2 ? '' : nearest === farthest && nearest === first
+    ? `${first.name} queda 1.ª porque combina la d⁺ más corta (${first.dPlus.toFixed(4)}) con la d⁻ más larga (${first.dMinus.toFixed(4)}): la más cercana al ideal y la más lejana del anti-ideal a la vez.`
+    : `${first.name} queda 1.ª (${closenessLabel} = ${first.closeness.toFixed(4)}) aunque no gana en las dos distancias: la más cercana al ideal es ${nearest.name} (d⁺ = ${minDp.toFixed(4)}) y la más lejana del anti-ideal es ${farthest.name} (d⁻ = ${maxDm.toFixed(4)}). ${closenessLabel} pondera las dos a la vez.`;
   return (
+    <>
+    <div className="calc-chart" style={{ ['--cw' as string]: W + 'px' }}>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} style={{ width: '100%', maxWidth: 720, display: 'block', margin: '0 auto' }}>
       <defs>
         {/* d⁻: rayas diagonales del color del método sobre el fondo, para distinguirla de d⁺ también en blanco y negro */}
@@ -39,17 +48,18 @@ export default function IdealDistances({ rows, closenessLabel = 'C' }: { rows: R
       {ticks.map((t, k) => (
         <g key={k}>
           <line x1={x(t)} x2={x(t)} y1={T - 6} y2={axisY} stroke="var(--line)" strokeDasharray="3 4" />
-          <text x={x(t)} y={axisY + 16} textAnchor="middle" fontSize="11" fill="var(--muted)">{t.toFixed(2)}</text>
+          <text x={x(t)} y={axisY + 16} textAnchor="middle" fontSize="12" fill="var(--muted)">{t.toFixed(2)}</text>
         </g>
       ))}
-      <text x={L - 8} y={T - 10} textAnchor="end" fontSize="11" fill="var(--muted)">Posición · alternativa</text>
-      <text x={CX} y={T - 10} textAnchor="end" fontSize="11" fill="var(--muted)">{closenessLabel} = d⁻/(d⁺+d⁻)</text>
+      <text x={L - 8} y={T - 10} textAnchor="end" fontSize="12" fill="var(--muted)">Posición · alternativa</text>
+      <text x={CX} y={T - 10} textAnchor="end" fontSize="12" fill="var(--muted)">{closenessLabel} = d⁻/(d⁺+d⁻)</text>
+      <text x={L + BX / 2} y={axisY + 34} textAnchor="middle" fontSize="12" fill="var(--ink)">Distancia ponderada (misma escala para d⁺ y d⁻)</text>
       {sorted.map((r, k) => {
         const yy = T + k * ROW + 6;
         const first = r.rank === 1;
         const mid = yy + BAR + GAP / 2;
         const val = (d: number, y: number) => (
-          <text x={x(d) + 6} y={y + BAR - 2} fontSize="11.5" fontWeight={first ? 700 : 500} fill="var(--ink)" className="mono">{d.toFixed(4)}</text>
+          <text x={x(d) + 6} y={y + BAR - 2} fontSize="12" fontWeight={first ? 700 : 500} fill="var(--ink)" className="mono">{d.toFixed(4)}</text>
         );
         return (
           <g key={r.name + k}>
@@ -74,9 +84,12 @@ export default function IdealDistances({ rows, closenessLabel = 'C' }: { rows: R
       })}
       {/* leyenda escrita: d⁺ sólida, d⁻ rayada */}
       <rect x={L} y={ly - 10} width={22} height={11} rx={2} fill="var(--m-topsis)" stroke="var(--ink)" strokeWidth={0.8} />
-      <text x={L + 28} y={ly} fontSize="11.5" fill="var(--ink)">d⁺ a la ideal (menor es mejor)</text>
-      <rect x={L + 230} y={ly - 10} width={22} height={11} rx={2} fill={`url(#${pat})`} stroke="var(--ink)" strokeWidth={0.8} />
-      <text x={L + 258} y={ly} fontSize="11.5" fill="var(--ink)">d⁻ a la anti-ideal (mayor es mejor)</text>
+      <text x={L + 28} y={ly} fontSize="12.5" fill="var(--ink)">d⁺ al ideal: barra más corta = mejor</text>
+      <rect x={L + 250} y={ly - 10} width={22} height={11} rx={2} fill={`url(#${pat})`} stroke="var(--ink)" strokeWidth={0.8} />
+      <text x={L + 278} y={ly} fontSize="12.5" fill="var(--ink)">d⁻ al anti-ideal: barra más larga = mejor</text>
     </svg>
+    </div>
+    {reading && <p className="s3-note"><b>Cómo leerlo:</b> {reading}</p>}
+    </>
   );
 }

@@ -8,6 +8,7 @@
 import { altSheet, CRIT_SHEET, synthesis } from './ahp.ts';
 import { toLegacy, type Study } from './legacy.ts';
 import { alive, cols, f2, finalists, inIndep, mean, passes, ranked, scoreOf } from './prio.ts';
+import { NEAR_LIMIT } from './prioSteps.ts';
 import type { Method } from './types.ts';
 import { resolveTargets } from './topsis.ts';
 import { ahpSheet, colL, matrixSheet, qs, setPalette, stl, W } from './excel-core.ts';
@@ -222,6 +223,7 @@ export function buildPrioWorkbook(XLSX: any, study: Study) {
       put(4 + i, 0, c.name, { s: stl.wrap }); put(4 + i, 1, c.qmide, { s: stl.wrap }); put(4 + i, 2, c.ind, { s: stl.wrap });
       put(4 + i, 3, c.stage === 'keep' ? 'Se mantiene como eje independiente.' : 'Se solapa: se funde con ' + (t ? t.name : '—') + '. ' + c.reason, { s: stl.wrap });
     });
+    put(5 + inIndep(A).length, 0, `Pool que llega al panel: ${alive(A).length} de ${inIndep(A).length} candidatos se mantienen como ejes independientes.`, { s: stl.b });
     add('Prior 3. Independencia', fin([34, 44, 64, 40], [{ hpt: 24 }]));
   }
   const alive0 = alive(A), cs = cols(A), isQ = A.mode === 'q', pc = cs.length + 1, prow: Record<string, number> = {};
@@ -248,14 +250,26 @@ export function buildPrioWorkbook(XLSX: any, study: Study) {
     put(2, 0, 'Corte elegido (ponderación ≥)', { s: stl.b }); put(2, 1, A.cutoff, { s: stl.key, z: '0.0' });
     put(3, 0, 'Convención práctica del curso, no un estándar de la literatura: documenta por qué elegiste este corte.', { s: stl.note });
     put(5, 0, 'Finalistas (ponderación ≥ corte)', { s: stl.b12 });
-    ['Criterio', 'Ponderación', 'Por qué queda'].forEach((h, j) => put(6, j, h, { s: stl.hdrL }));
-    ok.forEach((c, i) => { put(7 + i, 0, c.name, { s: stl.wrap }); put(7 + i, 1, mean(A, c), { f: `${PN}${colL(pc)}${prow[c.id]}`, z: '0.00', s: stl.c }); put(7 + i, 2, c.just, { s: stl.wrap }); });
+    ['Criterio', 'Ponderación', 'Por qué queda', '¿Pasa el corte?', 'Medible para todas las alternativas', 'Evidencia de medibilidad'].forEach((h, j) => put(6, j, h, { s: stl.hdrL }));
+    const passF = (row: number) => `IF(B${row}>=$B$2-0.000000001,"Pasa","No pasa")`;
+    ok.forEach((c, i) => {
+      put(7 + i, 0, c.name, { s: stl.wrap }); put(7 + i, 1, mean(A, c), { f: `${PN}${colL(pc)}${prow[c.id]}`, z: '0.00', s: stl.c }); put(7 + i, 2, c.just, { s: stl.wrap });
+      put(7 + i, 3, 'Pasa', { f: passF(7 + i), s: stl.c });
+      put(7 + i, 4, c.measurable === true ? 'Sí' : c.measurable === false ? 'No' : 'Sin verificar', { s: stl.c });
+      put(7 + i, 5, c.measEvid ?? '', { s: stl.wrap });
+    });
     let r = 8 + ok.length;
     const lim = no.find((c) => mean(A, c) != null);
-    if (lim && ok.length && (mean(A, ok[ok.length - 1]) ?? 0) - (mean(A, lim) ?? 0) <= 0.5) {
+    if (lim && ok.length && (mean(A, ok[ok.length - 1]) ?? 0) - (mean(A, lim) ?? 0) <= NEAR_LIMIT) {
       put(r, 0, 'Candidato en el límite (no incluido, pero documentado)', { s: stl.b12 }); r++;
       ['Criterio', 'Ponderación', 'Nota'].forEach((h, j) => put(r, j, h, { s: stl.hdrL })); r++;
       put(r, 0, lim.name, { s: stl.wrap }); put(r, 1, mean(A, lim), { f: `${PN}${colL(pc)}${prow[lim.id]}`, z: '0.00', s: stl.c }); put(r, 2, lim.cutReason, { s: stl.wrap }); r += 2;
+    }
+    if (lim && ok.length) {
+      put(r, 0, 'Brecha = último que pasa − primero que no pasa', { s: stl.b });
+      put(r, 1, (mean(A, ok[ok.length - 1]) ?? 0) - (mean(A, lim) ?? 0), { f: `B${6 + ok.length}-${PN}${colL(pc)}${prow[lim.id]}`, z: '0.00', s: stl.key });
+      put(r, 2, `Criterio de la plataforma: «en el límite» si la brecha es ≤ ${NEAR_LIMIT}. Una brecha estrecha exige justificar más el corte.`, { s: stl.note });
+      r += 2;
     }
     put(r, 0, 'Tabla de descarte, con razón documentada de cada uno', { s: stl.b12 }); r++;
     ['Criterio', 'Etapa de descarte', 'Razón'].forEach((h, j) => put(r, j, h, { s: stl.hdrL })); r++;
@@ -266,7 +280,7 @@ export function buildPrioWorkbook(XLSX: any, study: Study) {
       put(r, 1, (c.at === 'ind' ? 'Independencia' : 'Tamizaje') + (c.stage === 'merge' && t ? ' (fusionado con ' + t.name + ')' : ''), { s: stl.wrap });
       put(r, 2, c.reason, { s: stl.wrap }); r++;
     });
-    add('Prior 5. Resultado final', fin([46, 32, 80], [{ hpt: 24 }]));
+    add('Prior 5. Resultado final', fin([46, 32, 80, 16, 24, 44], [{ hpt: 24 }]));
   }
   return wb;
 }

@@ -268,6 +268,18 @@ for (const caso of ['iot', 'viaje', 'solar'] as const) {
   // c*=0.30/d*=0.90 (mucho más laxo que el default 0.65/0.30) debe dar MÁS relaciones que las 2 del
   // default (ver check-excel-electre.ts, verificado en JS puro arriba: da 7) — si esto fallara, sería
   // señal de que las fórmulas ignoraron las celdas editables y siguen usando el umbral incrustado de antes.
+  // Bloque «Núcleo»: «Supera a», «Es superada por» y «Estado» son fórmulas vivas (COUNTIF/IF sobre la grilla Relación) y deben salir igual tras recalcular.
+  {
+    const rRelSum = rRel0 + n, rInc = rRelSum + 2 + exp.relations.length;
+    const rKer0 = rInc + 1 + Math.max(1, exp.incomparable.length) + 2;
+    alternatives.forEach((a, i) => {
+      const out = exp.result.outranks[i].filter(Boolean).length, inn = exp.result.outranks.filter((row) => row[i]).length;
+      const estado = out === 0 && inn === 0 ? 'Sin relación' : inn === 0 ? 'Nadie la supera' : out === 0 ? 'Solo es superada' : 'Supera y es superada';
+      ok(ws['B' + (rKer0 + i)]?.v === out, `[LibreOffice recalculó] ELECTRE núcleo: «${a.name}» supera a ${ws['B' + (rKer0 + i)]?.v} (esperado ${out})`);
+      ok(ws['C' + (rKer0 + i)]?.v === inn, `[LibreOffice recalculó] ELECTRE núcleo: «${a.name}» es superada por ${ws['C' + (rKer0 + i)]?.v} (esperado ${inn})`);
+      ok(ws['D' + (rKer0 + i)]?.v === estado, `[LibreOffice recalculó] ELECTRE núcleo: «${a.name}» estado = ${ws['D' + (rKer0 + i)]?.v} (esperado ${estado})`);
+    });
+  }
   ok(exp.relations.length > 2, `ELECTRE con c*=0.30/d*=0.90 da más relaciones que el default 0.65/0.30 (da ${exp.relations.length})`);
 }
 

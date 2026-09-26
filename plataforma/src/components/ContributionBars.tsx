@@ -15,7 +15,8 @@ const W = 640, L = 170, R = 112, ROW = 34, BAR = 20, LEG = 18;
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 const fin = (x: number) => (Number.isFinite(x) ? x : 0);
 
-/** Barras horizontales apiladas: una por alternativa (ordenadas por posición) y un tramo por criterio, cuya longitud es lo que
+/** En pantallas angostas la gráfica conserva su ancho natural (640) dentro de una región con desplazamiento propio, para que los números
+ * se sigan leyendo (≥ 12 px) sin ensanchar la página. Barras horizontales apiladas: una por alternativa (ordenadas por posición) y un tramo por criterio, cuya longitud es lo que
  * ese criterio aporta al total de la alternativa (AHP: peso × prioridad local; SAW: peso × valor normalizado Min-Max). Escala
  * común a todas las barras. SVG propio sin librerías, igual que ClosenessBars. Para el informe impreso nada depende solo del
  * color: cada criterio lleva un número (impreso dentro del tramo cuando cabe y en la leyenda), del sexto criterio en adelante
@@ -57,7 +58,8 @@ export default function ContributionBars({ criteria, rows, unit }: Props) {
     + sorted.map((r) => `${r.rank}º ${r.name}: total ${fin(r.total).toFixed(4)} (${criteria.map((c, i) => `${c} ${fin(r.parts[i] ?? 0).toFixed(4)}`).join('; ')})`).join('. ') + '.';
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} style={{ width: '100%', maxWidth: 720, display: 'block', margin: '0 auto' }}>
+    <div className="ahp-svgscroll" role="region" aria-label={`Aporte de cada criterio a la ${unit} (gráfica de barras apiladas)`} tabIndex={0}>
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} style={{ width: '100%', minWidth: W, maxWidth: 720, display: 'block', margin: '0 auto' }}>
       {nc > 5 && (
         <defs>
           {/* rayas diagonales */}
@@ -83,17 +85,17 @@ export default function ContributionBars({ criteria, rows, unit }: Props) {
         <g key={i}>
           <title>{criteria[i]}</title>
           <rect x={gx} y={y + 2} width={14} height={14} rx={2} fill={fillFor(i)} stroke="var(--ink)" strokeWidth={0.8} />
-          <text x={gx + 20} y={y + 13.5} fontSize="11.5" fill="var(--ink)">{label}</text>
+          <text x={gx + 20} y={y + 13.5} fontSize="12" fill="var(--ink)">{label}</text>
         </g>
       ))}
 
       {ticks.map((t) => (
         <g key={t}>
           <line x1={x(t)} x2={x(t)} y1={T - 6} y2={T + sorted.length * ROW - 8} stroke="var(--line)" strokeDasharray="3 4" />
-          <text x={x(t)} y={T + sorted.length * ROW + 6} textAnchor="middle" fontSize="11" fill="var(--muted)">{t.toFixed(2)}</text>
+          <text x={x(t)} y={T + sorted.length * ROW + 6} textAnchor="middle" fontSize="12" fill="var(--muted)">{t.toFixed(2)}</text>
         </g>
       ))}
-      <text x={L - 8} y={T - 8} textAnchor="end" fontSize="11" fill="var(--muted)">Posición · alternativa</text>
+      <text x={L - 8} y={T - 8} textAnchor="end" fontSize="12" fill="var(--muted)">Posición · alternativa</text>
 
       {sorted.map((r, k) => {
         const yy = T + k * ROW;
@@ -117,7 +119,7 @@ export default function ContributionBars({ criteria, rows, unit }: Props) {
                   <title>{`${c}: ${v.toFixed(4)}`}</title>
                   <rect x={x0} y={yy} width={w} height={BAR} fill={fillFor(i)} stroke="var(--surface)" strokeWidth={1} />
                   {text && (
-                    <text x={(x0 + x1) / 2} y={yy + BAR / 2 + 4} textAnchor="middle" fontSize="11" fontWeight={700} fill="var(--ink)" className="mono" style={halo}>{text}</text>
+                    <text x={(x0 + x1) / 2} y={yy + BAR / 2 + 4} textAnchor="middle" fontSize="12" fontWeight={700} fill="var(--ink)" className="mono" style={halo}>{text}</text>
                   )}
                 </g>
               );
@@ -130,9 +132,10 @@ export default function ContributionBars({ criteria, rows, unit }: Props) {
           </g>
         );
       })}
-      <text x={(L + W - R) / 2} y={H - 4} textAnchor="middle" fontSize="11" fill="var(--muted)">
+      <text x={(L + W - R) / 2} y={H - 4} textAnchor="middle" fontSize="12" fill="var(--muted)">
         {`Longitud total = ${unit}; cada tramo es lo que aporta un criterio (número = criterio de la leyenda)`}
       </text>
     </svg>
+    </div>
   );
 }

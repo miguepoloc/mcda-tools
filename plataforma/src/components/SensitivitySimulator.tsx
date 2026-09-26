@@ -2,12 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import type { Criterion, Alternative, DecisionMatrix } from '@/lib/types';
-import { topsisSynthesis } from '@/lib/topsis';
-import { sawSynthesis } from '@/lib/saw';
-import { vikorSynthesis } from '@/lib/vikor';
-import { prometheeSynthesis } from '@/lib/promethee';
 import { electreSynthesis } from '@/lib/electre';
-import { fuzzyTopsisSynthesis } from '@/lib/fuzzy_topsis';
+import { buildRankFn, redistribute } from '@/lib/sensitivity';
 import type { MethodKey } from './ScientificMethodModal';
 
 export interface AhpSynthRow {
@@ -45,57 +41,55 @@ export default function SensitivitySimulator({
     setSimWeights([...baseWeights]);
   }, [baseWeights]);
 
-  // Función para re-ponderar proporcionalmente al mover un slider
+  // Al mover un slider, el resto de los pesos se reescala proporcionalmente (misma regla que el análisis fijo del informe: lib/sensitivity.ts)
   function handleWeightChange(index: number, newRawVal: number) {
-    const newTarget = Math.max(0, Math.min(1, newRawVal));
-    const m = criteria.length;
-    if (m <= 1) {
-      setSimWeights([1]);
-      return;
-    }
-
-    const next = [...simWeights];
-    const oldTarget = next[index] ?? (1 / m);
-    next[index] = newTarget;
-
-    const remainingNew = 1 - newTarget;
-    const otherOldSum = next.reduce((sum, w, i) => (i === index ? sum : sum + w), 0);
-
-    if (otherOldSum > 1e-6) {
-      const factor = remainingNew / otherOldSum;
-      for (let i = 0; i < m; i++) {
-        if (i !== index) {
-          next[i] = Math.max(0, next[i] * factor);
-        }
-      }
-    } else {
-      // Si todos los demás estaban en 0, repartir equitativamente el remanente
-      const evenSplit = remainingNew / (m - 1);
-      for (let i = 0; i < m; i++) {
-        if (i !== index) {
-          next[i] = evenSplit;
-        }
-      }
-    }
-
-    // Normalización final estricta
-    const sum = next.reduce((a, b) => a + b, 0) || 1;
-    setSimWeights(next.map((w) => w / sum));
+    setSimWeights(redistribute(simWeights, index, newRawVal));
   }
 
   function resetWeights() {
     setSimWeights([...baseWeights]);
   }
 
+  // ELECTRE NO da ranking (da una relación de superación con incomparables): no se le inventa uno a partir de netOutdegree.
+  const isElectre = method === 'electre';
+  const rankFn = useMemo(
+    () => (isElectre ? null : buildRankFn(method, { criteria, alternatives, dm: decisionMatrix, ahpRows: ahpSynthRows })),
+    [isElectre, method, criteria, alternatives, decisionMatrix, ahpSynthRows],
+  );
+  // Sin datos con los que recalcular (p. ej. AHP sin prioridades locales) se muestra el ranking base tal cual, sin reaccionar a los pesos.
+  const staticRanking = (): { name: string; score: number; rank: number }[] =>
+    method === 'ahp' && ahpSynthRows?.length
+      ? ahpSynthRows.map((r) => ({ name: r.name, score: r.score, rank: r.rank }))
+      : alternatives.map((a, i) => ({ name: a.name, score: 0, rank: i + 1 }));
+
   // Resolver síntesis base
-  const baseResult = useMemo(() => {
-    return computeRanking(method, criteria, alternatives, decisionMatrix, baseWeights, ahpSynthRows);
-  }, [method, criteria, alternatives, decisionMatrix, baseWeights, ahpSynthRows]);
+  const baseResult = useMemo(() => (isElectre ? [] : rankFn ? rankFn(baseWeights) : staticRanking()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isElectre, rankFn, baseWeights]);
 
   // Resolver síntesis simulada en tiempo real
-  const simResult = useMemo(() => {
-    return computeRanking(method, criteria, alternatives, decisionMatrix, simWeights, ahpSynthRows);
-  }, [method, criteria, alternatives, decisionMatrix, simWeights, ahpSynthRows]);
+  const simResult = useMemo(() => (isElectre ? [] : rankFn ? rankFn(simWeights) : staticRanking()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isElectre, rankFn, simWeights]);
+
+  // ELECTRE: relaciones (a cuántas supera cada alternativa y por cuántas es superada) con los pesos base y con los simulados.
+  const electreView = (w: number[]) => {
+    const syn = electreSynthesis(criteria, alternatives, decisionMatrix, w);
+    return {
+      out: syn.names.map((_, i) => syn.result.outranks[i]?.filter(Boolean).length ?? 0),
+      inn: syn.names.map((_, i) => syn.result.outranks.filter((row) => row[i]).length),
+      relations: syn.relations.length,
+      incomparable: syn.incomparable.length,
+      winner: syn.kernel.winner != null ? syn.names[syn.kernel.winner] : null,
+      members: syn.kernel.members.map((k) => syn.names[k]),
+    };
+  };
+  const electreBase = useMemo(() => (isElectre ? electreView(baseWeights) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isElectre, criteria, alternatives, decisionMatrix, baseWeights]);
+  const electreSim = useMemo(() => (isElectre ? electreView(simWeights) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isElectre, criteria, alternatives, decisionMatrix, simWeights]);
 
   // Después de todos los hooks (un return antes de ellos rompe el orden de hooks si cambia el número de criterios).
   if (!criteria.length || !alternatives.length || !baseWeights.length) {
@@ -105,6 +99,10 @@ export default function SensitivitySimulator({
   const baseWinner = baseResult.find((r) => r.rank === 1);
   const simWinner = simResult.find((r) => r.rank === 1);
   const winnerChanged = baseWinner && simWinner && baseWinner.name !== simWinner.name;
+  const electreChanged = !!(electreBase && electreSim && (
+    electreBase.relations !== electreSim.relations || electreBase.winner !== electreSim.winner
+    || electreBase.out.some((o, i) => o !== electreSim.out[i]) || electreBase.inn.some((o, i) => o !== electreSim.inn[i])
+  ));
 
   return (
     <div
@@ -165,8 +163,25 @@ export default function SensitivitySimulator({
         </button>
       </div>
 
-      {/* Alerta de Cambio de Ganador */}
-      {winnerChanged ? (
+      {/* Alerta de Cambio de Ganador (ELECTRE: no hay ganador por puntaje, se avisa si cambian las relaciones o el núcleo) */}
+      {isElectre && electreBase && electreSim ? (
+        electreChanged ? (
+          <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid #F59E0B', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }} role="status">
+            <span style={{ fontSize: 22 }} aria-hidden>⚠️</span>
+            <div style={{ fontSize: 13.5, color: '#FCD34D' }}>
+              <strong>Cambian las relaciones de superación.</strong> Con esta ponderación ELECTRE encuentra{' '}
+              <b style={{ color: '#FFF' }}>{electreSim.relations}</b> relación{electreSim.relations === 1 ? '' : 'es'} y{' '}
+              <b style={{ color: '#FFF' }}>{electreSim.incomparable}</b> par{electreSim.incomparable === 1 ? '' : 'es'} incomparable{electreSim.incomparable === 1 ? '' : 's'}
+              {' '}(con los pesos base: {electreBase.relations} y {electreBase.incomparable}). Núcleo: {electreSim.winner ? <>única alternativa <b style={{ color: '#FFF' }}>{electreSim.winner}</b></> : <>sin ganador único ({electreSim.members.join(', ') || 'sin relaciones'})</>}.
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#A7F3D0' }} role="status">
+            <span aria-hidden>✓</span>
+            <span><strong>Relaciones sin cambio:</strong> con esta combinación de pesos ELECTRE encuentra las mismas relaciones de superación que con los pesos base. ELECTRE no da ranking: no hay «ganador» por puntaje.</span>
+          </div>
+        )
+      ) : winnerChanged ? (
         <div
           style={{
             background: 'rgba(245, 158, 11, 0.12)',
@@ -260,7 +275,50 @@ export default function SensitivitySimulator({
         })}
       </div>
 
+      {/* ELECTRE: relaciones base vs. simuladas (sin puestos: no es un ranking) */}
+      {isElectre && electreBase && electreSim && (
+        <div>
+          <div style={{ fontSize: 12, fontFamily: 'var(--f-mono)', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+            Relaciones de superación (ELECTRE no da ranking)
+          </div>
+          <div className="tbl">
+            <table>
+              <caption className="sr-only">Cuántas alternativas supera cada una y por cuántas es superada, con pesos base y simulados</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Alternativa</th>
+                  <th scope="col" className="n">Supera a (base)</th>
+                  <th scope="col" className="n">Superada por (base)</th>
+                  <th scope="col" className="n">Supera a (simulado)</th>
+                  <th scope="col" className="n">Superada por (simulado)</th>
+                  <th scope="col" className="n">Cambio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alternatives.map((a, i) => {
+                  const same = electreBase.out[i] === electreSim.out[i] && electreBase.inn[i] === electreSim.inn[i];
+                  return (
+                    <tr key={a.id}>
+                      <th scope="row" style={{ textAlign: 'left', fontWeight: 500, color: 'var(--ink)', textTransform: 'none', letterSpacing: 0, fontFamily: 'inherit', fontSize: 14 }}>{a.name}</th>
+                      <td className="n">{electreBase.out[i]}</td>
+                      <td className="n">{electreBase.inn[i]}</td>
+                      <td className="n" style={{ fontWeight: 700 }}>{electreSim.out[i]}</td>
+                      <td className="n" style={{ fontWeight: 700 }}>{electreSim.inn[i]}</td>
+                      <td className="n">{same ? '= Sin cambio' : 'Cambió'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
+            Con c* y d* del proyecto. Núcleo con pesos base: {electreBase.winner ? `única alternativa ${electreBase.winner}` : `sin ganador único (${electreBase.members.join(', ') || 'sin relaciones'})`}.
+          </p>
+        </div>
+      )}
+
       {/* Comparativa: Ranking Base vs. Ranking Simulado */}
+      {!isElectre && (
       <div>
         <div style={{ fontSize: 12, fontFamily: 'var(--f-mono)', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
           Comparativa de Posición en el Ranking
@@ -322,73 +380,7 @@ export default function SensitivitySimulator({
           </table>
         </div>
       </div>
+      )}
     </div>
   );
-}
-
-// Función auxiliar para calcular rankings en base al método
-function computeRanking(
-  method: MethodKey,
-  criteria: Criterion[],
-  alternatives: Alternative[],
-  dm: DecisionMatrix,
-  weights: number[],
-  ahpSynthRows?: AhpSynthRow[],
-): { name: string; score: number; rank: number }[] {
-  if (method === 'topsis') {
-    const synth = topsisSynthesis(criteria, alternatives, dm, weights);
-    return synth.rows.map((r) => ({ name: r.name, score: r.c, rank: r.rank }));
-  }
-
-  if (method === 'saw') {
-    const synth = sawSynthesis(criteria, alternatives, dm, weights);
-    return synth.rows.map((r) => ({ name: r.name, score: r.value, rank: r.rank }));
-  }
-
-  if (method === 'vikor') {
-    const synth = vikorSynthesis(criteria, alternatives, dm, weights);
-    return synth.rows.map((r) => ({ name: r.name, score: r.q, rank: r.rank }));
-  }
-
-  if (method === 'promethee') {
-    const synth = prometheeSynthesis(criteria, alternatives, dm, weights);
-    return synth.rows.map((r) => ({ name: r.name, score: r.phi, rank: r.rank }));
-  }
-
-  if (method === 'electre') {
-    const synth = electreSynthesis(criteria, alternatives, dm, weights);
-    const minNet = Math.min(...synth.netOutdegree, 0);
-    const maxNet = Math.max(...synth.netOutdegree, 0);
-    const span = maxNet - minNet || 1;
-    return synth.names.map((name, i) => ({
-      name,
-      score: (synth.netOutdegree[i] - minNet) / span,
-      rank: 1 + synth.netOutdegree.filter((val) => val > synth.netOutdegree[i]).length,
-    }));
-  }
-
-  if (method === 'fuzzy_topsis') {
-    const synth = fuzzyTopsisSynthesis(criteria, alternatives, dm, weights);
-    return synth.rows.map((r) => ({ name: r.name, score: r.value, rank: r.rank }));
-  }
-
-  // Síntesis dinámica de AHP usando prioridades locales de los criterios
-  if (method === 'ahp' && ahpSynthRows && ahpSynthRows.length) {
-    const hasLoc = ahpSynthRows.some((r) => r.loc && r.loc.length > 0);
-    if (hasLoc) {
-      // g_i(w) = sum_c (w_c * loc_c,i)
-      const scored = ahpSynthRows.map((r) => {
-        const score = (r.loc ?? []).reduce((acc: number, l: number, c: number) => acc + (weights[c] ?? 0) * (l ?? 0), 0);
-        return { name: r.name, score };
-      });
-      return scored.map((s) => ({
-        name: s.name,
-        score: s.score,
-        rank: 1 + scored.filter((o) => o.score > s.score + 1e-9).length,
-      }));
-    }
-    return ahpSynthRows.map((r) => ({ name: r.name, score: r.score, rank: r.rank }));
-  }
-
-  return alternatives.map((a, i) => ({ name: a.name, score: 0, rank: i + 1 }));
 }

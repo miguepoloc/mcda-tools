@@ -197,3 +197,60 @@ export function phrase(items: Item[], i: number, j: number, v: number | null): s
   const lose = v < 0 ? j : i;
   return `${k} · ${items[win].name} es ${SAATY[k]} preferida que ${items[lose].name}.`;
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Helpers de solo lectura para el desglose didáctico (components/calc/AhpBreakdown.tsx). No cambian ningún resultado de `analyze`.
+
+/**
+ * Primeras iteraciones del método de potencias de Saaty: w⁽⁰⁾ = (1/n, …, 1/n) y w⁽ᵏ⁺¹⁾ = A·w⁽ᵏ⁾ / ‖A·w⁽ᵏ⁾‖₁.
+ * Devuelve `steps + 1` vectores (de w⁽⁰⁾ a w⁽ˢᵗᵉᵖˢ⁾), cada uno con suma 1. Es la misma recurrencia que `principalEigenvector`,
+ * pero guardando cada paso en vez de iterar hasta converger (sin tolerancia): sirve para mostrar cómo se acerca al eigenvector.
+ */
+export function powerIterations(A: number[][], steps = 6): number[][] {
+  const n = A.length;
+  let p: number[] = Array(n).fill(n ? 1 / n : 0);
+  const out: number[][] = [p];
+  for (let k = 0; k < steps; k++) {
+    const q = A.map((r) => r.reduce((a, x, j) => a + x * p[j], 0));
+    const s = q.reduce((a, b) => a + b, 0);
+    p = s > 0 ? q.map((x) => x / s) : q;
+    out.push(p);
+  }
+  return out;
+}
+
+export type IdealSynth = {
+  /** Prioridades locales en modo ideal: L'[i][c] = L[i][c] / max_i L[i][c] (la mejor alternativa de cada criterio vale 1). */
+  localIdeal: number[][];
+  /** Mejor prioridad local de cada criterio (el divisor). */
+  best: number[];
+  /** P'_i = Σ_c w_c · L'[i][c], tal cual (no suma 1). */
+  raw: number[];
+  /** raw normalizado a suma 1, para compararlo con el modo distributivo. */
+  norm: number[];
+  /** Posición de cada alternativa (1 = mejor; empates comparten posición, tolerancia 1e-9 como `synthesis`). */
+  rank: number[];
+};
+
+/**
+ * Síntesis en modo IDEAL (Saaty & Vargas, 1993): cada prioridad local se divide entre la MEJOR de su criterio en vez de entre la suma
+ * (que es lo que ya hace el modo distributivo de `synthesis`). `wr[c]` = peso del criterio c, `loc[i][c]` = prioridad local distributiva
+ * de la alternativa i en el criterio c (`Synth.rows[i].loc`). No depende de cuántas alternativas compitan, solo de quién es la mejor.
+ */
+export function idealSynthesis(wr: number[], loc: number[][]): IdealSynth {
+  const best = wr.map((_, c) => Math.max(0, ...loc.map((r) => r[c] ?? 0)));
+  const localIdeal = loc.map((r) => wr.map((_, c) => (best[c] > 0 ? (r[c] ?? 0) / best[c] : 0)));
+  const raw = localIdeal.map((r) => r.reduce((a, x, c) => a + wr[c] * x, 0));
+  const total = raw.reduce((a, b) => a + b, 0);
+  const norm = raw.map((x) => (total > 0 ? x / total : 0));
+  const rank = raw.map((x) => 1 + raw.filter((o) => o > x + 1e-9).length);
+  return { localIdeal, best, raw, norm, rank };
+}
+
+/** Síntesis con pesos IGUALES (1/n a cada criterio) sobre las mismas prioridades locales: la línea base «a ojo» contra la que se
+ * compara el peso que sale de los juicios. `score[i]` = media de las prioridades locales de la alternativa i. */
+export function equalWeightsSynthesis(loc: number[][]): { score: number[]; rank: number[] } {
+  const score = loc.map((r) => (r.length ? r.reduce((a, b) => a + b, 0) / r.length : 0));
+  const rank = score.map((x) => 1 + score.filter((o) => o > x + 1e-9).length);
+  return { score, rank };
+}

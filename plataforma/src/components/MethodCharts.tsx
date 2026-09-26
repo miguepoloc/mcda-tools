@@ -33,7 +33,7 @@ export default function MethodCharts({ method, data, showWeights = true, showClo
     <>
       {showCloseness && d && d.rows.length > 0 && (
         <figure style={FIG}>
-          <figcaption style={CAPTION}>{d.label === 'CC' ? 'Coeficiente de cercanía CC de Fuzzy TOPSIS' : 'Cercanía relativa C de TOPSIS'} por alternativa (0 a 1, mayor es mejor)</figcaption>
+          <figcaption style={CAPTION}>{d.label === 'CC' ? 'Coeficiente de cercanía CC de Fuzzy TOPSIS' : 'Cercanía relativa C de TOPSIS'} por alternativa (0 = en el anti-ideal, 1 = en el ideal; barra más larga = mejor)</figcaption>
           <ClosenessBars rows={d.rows.map((r) => ({ name: r.name, value: r.closeness, rank: r.rank }))} />
         </figure>
       )}
@@ -51,7 +51,7 @@ export default function MethodCharts({ method, data, showWeights = true, showClo
       )}
       {d && d.rows.length > 0 && (
         <figure style={FIG}>
-          <figcaption style={CAPTION}>Distancia a la solución ideal (d⁺) y a la anti-ideal (d⁻)</figcaption>
+          <figcaption style={CAPTION}>Distancia a la solución ideal (d⁺: más corta = mejor) y a la anti-ideal (d⁻: más larga = mejor)</figcaption>
           <IdealDistances rows={d.rows} closenessLabel={d.label} />
         </figure>
       )}

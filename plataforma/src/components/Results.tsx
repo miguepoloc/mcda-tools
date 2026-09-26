@@ -24,8 +24,23 @@ import GroupDiagnostics from './GroupDiagnostics';
 import WeightingCard from './WeightingCard';
 import { WEIGHTING_SHORT, effectiveWeighting, expertsWithJudgments, isObjectiveFor, resultsGate } from '@/lib/weightingMode';
 import type { MethodKey } from './ScientificMethodModal';
+import type { PrioState } from '@/lib/prio';
+import { buildAhpBreakdownData } from '@/lib/ahpBreakdown';
+import { describeMethodParams, electreCompareInfo } from '@/lib/rankCompare';
+import AhpBreakdown from './calc/AhpBreakdown';
+import AhpVsEqualWeights from './calc/AhpVsEqualWeights';
+import TopsisBreakdown from './calc/TopsisBreakdown';
+import VikorBreakdown from './calc/VikorBreakdown';
+import ElectreBreakdown from './calc/ElectreBreakdown';
+import PrometheeBreakdown from './calc/PrometheeBreakdown';
+import PrioBreakdown from './calc/PrioBreakdown';
+import WeightsBreakdown from './calc/WeightsBreakdown';
+import SensitivityReport from './calc/SensitivityReport';
+import MethodComparisonReport, { type CompareMethod } from './calc/MethodComparisonReport';
+import ContributionBars from './ContributionBars';
+import VikorRankBar from './VikorRankBar';
 
-export type ExpertLite = { id: string; label: string };
+export type ExpertLite = { id: string; label: string; /** Rol del experto (solo el dueño lo ve: la vista pública no lo trae). */ role?: string };
 
 type Props = {
   /** 'single': resultado del método elegido del proyecto (pestaña "Resultados").
@@ -56,6 +71,8 @@ type Props = {
   /** Solo dueño: atajos de los mensajes de «faltan juicios». Sin ellos (vista pública) el mensaje va sin botón. */
   onGoExperts?: () => void;
   onGoProject?: () => void;
+  /** Parte A (priorización de criterios) guardada. Solo el dueño la tiene: `public_get` no la expone, así que en la vista pública falta. */
+  prio?: PrioState;
 };
 
 const METHOD_LABEL: Record<Method, string> = {
@@ -156,7 +173,7 @@ function Table({ names, M, f }: { names: string[]; M: number[][]; f: (x: number)
   );
 }
 
-export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onGoExperts, onGoProject }: Props) {
+export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onGoExperts, onGoProject, prio }: Props) {
   const [showReportModal, setShowReportModal] = useState(false);
   const idx = useMemo(() => indexJudgments(judgments), [judgments]);
   // Con CRITIC/Entropía los pesos salen de la matriz de decisión: los juicios guardados de una fase anterior (AHP) NO cuentan para nada
@@ -198,14 +215,14 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
   const changeV = (v: number) => (onChangeV ? onChangeV(v) : setVLocal(v));
   const changeCStar = (c: number) => (onChangeCStar ? onChangeCStar(c) : setCLocal(c));
   const changeDStar = (d: number) => (onChangeDStar ? onChangeDStar(d) : setDLocal(d));
+  // CRITIC y Entropía necesitan números: en Fuzzy TOPSIS las etiquetas se desdifusifican (centroide) antes de calcularlos.
+  const dmNum = useMemo(() => (method === 'fuzzy_topsis' ? defuzzifyMatrix(dm, criteria, alternatives) : dm), [method, dm, criteria, alternatives]);
   const critWeights = useMemo(() => {
     if (method === 'ahp') return ahpWeights;
-    // CRITIC y Entropía necesitan números: en Fuzzy TOPSIS las etiquetas se desdifusifican (centroide) antes de calcularlos.
-    const dmNum = method === 'fuzzy_topsis' ? defuzzifyMatrix(dm, criteria, alternatives) : dm;
     if (weighting === 'critic') return criticWeights(criteria, alternatives, dmNum);
     if (weighting === 'entropy') return entropyWeights(criteria, alternatives, dmNum);
     return ahpWeights; // 'ahp' (default)
-  }, [method, weighting, ahpWeights, criteria, alternatives, dm]);
+  }, [method, weighting, ahpWeights, criteria, alternatives, dmNum]);
 
   const topSyn = useMemo(() => topsisSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
   const vikSyn = useMemo(() => vikorSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
@@ -288,7 +305,6 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
   const r = useMemo(() => sheetResult(sheet, items, used, idx, wm), [sheet, items, used, idx, wm]);
   // Consistencia (CR) solo tiene sentido si hay juicios de expertos detrás de los pesos.
   const bad = objective ? [] : sheets.filter((s) => !sheetResult(s.key, sheetItems(s.key, criteria, alternatives), used, idx, wm).agg.ok).map((s) => s.label);
-  const colv = (i: number) => (i < 5 ? `var(--s${i + 1})` : 'var(--other)');
   const wmax = Math.max(...r.agg.w, 0.0001) * 1.12;
 
   const viewExpert = view !== 'agg' ? experts.find((e) => e.id === view) : undefined;
@@ -347,6 +363,33 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
     return data;
   }, [method, criteria, alternatives, dm, critWeights, syn, sawSyn, promSyn, topSyn, fuzzyTopSyn]);
 
+  // Desglose completo de AHP (matrices, λmax, CI, RI, CR, media geométrica, iteración de potencias, síntesis): solo cuando hay juicios
+  // detrás de los pesos (AHP o un método de matriz ponderado con AHP). Los números salen de las mismas funciones de lib/ahp.ts.
+  const ahpBreakdown = useMemo(() => (!objective && (method === 'ahp' || weightingMethod === 'ahp')
+    ? buildAhpBreakdownData({
+      criteria, alternatives, experts: experts.filter((e) => used.includes(e.id)).map((e) => ({ id: e.id, label: e.label, role: e.role })),
+      used, idx, weightMethod: wm, withAlternatives: method === 'ahp',
+    })
+    : undefined), [objective, method, weightingMethod, criteria, alternatives, experts, used, idx, wm]);
+  const ahpRows = useMemo(() => syn.rows.map((r) => ({ name: r.name, loc: r.loc })), [syn]);
+  // Comparación entre métodos (pantalla «Comparativa» y apéndice del informe): mismos rankings, parámetros y concordancia.
+  const comparison = useMemo(() => {
+    const methods: CompareMethod[] = compareViews.map((m) => ({
+      key: m.key, label: m.label,
+      ranks: m.tie ? null : alternatives.map((a) => m.rows.find((rr) => rr.name === a.name)?.rank ?? null),
+      scores: alternatives.map((a) => m.rows.find((rr) => rr.name === a.name)?.value ?? null),
+      scoreLabel: m.unit,
+      params: describeMethodParams(m.key, { vikorV: vEff }),
+      compromise: m.soft,
+      unavailableReason: m.tie ? 'sin datos suficientes' : undefined,
+    }));
+    return {
+      methods,
+      electre: electreCompare.hasData ? electreCompareInfo(elecSyn) : undefined,
+      weightsNote: weighting === 'ahp' ? 'AHP, de los juicios de los expertos' : WEIGHTING_SHORT[weighting],
+    };
+  }, [compareViews, alternatives, vEff, electreCompare, elecSyn, weighting]);
+
   // Con pesos objetivos el bloqueo depende SOLO de la matriz de decisión. Con pesos AHP en un método de matriz, sin juicios sobre los
   // criterios los pesos quedarían iguales en silencio: se bloquea y se manda a Expertos.
   const gate = resultsGate({ mode, method, weighting: weightingMethod, matrixFilled: dmFilled, expertCount: withData.length, decidableCount: decidableViews.length });
@@ -379,8 +422,6 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       </div>
     );
   }
-
-  const maxG = Math.max(...syn.rows.map((x) => x.g), 0.0001) * 1.08;
 
   // Panel de ELECTRE: se usa tanto en la vista "Método elegido" (si method === 'electre') como,
   // sin condición, dentro de "Comparar los 6 métodos" — ELECTRE no pasa por quantViewFor (no da
@@ -455,13 +496,19 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
           {kernelNote.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
       </div>
-      <div className="card res">
-        <h3>Cómo se decide quién supera a quién</h3>
-        <details open>
-          <summary>Ver detalle</summary>
-          <ElectreMatrices names={elecSyn.names} result={elecSyn.result} />
-        </details>
-      </div>
+      {mode === 'single' ? (
+        <div className="card res" id="desglose">
+          <ElectreBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} cStar={cEff} dStar={dEff} />
+        </div>
+      ) : (
+        <div className="card res">
+          <h3>Cómo se decide quién supera a quién</h3>
+          <details open>
+            <summary>Ver detalle</summary>
+            <ElectreMatrices names={elecSyn.names} result={elecSyn.result} />
+          </details>
+        </div>
+      )}
     </>
   );
 
@@ -478,7 +525,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
           <div>
             <h2 style={{ margin: 0, fontSize: 20 }}>Síntesis y Ranking de Resultados</h2>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: 13 }}>
-              Ponderación por {WEIGHTING_SHORT[weighting]} · Algoritmo de ranking {METHOD_LABEL[method]}
+              Ponderación por {WEIGHTING_SHORT[weighting]} · Algoritmo de ranking {METHOD_LABEL[method]} · <a href="#desglose">Ir al desglose de cálculo paso a paso ↓</a>
             </p>
           </div>
         ) : (
@@ -560,36 +607,14 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
             <>
               <div className="card">
                 <h3 style={{ marginBottom: 10 }}>Cuánto aporta cada criterio a la prioridad global</h3>
-                <div className="stack">
-                  {syn.order.map((i) => {
-                    const row = syn.rows[i];
-                    return (
-                      <div className="srow" key={row.name + i}>
-                        <span className="nm">{row.rank}. {row.name}</span>
-                        <div className="strack">
-                          <div className="sbar" style={{ width: `${(row.g / maxG) * 100}%` }}>
-                            {row.contrib.map((x, c) => (
-                              <i key={c} style={{ background: colv(c), width: `${row.g ? (x / row.g) * 100 : 0}%` }}
-                                 title={`${row.name} · ${criteria[c]?.name}: peso ${syn.wr[c]?.toFixed(3)} × local ${row.loc[c]?.toFixed(3)} = ${x.toFixed(4)}`} />
-                            ))}
-                          </div>
-                          <span className="sval">{row.g.toFixed(4)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="lg" style={{ marginTop: 12 }}>
-                  {criteria.slice(0, 5).map((c, i) => <span key={c.id}><i style={{ background: `var(--s${i + 1})` }} />{c.name}</span>)}
-                  {criteria.length > 5 && <span><i style={{ background: 'var(--other)' }} />Otros criterios ({criteria.length - 5})</span>}
-                </div>
+                {methodCharts.contribution && <ContributionBars {...methodCharts.contribution} />}
               </div>
 
               <div className="card">
                 <h3>Tabla de síntesis</h3>
                 <div className="tbl" style={{ marginTop: 8 }}>
                   <table>
-                    <thead><tr><th>Estrategia</th>{criteria.map((c) => <th key={c.id} className="n">{c.name}</th>)}<th className="n">Global</th><th className="n">Rank</th></tr></thead>
+                    <thead><tr><th>Alternativa</th>{criteria.map((c) => <th key={c.id} className="n">{c.name}</th>)}<th className="n">Global</th><th className="n">Rank</th></tr></thead>
                     <tbody>
                       <tr><td className="muted">Peso del criterio</td>{syn.wr.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}<td /><td /></tr>
                       {syn.order.map((idx) => {
@@ -643,11 +668,17 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                   </table>
                 </div>
               </div>
+              <div className="card">
+                <AhpVsEqualWeights mode="screen" criteria={criteria.map((c) => c.name)} weights={syn.wr} alternatives={alternatives.map((a) => a.name)} local={syn.rows.map((r) => r.loc)} scores={syn.rows.map((r) => r.g)} />
+              </div>
             </>
           ) : (
             <>
             <div className="card">
               <h3 style={{ marginBottom: 10 }}>Ranking {METHOD_LABEL[method]} — {quant.unit}</h3>
+              {method === 'vikor' ? (
+                <VikorRankBar rows={quant.rows} order={quant.order} soft={quant.soft} v={vEff} />
+              ) : (
               <div className="stack">
                 {quant.order.map((i) => {
                   const row = quant.rows[i];
@@ -660,7 +691,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                   );
                 })}
               </div>
-              <details style={{ marginTop: 12 }}>
+              )}
+              <details open style={{ marginTop: 12 }}>
                 <summary>Ver matriz de decisión y pesos usados</summary>
                 <h4>{objective ? `Peso de cada criterio (${WEIGHTING_SHORT[weighting]}, calculado de esta matriz)` : 'Peso de cada criterio (de la hoja Criterios)'}</h4>
                 <div className="tbl" style={{ marginTop: 8 }}>
@@ -820,6 +852,10 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
               </div>
             </div>
 
+            <div className="card">
+              <MethodComparisonReport mode="screen" alternatives={alternatives.map((a) => a.name)} {...comparison} />
+            </div>
+
             {electrePanel}
         </>
       )}
@@ -851,6 +887,11 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
             ahpSynthRows={syn.rows.map((r) => ({ name: r.name, score: r.g, rank: r.rank, loc: r.loc }))}
             derivedWeights={objective ? WEIGHTING_SHORT[weighting] : undefined}
           />
+
+      <SensitivityReport
+        mode="screen" method={method} criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights}
+        ahpRows={method === 'ahp' ? ahpRows : undefined} accent={METHOD_ACCENT[method].color}
+      />
 
       {/* Detalle por hoja = juicios por pares, CR, λmax y consenso de los expertos: con pesos objetivos no existe nada de eso que mostrar. */}
       {!objective && (
@@ -899,6 +940,19 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       </div>
       )}
 
+      {/* Desglose de cálculo paso a paso (como en las diapositivas 1 a 4 del curso): de dónde salen los criterios, cómo se obtuvieron los
+          pesos y cada matriz intermedia del método. Los mismos componentes con los mismos números van en el apéndice del informe. */}
+      <div id="desglose" style={{ display: 'grid', gap: 14 }}>
+        {prio && prio.cands.length > 0 && <PrioBreakdown prio={prio} mode="screen" criteriaCount={criteria.length} />}
+        {objective && (weighting === 'critic' || weighting === 'entropy') && method !== 'ahp' && (
+          <WeightsBreakdown method={weighting} criteria={criteria} alternatives={alternatives} dm={dmNum} mode="screen" />
+        )}
+        {ahpBreakdown && <AhpBreakdown mode="screen" data={ahpBreakdown} current={6} />}
+        {method === 'topsis' && <TopsisBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
+        {method === 'vikor' && <VikorBreakdown mode="screen" criteria={criteria} alternatives={alternatives} decisionMatrix={dmRaw} weights={critWeights} v={vEff} weightsSource={objective ? WEIGHTING_SHORT[weighting] : 'la hoja Criterios (AHP)'} />}
+        {method === 'promethee' && <PrometheeBreakdown mode="screen" criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} />}
+      </div>
+
       {showReportModal && (
         <ExecutiveReportModal
           projectTitle={projectTitle}
@@ -922,6 +976,9 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
           vikorChart={vikorReportChart}
           charts={methodCharts}
           vikorV={method === 'vikor' ? vEff : undefined}
+          prio={prio}
+          ahpBreakdown={ahpBreakdown}
+          comparison={comparison}
           compromiseSet={method === 'vikor' && vikSyn.verdict && vikSyn.verdict.kind !== 'unique' ? vikSyn.verdict.set.map((i) => vikSyn.rows[i].name) : undefined}
           onClose={() => setShowReportModal(false)}
         />

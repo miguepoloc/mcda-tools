@@ -16,6 +16,10 @@ export type Cand = {
   se: Record<string, number | null>;
   just: string;
   cutReason: string;
+  /** Verificación de la diapositiva 18 (finalistas): ¿se puede medir para todas las alternativas? Opcional (null/ausente = sin verificar):
+   * vive en el JSON de la Parte A, sin migración, y se conserva al exportar/importar. */
+  measurable?: boolean | null;
+  measEvid?: string;
 };
 export type PrioState = {
   cands: Cand[];
@@ -62,7 +66,8 @@ export const newCand = (id: string, name: string): Cand => ({
 });
 
 export const alive = (A: PrioState) => A.cands.filter((c) => c.stage === 'keep');
-export const inIndep = (A: PrioState) => A.cands.filter((c) => c.stage === 'keep' || (c.stage === 'merge' && c.at === 'ind'));
+// Los que llegan a la verificación de independencia = los que NO se eliminaron en el tamizaje (keep, o eliminados ya en la independencia).
+export const inIndep = (A: PrioState) => A.cands.filter((c) => c.stage === 'keep' || c.at === 'ind');
 export const cols = (A: PrioState): { key: string | number; label: string }[] =>
   A.mode === 'q'
     ? A.questions.map((_, i) => ({ key: i, label: 'Q' + (i + 1) }))

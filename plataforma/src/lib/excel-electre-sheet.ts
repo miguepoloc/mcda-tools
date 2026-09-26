@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { colL, qs, stl, W, type MatInfo } from './excel-core.ts';
 import { getCell, getType } from './topsis.ts';
-import { electre, electreCStar, electreDStar, electreSynthesis } from './electre.ts';
+import { electre, electreCStar, electreDStar, electreKernelText, electreSynthesis } from './electre.ts';
 import type { Alternative, Criterion, DecisionMatrix } from './types.ts';
 
 /** ELECTRE I con fórmulas vivas: misma matriz "dirección beneficio" g y rango P que PROMETHEE.
@@ -124,6 +124,29 @@ export function electreSheet(criteria: Criterion[], alternatives: Alternative[],
   put(rInc, 0, 'Pares incomparables (ninguna supera a la otra)', { s: stl.b12 });
   if (syn.incomparable.length) syn.incomparable.forEach(([x, y], i) => put(rInc + 1 + i, 0, `${x} — ${y}`, { s: stl.wrap }));
   else put(rInc + 1, 0, 'Ninguno: cada par tiene relación en algún sentido.', { s: stl.wrap });
-  const colsW = [30, ...Array.from({ length: Math.max(m, n, 1) }, () => 16)];
+  // Núcleo de la relación (Roy): conjunto que ninguna otra alternativa del núcleo supera y que, juntas, supera a todas las demás (los ciclos son un solo bloque).
+  // Las columnas «Supera a», «Es superada por» y «Estado» son fórmulas vivas sobre la grilla «Relación» (cambian si cambias c* o d*). La pertenencia al núcleo
+  // NO es una fórmula: exige hallar ciclos (cierre transitivo), que en una celda no es confiable; se guarda como VALOR calculado al exportar con los c*/d*
+  // del proyecto, y la nota de la hoja lo dice. Mismo criterio que electreKernel() (electre.ts): «que nadie la supere» NO basta para ganar.
+  const kernel = syn.kernel, kernelText = electreKernelText(syn.names, kernel, syn.relations.length > 0);
+  const rKerHead = rInc + 1 + Math.max(1, syn.incomparable.length) + 1, rKer0 = rKerHead + 1;
+  put(rKerHead - 1, 0, 'Núcleo de la relación de superación', { s: stl.b12 });
+  put(rKerHead, 0, 'Alternativa', { s: stl.hdrL });
+  ['Supera a (nº)', 'Es superada por (nº)', 'Estado (según la grilla Relación)', 'En el núcleo (valor al exportar)'].forEach((h, c) => put(rKerHead, 1 + c, h, { s: stl.hdr }));
+  alternatives.forEach((a, i) => {
+    const rr = rKer0 + i, relRow = rRel0 + i, colI = colL(1 + i);
+    const out = r.outranks[i].filter(Boolean).length, inn = r.outranks.filter((row) => row[i]).length;
+    const estado = out === 0 && inn === 0 ? 'Sin relación' : inn === 0 ? 'Nadie la supera' : out === 0 ? 'Solo es superada' : 'Supera y es superada';
+    put(rr, 0, a.name, { s: stl.hdrL });
+    put(rr, 1, out, { f: `COUNTIF(B${relRow}:${lastAlt}${relRow},"Sí")`, s: stl.c, z: '0' });
+    put(rr, 2, inn, { f: `COUNTIF(${colI}${rRel0}:${colI}${rRel0 + n - 1},"Sí")`, s: stl.c, z: '0' });
+    put(rr, 3, estado, { f: `IF(AND(B${rr}=0,C${rr}=0),"Sin relación",IF(C${rr}=0,"Nadie la supera",IF(B${rr}=0,"Solo es superada","Supera y es superada")))`, s: stl.c });
+    put(rr, 4, kernel.members.includes(i) ? 'Sí' : 'No', { s: stl.key });
+  });
+  const rKerSum = rKer0 + n;
+  put(rKerSum, 0, kernelText.summary, { s: stl.wrap });
+  kernelText.reasons.forEach((t, i) => put(rKerSum + 1 + i, 0, t, { s: stl.wrap }));
+  put(rKerSum + 1 + kernelText.reasons.length, 0, 'Nota: «Nadie la supera» no significa «gana». La columna «En el núcleo» es un valor calculado al exportar con los c*/d* del proyecto: si cambias c* o d* en esta hoja, las demás columnas se recalculan pero esa no. Solo hay ganador si el núcleo es una única alternativa.', { s: stl.note });
+  const colsW = [30, ...Array.from({ length: Math.max(m, n, 4, 1) }, () => 18)];
   return fin(colsW, [{ hpt: 30 }], [{ s: { r: 0, c: 1 }, e: { r: 0, c: Math.max(m, n) } }]);
 }

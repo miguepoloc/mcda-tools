@@ -254,6 +254,25 @@ del SQL (políticas + funciones `SECURITY DEFINER`) se ve correcta, pero eso no 
 
 ## Historial de cambios
 
+**26 sep 2026 (desglose de cálculo paso a paso, como en las diapositivas 1-4):** auditoría de las sesiones 1-4 contra la
+plataforma: los números intermedios (matriz normalizada y ponderada, A⁺/A⁻, contribuciones de VIKOR, matriz π de PROMETHEE,
+matrices de AHP, media geométrica…) ya se calculaban pero Resultados y el informe solo pintaban el resultado final. Ahora
+`src/components/calc/` trae un desglose por método (`AhpBreakdown`, `TopsisBreakdown`, `VikorBreakdown`, `ElectreBreakdown`,
+`PrometheeBreakdown`, `PrioBreakdown` = de la lluvia de ideas a los finalistas, `WeightsBreakdown` = CRITIC/Entropía, más
+`HierarchyTree`, `SensitivityReport` y `MethodComparisonReport` con Spearman/Kendall), construido con las piezas comunes de
+`CalcKit.tsx` (paso numerado, fórmula, «qué significa», «con tus números», «cómo leerlo»). En **Resultados** cada paso es
+desplegable (ancla «Ir al desglose de cálculo»); en el **Informe ejecutivo** es un apéndice con todo abierto (un `<details>`
+cerrado no se imprime), más secciones nuevas de selección de criterios, estructura de la decisión, sensibilidad (tablas fijas;
+antes el informe decía que no la incluía) y comparación entre métodos. Gráficas corregidas: corte de la priorización (leyenda,
+eje, «Pasa/No pasa», brecha), barra de ranking de VIKOR (la más corta es la mejor), distancias al ideal, S-R-Q y Q vs v. El
+simulador ya no inventa un ranking de ELECTRE. Excel: bloque «Núcleo» en la hoja ELECTRE y «¿Pasa el corte?» con fórmula viva en
+Prior 5. Contadores de la priorización unificados con el Excel (10 → 9 → 7 → 4). Pruebas nuevas: `check-ahp-breakdown`,
+`check-breakdown-s3`, `check-outranking-breakdown`, `check-prio-steps`, `check-sensitivity`, `check-integration` (renderiza
+Results y el informe por método) y `check-excel-prio` (en `test:excel`). **No verificado:** aspecto visual, impresión y móvil
+(solo se renderizó a HTML). **Pendiente:** `exampleData` del informe nunca se pasa desde Results (un caso de ejemplo se
+imprimiría sin aviso; falta guardar la marca en el proyecto), la diapositiva 12 (S1) no se reproduce con SAW ni TOPSIS con los
+datos de la 11 y la diapositiva 25 (S4) cita Autonomía donde el veto de LoRaWAN sobre Sigfox está en Madurez.
+
 **26 sep 2026 (ELECTRE: núcleo real en vez de «nadie la supera»):** un estudiante preguntó por qué MLP «ganaba» si era
 incomparable con todas. Era un error de criterio (los cálculos de c/d y de superación estaban bien): el ✓, el «ganador» de
 la comparación entre métodos (y su voto al consenso) y el dictamen del informe usaban «alternativa con nadie que la supere»,
