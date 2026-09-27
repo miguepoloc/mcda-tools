@@ -7,8 +7,8 @@ authors:
     given-names: "Miguel Angel"
     affiliation: "Universidad del Magdalena"
     orcid: "https://orcid.org/0000-0002-7461-2558"
-version: 0.1.1
-date-released: "2026-09-27"
+version: 0.1.2
+date-released: "2026-09-28"
 doi: 10.5281/zenodo.23002866
 identifiers:
   - type: doi

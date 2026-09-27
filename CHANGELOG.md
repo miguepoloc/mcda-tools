@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.1.2] - 2026-09-28
+
+### Removed
+- The "aptitud cacaotera · Sierra Nevada" spatial example (`snsm-cacao-v1`, notebook 07). Its geo-pack shipped two layers (temperature, precipitation) derived from WorldClim 2.1, whose license (CC BY-NC-SA 4.0) explicitly forbids redistribution. The buoy example (`boya-2021`, Polo-Castañeda et al. 2021, no such restriction) is now the platform's only built-in spatial example. The removed files stay available locally (git-ignored) for continued work outside this repository.
+
+### Fixed
+- `scripts/check-geo-crs.ts` no longer reads the (now removed) `snsm-cacao-v1/manifest.json`; it uses the reference grid's transform and CRS code directly (georeferencing metadata only, not the licensed data), so the regression test still runs.
+
+---
+
 ## [0.1.1] - 2026-09-27
 
 ### Fixed
