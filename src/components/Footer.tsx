@@ -22,6 +22,7 @@ export default function Footer() {
       <nav aria-label="Enlaces del pie de página" className="lfoot-nav">
         <Link href="/metodo">¿Qué método uso?</Link>
         <Link href="/tutorial">Cómo funciona</Link>
+        <Link href="/citar">Cómo citar</Link>
         <a href={APP_REPO_URL} target="_blank" rel="noopener noreferrer">
           GitHub
         </a>

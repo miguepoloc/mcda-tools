@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import Topbar from '@/components/Topbar';
 import Footer from '@/components/Footer';
+import CitationSection from '@/components/CitationSection';
 import { FAMILY, METHOD_GUIDE, METHOD_ORDER, WEIGHTING_GUIDE, WEIGHTING_ORDER } from '@/lib/methodGuide';
 import { WEIGHTING_REFS } from '@/lib/references';
 
@@ -236,6 +237,8 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      <CitationSection />
 
       <div className="wrap">
         <div className="lcta">

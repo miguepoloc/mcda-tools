@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: '/', label: 'Inicio' },
   { href: '/metodo', label: '¿Qué método uso?' },
   { href: '/tutorial', label: 'Cómo funciona' },
+  { href: '/citar', label: 'Cómo citar' },
 ];
 
 /** Barra superior compartida por TODAS las páginas: mismo logo, misma navegación (Inicio / ¿Qué

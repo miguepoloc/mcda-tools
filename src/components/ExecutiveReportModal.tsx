@@ -29,7 +29,7 @@ import SensitivityReport from './calc/SensitivityReport';
 import MethodComparisonReport, { type CompareMethod } from './calc/MethodComparisonReport';
 import { METHOD_EXTRA_REFS, REFS, WEIGHTING_REFS, apa, isObjectiveWeighting } from '@/lib/references';
 import type { WeightMethod } from '@/lib/ahp';
-import { APP_VERSION } from '@/lib/version';
+import { APP_VERSION, APP_DOI } from '@/lib/version';
 
 /** Colores del informe: el modal es siempre blanco (también en impresión), pero los gráficos leen las variables del tema de la app;
  * en modo oscuro `--ink` sería casi blanco sobre papel blanco. Se redefinen aquí en claro, con los tonos de método oscurecidos
@@ -937,6 +937,9 @@ export default function ExecutiveReportModal({
               {refList.map((r) => (
                 <p key={r} style={{ margin: 0, paddingLeft: '2em', textIndent: '-2em' }}>{r}</p>
               ))}
+            </div>
+            <div style={{ marginTop: 10, padding: '8px 12px', background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: 6, fontSize: 11, color: '#334155' }}>
+              <strong>Cómo citar esta plataforma (software científico):</strong> Polo-Castañeda, M. A. (2026). <em>mcda-tools</em> (v{APP_VERSION}) [Software]. Zenodo. https://doi.org/{APP_DOI} · Guía y formatos en <a href="https://mcda.tools/citar" target="_blank" rel="noopener noreferrer" style={{ color: '#4F46E5', textDecoration: 'underline' }}>mcda.tools/citar</a>
             </div>
           </Sec>
 
