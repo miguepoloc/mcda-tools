@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI Status](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23002791.svg)](https://doi.org/10.5281/zenodo.23002791)
+[![GitHub release](https://img.shields.io/github/v/release/miguepoloc/mcda-tools)](https://github.com/miguepoloc/mcda-tools/releases)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL_17_(Supabase)-336791?logo=postgresql)](https://supabase.com/)
@@ -18,6 +19,7 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Key Differentiators](#key-differentiators)
 - [Supported MCDA Methods](#supported-mcda-methods)
   - [1. Group Analytic Hierarchy Process (AHP)](#1-group-analytic-hierarchy-process-ahp)
@@ -40,6 +42,16 @@
 **MCDA Tools** is an academic-grade, open-source software platform designed to bridge the gap between rigorous mathematical Multi-Criteria Decision Analysis (MCDA / MCDM) algorithms and accessible, collaborative web workflows. 
 
 Developed for graduate-level engineering decision analysis and applied research, the platform eliminates dependencies on expensive proprietary software (such as Expert Choice or Super Decisions) and desktop GIS installations (QGIS, ArcGIS) by running complete decision workflows directly inside modern web browsers with cloud synchronization.
+
+---
+
+## Screenshots
+
+| Landing | Method selection wizard (`/metodo`) | Academic citation generator (`/citar`) |
+|---|---|---|
+| [![Landing page](docs/screenshots/landing.png)](https://mcda.tools) | [![Method selection wizard](docs/screenshots/metodo.png)](https://mcda.tools/metodo) | [![Citation generator](docs/screenshots/citar.png)](https://mcda.tools/citar) |
+
+Live captures from the production deployment ([https://mcda.tools](https://mcda.tools)).
 
 ---
 
@@ -262,6 +274,8 @@ M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria 
   url          = {https://doi.org/10.5281/zenodo.23002791}
 }
 ```
+
+You can also generate these references (plus RIS / Chicago) directly from the platform at [`/citar`](https://mcda.tools/citar).
 
 ---
 

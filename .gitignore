@@ -17,6 +17,7 @@ __pycache__/
 venv/
 .DS_Store
 .claude/
+.agents/
 
 # Temporary local files
 /*.pdf

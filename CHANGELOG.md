@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.1.1] - 2026-09-27
+
+### Fixed
+- Restored `notebooks/README.md`, which had been accidentally emptied while preparing the v0.1.0 release.
+- Removed `.agents/` (136 unrelated Claude Code UI/UX skill files, ~4 MB) from version control; it was mistakenly tracked during the `mcda-tools` restructuring and is now git-ignored.
+- Rewrote `README.es.md` from scratch: it still described the pre-restructuring layout (`plataforma/` as the app root, the deleted `prototipos/` folder and Harold's thesis HTML tool, a hardcoded Supabase project ref, and only 6 of the 15 migrations). It now mirrors `README.md` exactly, section by section.
+
+### Added
+- Real screenshots of the production deployment (landing, `/metodo`, `/citar`) under `docs/screenshots/`, embedded in both README files.
+- `GitHub release` badge in `README.md` and `README.es.md`.
+
+---
+
 ## [0.1.0] - 2026-09-27
 
 ### Initial Release: Web Platform for Multi-Criteria Decision Analysis & Spatial MCDA
