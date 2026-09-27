@@ -1,8 +1,8 @@
 /** Carga un paquete del catálogo (`public/geo-packs/<id>/manifest.json`) en el navegador: fetch +
  * descompresión gzip nativa (`DecompressionStream`, sin dependencias nuevas) + deshacer la
  * cuantización. Solo corre en cliente — no lo importa ningún `check-*.ts`. Generado por
- * `scripts/geo/export_pack.py` a partir de `data/ahp_sig_snsm/cache/` (ver ese script y
- * `plataforma/docs/PLAN_geovisor_ahp_sig.md`). */
+ * `scripts/geo/export_pack.py` a partir de `notebooks/data/ahp_sig_snsm/cache/` (ver ese script y
+ * `docs/PLAN_geovisor_ahp_sig.md`). */
 import { dequantizeLayer } from './quant.ts';
 import type { GeoGrid } from '../types.ts';
 

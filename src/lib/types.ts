@@ -6,7 +6,7 @@ export type Alternative = { id: string; name: string };
 export type ExpertStatus = 'pending' | 'in_progress' | 'submitted';
 /** 'ahp' = alternativas comparadas de a pares (como hasta ahora); los demás usan una matriz de
  * decisión cuantitativa + los mismos pesos de la hoja Criterios ('electre' NO da un ranking total,
- * da relaciones de superación con incomparabilidad posible). Ver plataforma/README.md § "Visión". */
+ * da relaciones de superación con incomparabilidad posible). Ver README.md. */
 export type Method = 'ahp' | 'topsis' | 'vikor' | 'electre' | 'promethee' | 'saw' | 'fuzzy_topsis';
 /** Método para calcular los pesos de los criterios:
  * - 'ahp': pesos derivados de los juicios por pares de los expertos (comportamiento histórico).
@@ -51,7 +51,7 @@ export type DecisionMatrix = {
  * hay `alternatives` ni `decision_matrix`; `method` se fija en 'saw' solo para que el panel de
  * expertos reutilice el mecanismo ya existente de pesar criterios por pares (JudgmentEditor ya
  * muestra únicamente la hoja `crit` cuando `method !== 'ahp'`, sin cambios). La configuración propia
- * del mapa vive en `geo`. Ver plataforma/docs/PLAN_geovisor_ahp_sig.md. */
+ * del mapa vive en `geo`. Ver docs/PLAN_geovisor_ahp_sig.md. */
 export type Kind = 'decision' | 'spatial';
 
 /** Regla de idoneidad de un criterio espacial: ver `src/lib/geo/membership.ts` (FnSpec/VetoSpec) —

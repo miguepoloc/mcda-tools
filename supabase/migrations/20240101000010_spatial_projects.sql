@@ -1,5 +1,5 @@
 -- Plataforma MCDA: primera pieza de "Mapa de aptitud (SIG)" (geovisor AHP + SIG, ver
--- plataforma/docs/PLAN_geovisor_ahp_sig.md). Un proyecto espacial es kind:'spatial' con
+-- docs/PLAN_geovisor_ahp_sig.md). Un proyecto espacial es kind:'spatial' con
 -- method:'saw' (así JudgmentEditor/expert_get ya se comportan como se necesita, sin tocarlos: solo
 -- muestran la hoja 'crit' cuando method != 'ahp' — comportamiento existente desde 0002). No hace
 -- falta RLS nueva: `projects_owner` (0001_init.sql) ya es a nivel de fila, cubre estas columnas.

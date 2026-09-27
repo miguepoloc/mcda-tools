@@ -724,7 +724,7 @@ Resolver antes de comprometer diseño:
 ### Fase 8 · Tutorial, ejemplo y pulido (L)
 - [ ] `/tutorial` (fase nueva) + tutorial solar + `/metodo` + `NewProject` con el caso guiado + coachmarks + landing.
 - [ ] Revisión: 375 px, tablet, horizontal, oscuro, `prefers-reduced-motion`, texto grande, teclado y lector de pantalla, contraste, Lighthouse/CLS, tamaño de *bundle* (MapLibre y geotiff.js solo en rutas del geovisor).
-- [ ] README de `plataforma/` (modelo de datos, historial, verificado/no verificado) y `CLAUDE.md` (nueva sección + excepción a "nada persiste resultados").
+- [x] README (modelo de datos, historial, verificado/no verificado) y `CLAUDE.md` (nueva sección + excepción a "nada persiste resultados").
 
 **Definición de hecho de cada fase:** `npm run typecheck`, `npm test`, `npm run build` en verde; lo que toque Excel pasa `test:excel` y el recálculo real; lo que toque seguridad pasa `test:rls`; y se **prueba en el navegador** el flujo dorado (ejemplo cacao de punta a punta y un caso propio pequeño), no solo los tipos.
 
@@ -772,5 +772,4 @@ Resolver antes de comprometer diseño:
 **Modificar**
 - `src/lib/types.ts` (`kind`, `GeoConfig`, `PublicGet`/`ExpertGet` con `kind`).
 - `src/components/ProjectWorkspace.tsx` (pestañas por `kind`), `NewProject.tsx`, `MetodoClient.tsx`, `PublicView.tsx`, `ProjectList.tsx` (insignia de tipo), `src/app/tutorial/page.tsx`, `src/app/admin/*`, `src/lib/admin.ts`, `src/lib/excel.ts` (hoja de puntos), `src/app/globals.css` (tokens `--m-sig`, `--geo-*` y clases `.geo-*`).
-- `package.json` (`maplibre-gl`, `geotiff`, `proj4`, `shpjs`, y opcional `fflate`), scripts `test`/`test:excel`.
-- `README.md` de `plataforma/` y `CLAUDE.md` del repo.
+- `README.md` y `CLAUDE.md` del repo.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Exporta un paquete del catálogo del geovisor (plataforma/) a partir de las
-matrices ya calculadas por 07_ahp_sig_cacao_snsm.ipynb (data/ahp_sig_snsm/cache/).
+"""Exporta un paquete del catálogo del geovisor a partir de las
+matrices ya calculadas por 07_ahp_sig_cacao_snsm.ipynb (notebooks/data/ahp_sig_snsm/cache/).
 
 No descarga nada nuevo: reusa el caché del notebook. Produce, bajo
-plataforma/public/geo-packs/<pack_id>/:
+public/geo-packs/<pack_id>/:
   - manifest.json   grilla (CRS/bbox/res/tamaño), un registro por capa
                      (id, etiqueta, unidad, min/max reales, ruta) y puntos de
                      ejemplo.
@@ -13,8 +13,8 @@ plataforma/public/geo-packs/<pack_id>/:
   - base.png          hillshade del DEM, tamaño nativo de la grilla, como
                       fondo del mapa (el geovisor lo pinta con opacidad baja).
 
-Ver plataforma/src/lib/geo/membership.ts y suitability.ts para el consumidor.
-Ver plataforma/docs/PLAN_geovisor_ahp_sig.md § 6.2 sobre `pend`: la función de
+Ver src/lib/geo/membership.ts y suitability.ts para el consumidor.
+Ver docs/PLAN_geovisor_ahp_sig.md § 6.2 sobre `pend`: la función de
 idoneidad de pendiente no está en membership.py (falta en el notebook); aquí
 solo se exporta el dato crudo en grados, la función vive en el cliente.
 

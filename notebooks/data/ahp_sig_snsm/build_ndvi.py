@@ -6,9 +6,8 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-AOI_BOUNDS_WGS84 = (-74.24, 10.19, -72.85, 11.49)  # lon_min, lat_min, lon_max, lat_max
-OUT_DIR = "/Users/miguepoloc/Code/02-learning/maestria/toma-decisiones-mcda/data/ahp_sig_snsm/cache"
-TARGET_RES_M = 100  # leer decimado a ~100m (GDAL usa los overviews del COG, no la banda 10m completa) -- de sobra para remuestrear despues a 250m
+from pathlib import Path
+OUT_DIR = str(Path(__file__).resolve().parent / "cache")
 
 catalog = pystac_client.Client.open('https://planetarycomputer.microsoft.com/api/stac/v1', modifier=planetary_computer.sign_inplace)
 search = catalog.search(

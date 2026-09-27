@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
-title: "MCDA Platform: multi-criteria decision analysis with group AHP and a suitability-map geoviewer"
+title: "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA"
 type: software
 authors:
   - family-names: "Polo-Castañeda"
@@ -8,12 +8,11 @@ authors:
     affiliation: "Universidad del Magdalena"
     orcid: "https://orcid.org/0000-0002-7461-2558"
 version: 0.1.0
-# When the frozen version that a paper will cite is tagged (v1.0.0), Zenodo mints its DOI. Then set here:
-# version: 1.0.0
-# date-released: "YYYY-MM-DD"   # the day the GitHub release is created, not before
-# doi: 10.5281/zenodo.XXXXXXX   # the Zenodo DOI of that release (it does not depend on any journal)
+date-released: "2026-09-27"
+# Once GitHub Release v0.1.0 is published and Zenodo mints the DOI, add:
+# doi: 10.5281/zenodo.XXXXXXX
 license: MIT
-repository-code: "https://github.com/miguepoloc/toma-decisiones-mcda"
+repository-code: "https://github.com/miguepoloc/mcda-tools"
 url: "https://mcda.tools"
 keywords:
   - multi-criteria decision analysis

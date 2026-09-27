@@ -2,7 +2,7 @@
 -- almacenamiento editable por el admin, catálogo de paquetes del docente y limpieza de huérfanos.
 -- Requiere 20240101000010 (kind/geo) y 20240101000011 (bucket `geo-layers`).
 --
--- Decisiones (ver plataforma/docs/PLAN_geovisor_ahp_sig.md §4):
+-- Decisiones (ver docs/PLAN_geovisor_ahp_sig.md §4):
 --  · El resultado público se guarda EN la base (`geo_results`, base64), no en Storage: se revoca al
 --    instante al quitar «público» y se sirve solo por `public_geo_get(token)`. Nunca las capas de entrada.
 --  · La cuota se mide sobre los objetos REALES de Storage (`storage.objects.metadata.size`), no sobre

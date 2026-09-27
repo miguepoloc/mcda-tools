@@ -573,7 +573,7 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 
 /* ---- geovisor (kind:'spatial') — todo prefijado .gv- para no chocar con clases cortas ya
    usadas arriba (.val, .track, .fill, .n, .st… viven en otros componentes; ver
-   plataforma/docs/PLAN_geovisor_ahp_sig.md sobre el bug real que motivó este prefijo) ---- */
+   docs/PLAN_geovisor_ahp_sig.md sobre el bug real que motivó este prefijo) ---- */
 .gv-wrap{--accent:var(--geo-accent);--accent-soft:var(--geo-accent-soft);--accent-ink:#0B0F17;position:relative;left:50%;transform:translateX(-50%);width:min(1560px,calc(100vw - 40px))}
 .gv-shell{display:grid;grid-template-columns:392px minmax(0,1fr);gap:14px;align-items:start}
 @media(max-width:1000px){.gv-wrap{left:0;transform:none;width:100%}.gv-shell{grid-template-columns:1fr}.gv-side{order:2}.gv-main{order:1}}

@@ -29,7 +29,7 @@ type Props = { initialProject: ProjectRow; initialExperts: ExpertRow[]; initialJ
 type Patch = Partial<Pick<ProjectRow, 'title' | 'objective' | 'method' | 'weighting_method' | 'criteria' | 'alternatives' | 'decision_matrix' | 'prioritization' | 'is_public' | 'public_token' | 'geo'>>;
 const TABS_AHP = ['Proyecto', 'Priorización (A)', 'Expertos', 'Resultados', 'Comparativa', 'Compartir'];
 const TABS_MATRIX = ['Proyecto', 'Priorización (A)', 'Expertos', 'Matriz de decisión', 'Resultados', 'Comparativa', 'Compartir'];
-// kind:'spatial' — ver GeoVisor.tsx y plataforma/docs/PLAN_geovisor_ahp_sig.md. Sin «Matriz de
+// kind:'spatial' — ver GeoVisor.tsx y docs/PLAN_geovisor_ahp_sig.md. Sin «Matriz de
 // decisión»/«Resultados»/«Comparativa»: las alternativas son píxeles, no filas de esas tablas.
 const TABS_SPATIAL = ['Proyecto', 'Priorización (A)', 'Expertos', 'Geovisor', 'Compartir'];
 const METHOD_OPTIONS: { key: Method; label: string; family: string; desc: string; citation: string }[] = [

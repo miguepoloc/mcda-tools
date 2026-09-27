@@ -1,7 +1,7 @@
 // Genera el paquete `public/geo-packs/boya-wsn-v1/` (caso de la boya, Polo-Castañeda et al. 2021, IJASEIT 11(5)) a partir
 // del archivo del autor: los 4 criterios ya clasificados 1/2/3 (rásteres float32 en MAGNA Bogotá, EPSG:3116, celda 38.68 × 17.89 m)
 // y los polígonos del área de trabajo (con y sin concesiones). Los datos originales NO están en el repositorio: este script solo
-// corre en el equipo del autor; el resultado (≈ cientos de KB) sí se versiona. Uso, desde `plataforma/`:
+// corre en el equipo del autor; el resultado (≈ cientos de KB) sí se versiona. Uso, desde la raíz del repositorio:
 //   BOYA_RASTER_DIR=".../Mapas/TESIS/Raster" BOYA_AREA_DIR=".../Mapas/TESIS/Area de trabajo" \
 //     node --experimental-strip-types --no-warnings scripts/geo/export-boya-pack.ts
 //

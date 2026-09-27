@@ -1,7 +1,6 @@
 // Prueba de humo de las funciones de idoneidad del geovisor AHP + SIG. Compara contra
 // data/ahp_sig_snsm/membership.py (el notebook 07) y contra los 4 puntos de ejemplo
-// (Palmor/San Pedro/Bonda/Guachaca) de idoneidad_biofisica_250m.npy, leídos directo del caché con
-// pyproj/rasterio (ver plataforma/docs/PLAN_geovisor_ahp_sig.md § 6.2 sobre `pend`).
+// pyproj/rasterio (ver docs/PLAN_geovisor_ahp_sig.md § 6.2 sobre `pend`).
 import { classes, down, fnIssue, sortedFn, suitability, trapezoid, up, vetoed } from '../src/lib/geo/membership.ts';
 
 let fallos = 0;

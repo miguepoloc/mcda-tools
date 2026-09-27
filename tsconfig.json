@@ -37,7 +37,6 @@
     ".next-geotest/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "prototipos"
+    "node_modules"
   ]
 }

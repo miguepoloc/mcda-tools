@@ -1,6 +1,6 @@
 'use client';
 
-/** Geovisor AHP + SIG (`kind:'spatial'`, ver plataforma/docs/PLAN_geovisor_ahp_sig.md). Mapa web real
+/** Geovisor AHP + SIG (`kind:'spatial'`, ver docs/PLAN_geovisor_ahp_sig.md). Mapa web real
  * (Leaflet) con mapa base mundial; el cálculo de idoneidad corre en el navegador con los pesos del
  * panel de expertos (mismo `sheetResult(CRIT_SHEET,…)` que usan los demás métodos). Los datos vienen
  * de un paquete del catálogo (`geo.packId`) o de las capas propias del estudiante (`geo.grid` +

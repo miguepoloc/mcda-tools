@@ -2,7 +2,7 @@
 -- Agrega a `projects` lo mínimo para que un proyecto elija cómo se ranquean las alternativas dado
 -- un peso de criterios ya fijado: AHP por pares (como hasta ahora, sin cambios) o una matriz de
 -- decisión cuantitativa (TOPSIS, y a futuro VIKOR/ELECTRE/PROMETHEE sobre la MISMA matriz — ver
--- plataforma/README.md § "Visión: plataforma multicriterio completa"). El paso de PESAR criterios
+-- README.md § "Visión: plataforma multicriterio completa"). El paso de PESAR criterios
 -- (AHP por pares vía `experts`/`judgments`, sheet='crit') no cambia con ninguno de estos métodos.
 --
 -- Por qué no hay una tabla nueva de "resultados": ningún método persiste su resultado, todos se

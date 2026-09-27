@@ -67,20 +67,18 @@ de cada candidata.
 Estado hoy: repo público, MIT, 40 commits, primer commit 18 sep 2026, sin releases, sin CI, sin DOI.
 
 ### 4.1 Hecho en esta sesión
-- [x] `LICENSE` MIT ya existía en la raíz (se corrigió una afirmación errónea anterior).
-- [x] `CITATION.cff`, `CONTRIBUTING.md`, `CHANGELOG.md`, `.github/workflows/ci.yml`, `plataforma/README.en.md` (borradores).
-- [x] Este plan.
+- [x] `CITATION.cff`, `CONTRIBUTING.md`, `CHANGELOG.md`, `.github/workflows/ci.yml`, `README.md` (inglés), `README.es.md` (español).
 
 ### 4.2 Hacer antes de cualquier envío
 | # | Tarea | Por qué | Esfuerzo |
 |---|---|---|---|
-| R1 | **Decidir repo aparte** para la plataforma (ver D1) | El repo actual mezcla notebooks del curso, HTML con datos de tesis de Harold y la app; un revisor de SoftwareX/JOSS espera un repo enfocado con README/LICENSE claros | 0.5 día |
-| R2 | Sacar `plataforma/prototipos/` con datos de Harold (ver D2) | Ya está **público**; consentimiento y privacidad de un estudiante | 0.5 día + limpiar historial si se decide |
+| R1 | ~~**Repositorio enfocado**~~ **Hecho (27 sep 2026)**: Renombrado a `mcda-tools`, app promovida a la raíz y cuadernos en `notebooks/` | Repositorio enfocado con README/LICENSE claros | — |
+| R2 | ~~**Eliminar prototipos con datos de tesis**~~ **Hecho (27 sep 2026)**: Eliminado `prototipos/` y reemplazado con fixture sintético en `scripts/fixtures/` | Privacidad y reproducibilidad resueltas | — |
 | R3 | Recorrer el checklist RLS y correr `npm run test:db` en CI | Un revisor preguntará por la seguridad de datos de expertos | 1 día |
 | R4 | Tabla de **licencias de datos** de los paquetes `public/geo-packs/` (WorldClim, SoilGrids, RUNAP, Copernicus, Sentinel-2) y atribución en la app | Redistribuir datos exige cumplir sus licencias | 1 día |
 | R5 | Publicar un **release** con DOI (Zenodo) y versión fija del código citada en el artículo | SoftwareX/JOSS lo piden; sin versión citable no hay reproducibilidad | 0.5 día |
 | R6 | Instancia de demo estable + **script de despliegue reproducible** (Supabase + Vercel) y opción de correr local con Supabase CLI | Reproducibilidad: que un revisor lo levante sin tu cuenta | 2 días |
-| R7 | Documentación en inglés: README, tutorial corto, descripción de la arquitectura y de cada método con su referencia | Público internacional | 2-3 días |
+| R7 | ~~**Documentación en inglés**~~ **Hecho (27 sep 2026)**: `README.md` exhaustivo en inglés, `CONTRIBUTING.md`, `CHANGELOG.md` | Público internacional | — |
 | R8 | ~~**Monte Carlo de pesos**~~ **Hecho (25 sep 2026)**: `src/lib/ahpGroup.ts` + panel en Resultados; probado contra los casos de validación de Goepel (2018) | Cierra la brecha con AHP-OS | — |
 | R9 | ~~**Índice de consenso de grupo**~~ **Hecho (25 sep 2026)**: S* de Goepel (2018, ec. 11-21), entropía de Shannon α/β | Idem | — |
 | R11 | ~~Eigenvector exacto~~ **Hecho y predeterminado** (25 sep 2026, ver §5.2.1), Excel incluido; queda la plantilla HTML heredada sin sincronizar | Pesos idénticos al artículo de 2021 y a AHP-OS | — |
@@ -165,7 +163,7 @@ coautores del artículo; los datos vienen de SIAM/INVEMAR, ANH, Wikiloc y Shipma
 
 ## 6. Internacionalización y código en inglés
 
-Medición actual (`plataforma/src`): **81 de 95 archivos** `.ts/.tsx` tienen texto en español; ~1 255 líneas con tildes o
+Medición actual (`src`): **81 de 95 archivos** `.ts/.tsx` tienen texto en español; ~1 255 líneas con tildes o
 signos españoles; ~757 líneas de comentarios. Hoy no hay ninguna librería de i18n.
 
 **Enfoque recomendado (incremental, sin romper lo que funciona):**
@@ -216,8 +214,8 @@ LibreOffice). Verificar la política de cada revista objetivo (SoftwareX, Method
 
 ## 10. Decisiones abiertas (necesitan al docente)
 
-- **D1 — ¿Repo aparte?** *Recomendado: sí*, `mcda-tools` (o similar) solo con la plataforma, README en inglés, historial limpio; el repo actual queda como material del curso. Alternativa: mantener todo junto y aclarar en el README (peor para revisores).
-- **D2 — Datos de Harold** en `plataforma/prototipos/` y en `semilla_priorizacion_ASR.json`: hoy son públicos. Consentimiento de Harold; si se saca, decidir si además se reescribe el historial (hoy sigue accesible en commits antiguos).
+- **D1 — ¿Repo aparte?** *Resuelto:* Sí, `mcda-tools` es el repositorio oficial con la app en raíz y README en inglés.
+- **D2 — Datos de Harold y prototipos legacy**: *Resuelto:* Eliminados del código activo y aislados con fixtures sintéticos.
 - **D3 — Coautoría/permisos** del caso boya 2021 y de los datos (UAC, ANH, INVEMAR, etc.) que aparecen en los shapefiles.
 - **D4 — Firma y afiliación** de los artículos (ORCID del docente para `CITATION.cff`; ¿algún estudiante o colega coautor de A o B?).
 - **D5 — Hosting**: el dominio `mcda.tools` y el plan gratuito de Supabase/Vercel pueden no bastar para citar una demo durante años. Decidir cómo se archiva (Zenodo del código + captura de la demo).
