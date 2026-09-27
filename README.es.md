@@ -253,12 +253,12 @@ Si utilizas **MCDA Tools** en cursos académicos, tesis de maestría o investiga
 
 ### APA (7.ª edición)
 ```text
-Polo-Castañeda, M. A. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.1) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23002866
+Polo-Castañeda, M. A. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.2) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23003288
 ```
 
 ### IEEE
 ```text
-M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.1, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23002866. [En línea]. Disponible: https://mcda.tools
+M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.2, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23003288. [En línea]. Disponible: https://mcda.tools
 ```
 
 ### BibTeX
@@ -269,13 +269,13 @@ M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria 
   year         = {2026},
   month        = sep,
   publisher    = {Zenodo},
-  version      = {v0.1.1},
-  doi          = {10.5281/zenodo.23002866},
-  url          = {https://doi.org/10.5281/zenodo.23002866}
+  version      = {v0.1.2},
+  doi          = {10.5281/zenodo.23003288},
+  url          = {https://doi.org/10.5281/zenodo.23003288}
 }
 ```
 
-Estos formatos citan esta versión exacta (v0.1.1). Para citar siempre la última versión, usa el DOI de concepto: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
+Estos formatos citan esta versión exacta (v0.1.2). Para citar siempre la última versión, usa el DOI de concepto: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
 
 También puedes generar estas referencias (y RIS / Chicago) desde la propia plataforma en [`/citar`](https://mcda.tools/citar).
 
