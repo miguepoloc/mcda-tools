@@ -97,6 +97,32 @@ npm run build
 
 ---
 
+## Semantic Versioning & Release Protocol
+
+This project strictly adheres to [Semantic Versioning 2.0.0](https://semver.org/):
+- **Patch (`0.1.0` → `0.1.1`)**: Backward-compatible bug fixes or calculation refinements.
+- **Minor (`0.1.0` → `0.2.0`)**: New decision methods, new GIS layer formats, or significant backward-compatible functionality.
+- **Major (`0.X.Y` → `1.0.0`)**: Production-ready stability with guaranteed API and schema compatibility.
+
+### Releasing a New Version
+When cutting an official release, the version number and DOI must be synchronized across:
+1. `src/lib/version.ts` (`APP_VERSION`, `APP_RELEASE_TAG`, `APP_DOI`)
+2. `package.json` (`version`)
+3. `CITATION.cff` (`version`, `date-released`, `doi`)
+4. `src/lib/citation.ts`
+5. `README.md` & `README.es.md` (badges and citation examples)
+6. `CHANGELOG.md`
+
+Tag the release commit and push to GitHub:
+```bash
+git tag -a vX.Y.Z -m "vX.Y.Z - Release summary"
+git push origin main
+git push origin vX.Y.Z
+```
+Zenodo will automatically archive the GitHub release and assign a Version DOI linked to the permanent Concept DOI.
+
+---
+
 ## License
 
 By contributing to MCDA Tools, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).

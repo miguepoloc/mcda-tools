@@ -34,6 +34,58 @@ npm run test:excel   # verifica la exportación y fórmulas vivas de Excel (AHP,
 
 `scripts/check-*.ts` forman la suite de pruebas unitarias y de integración matemática (corren con `node --experimental-strip-types`, sin bundlers adicionales).
 
+## Protocolo de Versionamiento y Releases (SemVer + Zenodo)
+
+Cualquier agente de IA o desarrollador que trabaje en este repositorio **DEBE** seguir este protocolo estricto de versionamiento, git tags y citación académica:
+
+### 1. Nombre y Firma del Autor (REGLA ESTRICTA)
+- **Nombre completo:** `Miguel Angel Polo Castañeda` (o `Miguel Angel Polo-Castañeda`).
+- **Iniciales de citación:** `M. A. Polo-Castañeda`.
+- **Afiliación institucional:** Universidad del Magdalena.
+- **ORCID:** `0000-0002-7461-2558`.
+- ⚠️ **CRÍTICO:** «Angel» y la inicial «A.» van **SIEMPRE SIN TILDE** (`Miguel Angel`, `M. A.`). Nunca escribir «Ángel» ni «M. Á.». Si un editor o búfer local reintroduce tildes, corregirlo de inmediato.
+
+### 2. Cuándo cambiar la versión (Semantic Versioning: `MAJOR.MINOR.PATCH`)
+- **NO cambiar la versión con commits ordinarios:** Commits regulares a `main` (mejoras de texto, refinamiento de UI, fixes menores o refactorizaciones internas dentro del ciclo de desarrollo de una misma versión) **no** incrementan la versión. La versión actual del software permanece estable.
+- **SÓLO incrementar la versión al preparar un RELEASE oficial:**
+  - **`PATCH` (ej. `0.1.0` → `0.1.1`):** Corrección de bugs numéricos, fixes de cálculo o correcciones de compatibilidad que no alteran la interfaz ni agregan nuevos métodos de decisión.
+  - **`MINOR` (ej. `0.1.0` → `0.2.0`):** Incorporación de nuevos métodos multicriterio (ej. ANP, MACBETH), soporte para nuevos formatos de capas GIS, nuevos motores de cálculo o flujos de trabajo mayores retrocompatibles.
+  - **`MAJOR` (ej. `0.X.Y` → `1.0.0`):** Cuando la plataforma culmine todas sus fases pedagógicas/maestría y alcance estabilidad garantizada de esquema, base de datos y API pública.
+
+### 3. Fuentes Únicas de Verdad de la Versión
+Cuando el usuario solicite un cambio de versión o se prepare un nuevo release, se DEBEN actualizar sincronizadamente los siguientes 6 archivos:
+1. `src/lib/version.ts`:
+   - `export const APP_VERSION = 'X.Y.Z';`
+   - `export const APP_RELEASE_TAG = 'vX.Y.Z';`
+   - `export const APP_DOI = '...';` (el DOI de la versión emitido en Zenodo)
+2. `package.json`: `"version": "X.Y.Z"`
+3. `CITATION.cff`:
+   - `version: X.Y.Z`
+   - `date-released: "YYYY-MM-DD"`
+   - `doi: 10.5281/zenodo.XXXXXXX`
+4. `src/lib/citation.ts`:
+   - Textos de citas bibliográficas sincronizados automáticamente con `APP_VERSION` y `APP_DOI`.
+5. `README.md` & `README.es.md`:
+   - Badge de Zenodo: `[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)`
+   - Citas en APA, IEEE y BibTeX en la sección `Citation` / `Cómo citar`.
+6. `CHANGELOG.md`: Entrada correspondiente al nuevo release `[X.Y.Z] - YYYY-MM-DD`.
+
+### 4. Git Tags y Publicación en Zenodo
+1. **Zenodo sincroniza mediante Git Tags / GitHub Releases:**
+   - **Concept DOI (`10.5281/zenodo.23002790`):** Permanece idéntico para siempre y apunta automáticamente a la versión más reciente del software.
+   - **Version DOI (`10.5281/zenodo.23002791` para v0.1.0):** Identifica específicamente esa versión congelada.
+2. **Creación obligatoria de Git Tag en releases:**
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z - Descripción concisa del release"
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+   *(Si se necesita corregir el commit apuntado por el tag actual antes de que Zenodo lo archive, usar `git tag -f -a vX.Y.Z -m "..." && git push -f origin vX.Y.Z`).*
+3. **Regla de Ejecución para Agentes:**
+   - Si el usuario pide guardar cambios, hacer commit o preparar release, el agente **DEBE** ejecutar el commit, tag y push directamente en el shell con `run_command` (sin pedirle al usuario que lo haga él manualmente).
+   - Siempre verificar previamente `npm run typecheck`, `npm test` y `npm run test:excel`.
+   - El árbol de trabajo (`git status`) SIEMPRE debe terminar limpio (`working tree clean`).
+
 ## Arquitectura
 
 ### La misma matemática vive en tres sitios y debe coincidir
