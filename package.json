@@ -2,7 +2,7 @@
   "name": "mcda-tools",
   "version": "0.1.0",
   "description": "Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA suitability mapping",
-  "author": "Miguel Ángel Polo-Castañeda <https://orcid.org/0000-0002-7461-2558>",
+  "author": "Miguel Angel Polo-Castañeda <https://orcid.org/0000-0002-7461-2558>",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Qué es este repositorio
 
 Material y herramientas del curso de posgrado **Toma de Decisiones Multicriterio** (Maestría en Ingeniería, Universidad
-del Magdalena, docente **Miguel Ángel Polo-Castañeda**, quien también trabaja directamente en este repositorio, no solo
+del Magdalena, docente **Miguel Angel Polo-Castañeda**, quien también trabaja directamente en este repositorio, no solo
 sus estudiantes). Idioma de trabajo: **español** (UI, textos y respuestas).
 
 El repositorio completo del curso (guiones de sesión, bibliografía, evaluación, cronograma) vive **fuera** de este repo

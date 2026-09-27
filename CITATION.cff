@@ -4,13 +4,16 @@ title: "mcda-tools: Open-source web platform for multi-criteria decision analysi
 type: software
 authors:
   - family-names: "Polo-Castañeda"
-    given-names: "Miguel Ángel"
+    given-names: "Miguel Angel"
     affiliation: "Universidad del Magdalena"
     orcid: "https://orcid.org/0000-0002-7461-2558"
 version: 0.1.0
 date-released: "2026-09-27"
-# Once GitHub Release v0.1.0 is published and Zenodo mints the DOI, add:
-# doi: 10.5281/zenodo.XXXXXXX
+doi: 10.5281/zenodo.23002791
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23002791
+    description: "The concept and version DOI of this software release on Zenodo"
 license: MIT
 repository-code: "https://github.com/miguepoloc/mcda-tools"
 url: "https://mcda.tools"

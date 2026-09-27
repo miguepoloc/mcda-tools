@@ -1,8 +1,17 @@
 # Plataforma MCDA (`mcda.tools`)
 
 > **Plataforma web de código abierto para el Análisis de Decisiones Multicriterio (MCDA / MCDM) y Modelado de Idoneidad Espacial (GIS-MCDA).**
->
-> **Idioma:** [English](README.md) | [Español](README.es.md)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI Status](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23002791.svg)](https://doi.org/10.5281/zenodo.23002791)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL_17_(Supabase)-336791?logo=postgresql)](https://supabase.com/)
+
+**Despliegue en producción:** [https://mcda.tools](https://mcda.tools)  
+**Repositorio oficial:** [https://github.com/miguepoloc/mcda-tools](https://github.com/miguepoloc/mcda-tools)  
+**Idioma:** [English](README.md) | [Español](README.es.md)
 
 **En producción:** <https://mcda.tools> — landing (`/`) explica qué hace y para quién; `/tutorial` trae la
 guía paso a paso; `/login` es donde el estudiante crea cuenta. Nadie necesita este README para usarla, es para quien la
@@ -750,3 +759,33 @@ no una jerarquía simple), sería la de mayor esfuerzo.
 - El plan gratuito de Supabase pausa proyectos inactivos; para uso continuo en un curso conviene entrar seguido o pasar a un plan de pago.
 - Otras ideas sueltas (menores, no priorizadas): rol de profesor que vea los proyectos de su curso, comentarios por par,
   recordatorios por correo a expertos, enlaces con vencimiento. El roadmap grande (métodos nuevos) está en "Visión" arriba.
+
+---
+
+## Cómo citar
+
+Si utilizas **MCDA Tools** en cursos académicos, tesis de maestría o investigaciones científicas, por favor cita este software utilizando los siguientes formatos:
+
+### APA (7.ª edición)
+```text
+Polo-Castañeda, M. A. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.0) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23002791
+```
+
+### IEEE
+```text
+M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.0, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23002791. [En línea]. Disponible: https://mcda.tools
+```
+
+### BibTeX
+```bibtex
+@software{polo_castaneda_2026_mcda_tools,
+  author       = {Polo-Castañeda, Miguel Angel},
+  title        = {{mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA}},
+  year         = {2026},
+  month        = sep,
+  publisher    = {Zenodo},
+  version      = {v0.1.0},
+  doi          = {10.5281/zenodo.23002791},
+  url          = {https://doi.org/10.5281/zenodo.23002791}
+}
+```

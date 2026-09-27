@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI Status](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/miguepoloc/mcda-tools/actions/workflows/ci.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.placeholder.svg)](https://doi.org/10.5281/zenodo.placeholder)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23002791.svg)](https://doi.org/10.5281/zenodo.23002791)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL_17_(Supabase)-336791?logo=postgresql)](https://supabase.com/)
@@ -237,23 +237,31 @@ npm run test:db
 
 ## Citation
 
-If you use **MCDA Tools** in an academic course, master's thesis, or scientific publication, please cite it using the metadata from [`CITATION.cff`](CITATION.cff):
+If you use **MCDA Tools** in academic courses, master's theses, or scientific research, please cite this software using the reference formats below:
+
+### APA (7th Edition)
+```text
+Polo-Castañeda, M. A. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23002791
+```
+
+### IEEE
+```text
+M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.0, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23002791. [Online]. Available: https://mcda.tools
+```
 
 ### BibTeX
 ```bibtex
-@software{PoloCastaneda_MCDA_Tools_2026,
-  author       = {Polo-Castañeda, Miguel Ángel},
-  title        = {{MCDA Platform: multi-criteria decision analysis with group AHP and a suitability-map geoviewer}},
+@software{polo_castaneda_2026_mcda_tools,
+  author       = {Polo-Castañeda, Miguel Angel},
+  title        = {{mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA}},
   year         = {2026},
+  month        = sep,
   publisher    = {Zenodo},
-  version      = {0.1.0},
-  url          = {https://mcda.tools},
-  repository   = {https://github.com/miguepoloc/mcda-tools}
+  version      = {v0.1.0},
+  doi          = {10.5281/zenodo.23002791},
+  url          = {https://doi.org/10.5281/zenodo.23002791}
 }
 ```
-
-### APA
-> Polo-Castañeda, M. Á. (2026). *MCDA Platform: multi-criteria decision analysis with group AHP and a suitability-map geoviewer* (Version 0.1.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.placeholder
 
 ---
 
