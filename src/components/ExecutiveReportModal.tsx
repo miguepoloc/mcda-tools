@@ -29,6 +29,7 @@ import SensitivityReport from './calc/SensitivityReport';
 import MethodComparisonReport, { type CompareMethod } from './calc/MethodComparisonReport';
 import { METHOD_EXTRA_REFS, REFS, WEIGHTING_REFS, apa, isObjectiveWeighting } from '@/lib/references';
 import type { WeightMethod } from '@/lib/ahp';
+import { APP_VERSION } from '@/lib/version';
 
 /** Colores del informe: el modal es siempre blanco (también en impresión), pero los gráficos leen las variables del tema de la app;
  * en modo oscuro `--ink` sería casi blanco sobre papel blanco. Se redefinen aquí en claro, con los tonos de método oscurecidos
@@ -947,7 +948,7 @@ export default function ExecutiveReportModal({
               ))}
             </div>
             <div style={{ borderTop: '1px solid #CBD5E1', marginTop: 16, paddingTop: 8, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4, fontSize: 11, color: '#475569' }}>
-              <span>Elaborado con Plataforma MCDA{origin ? ` · ${origin}` : ''} · {currentDate}, {currentTime}</span>
+              <span>Elaborado con Plataforma MCDA v{APP_VERSION}{origin ? ` · ${origin}` : ''} · {currentDate}, {currentTime}</span>
               <span>Universidad del Magdalena · Santa Marta, Colombia</span>
             </div>
           </footer>

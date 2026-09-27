@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import NewProject from '@/components/NewProject';
 import Topbar from '@/components/Topbar';
+import Footer from '@/components/Footer';
 import ProjectList from '@/components/ProjectList';
 import { PROJECT_LIST_SELECT, type ProjectListRow } from '@/lib/projects';
 
@@ -31,6 +32,7 @@ export default async function Dashboard() {
         <ProjectList initial={list} />
         <NewProject userId={user.id} />
       </div>
+      <Footer />
     </div>
   );
 }

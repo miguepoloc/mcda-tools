@@ -426,8 +426,16 @@ a{color:var(--accent)}
 .lcta .btn.primary{background:var(--accent-ink);color:var(--accent);border-color:var(--accent-ink)}
 .lcta .btn:not(.primary){border-color:color-mix(in srgb, var(--accent-ink) 40%, transparent);color:inherit;background:transparent}
 
-.lfoot{border-top:1px solid var(--line);padding-block:24px;display:flex;flex-wrap:wrap;gap:10px 20px;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
-.lfoot a{color:var(--muted)}
+.lfoot{border-top:1px solid var(--line);padding-block:24px;display:flex;flex-wrap:wrap;gap:12px 20px;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-top:40px}
+.lfoot-brand{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lfoot-title{font-weight:600;color:var(--ink)}
+.lfoot-ver-badge{font:600 11px var(--f-mono);padding:2px 7px;border-radius:4px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);text-decoration:none;transition:all .2s ease;display:inline-flex;align-items:center}
+.lfoot-ver-badge:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent);color:var(--ink);text-decoration:none}
+.lfoot-sep{color:var(--line)}
+.lfoot-sub{color:var(--muted)}
+.lfoot-nav{display:flex;gap:16px 20px;flex-wrap:wrap;align-items:center}
+.lfoot a{color:var(--muted);text-decoration:none;transition:color .2s ease}
+.lfoot a:hover{color:var(--ink);text-decoration:underline}
 
 @media(prefers-reduced-motion:no-preference){
   .lstep,.laud,.lmethod{transition:transform .18s ease,border-color .18s ease}
@@ -1007,8 +1015,9 @@ input[type=search]:focus{outline:none;border-color:var(--accent)}
 .topbar .brand{background:color-mix(in srgb,var(--ink) 3%,transparent)}
 .topbar .brand:hover{background:color-mix(in srgb,var(--ink) 7%,transparent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 15%,transparent)}
 .topbar .brand .brand-sub{font-size:11.5px}
-.brand-row{display:flex;align-items:center;gap:6px;line-height:1.2}
-.brand-badge{font:600 10px var(--f-mono);padding:1px 6px;border-radius:4px;background:color-mix(in srgb,var(--ink) 9%,transparent);color:var(--muted)}
+.brand-row{display:flex;align-items:center;gap:6px;line-height:1.2;flex-wrap:wrap}
+.brand-badge{font:600 10px var(--f-mono);padding:1px 6px;border-radius:4px;background:color-mix(in srgb,var(--ink) 9%,transparent);color:var(--muted);letter-spacing:0.03em;text-transform:uppercase}
+.brand-ver{font:600 10px var(--f-mono);padding:1px 6px;border-radius:4px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);letter-spacing:0.02em}
 .topbar-nav .navlink{display:inline-flex;align-items:center;min-height:40px}
 .topbar-nav .navlink:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .topbar-nav .navlink.active{background:color-mix(in srgb,var(--ink) 9%,transparent)}

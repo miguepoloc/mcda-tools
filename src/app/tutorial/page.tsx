@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import Topbar from '@/components/Topbar';
+import Footer from '@/components/Footer';
 
 export const metadata = { title: 'Cómo funciona · Plataforma MCDA' };
 
@@ -216,6 +217,7 @@ export default async function TutorialPage() {
           <Link className="btn" href="/">← Volver al inicio</Link>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

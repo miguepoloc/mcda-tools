@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import Topbar from '@/components/Topbar';
+import Footer from '@/components/Footer';
 import { FAMILY, METHOD_GUIDE, METHOD_ORDER, WEIGHTING_GUIDE, WEIGHTING_ORDER } from '@/lib/methodGuide';
 import { WEIGHTING_REFS } from '@/lib/references';
 
@@ -29,7 +30,7 @@ export default async function Home() {
   return (
     <>
       <div className="wrap">
-        <Topbar badge="v2.0" subtitle="Ingeniería de Decisión" loggedIn={logged} userEmail={userEmail} />
+        <Topbar subtitle="Ingeniería de Decisión" loggedIn={logged} userEmail={userEmail} />
 
         <div className="lhero">
           <div>
@@ -246,13 +247,7 @@ export default async function Home() {
           </div>
         </div>
 
-        <footer className="lfoot">
-          <span>Plataforma MCDA — Toma de Decisiones Multicriterio</span>
-          <nav aria-label="Enlaces del pie">
-            <Link href="/metodo">¿Qué método uso?</Link>
-            <Link href="/tutorial">Cómo funciona</Link>
-          </nav>
-        </footer>
+        <Footer />
       </div>
     </>
   );

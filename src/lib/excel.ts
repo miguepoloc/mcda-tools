@@ -19,6 +19,7 @@ import { electreSheet } from './excel-electre-sheet.ts';
 import { sawSheet } from './excel-saw-sheet.ts';
 import { fuzzyTopsisSheet } from './excel-fuzzy-topsis-sheet.ts';
 import { OBJECTIVE_WEIGHT_INFO, objectiveWeightsSheet } from './excel-weights-sheet.ts';
+import { APP_VERSION } from './version.ts';
 
 export { colL } from './excel-core.ts';
 
@@ -83,7 +84,7 @@ export function buildWorkbook(XLSX: any, study: Study) {
       ]),
       ['La priorización de criterios previa (Sesión 1: lluvia de ideas, tamizaje, independencia, panel de importancia, resultado final) está en un Excel aparte — descárgala desde la pestaña Compartir si la necesitas.', stl.wrap, { hpt: 32 }],
       ['', null, {}],
-      ['Exportado desde la plataforma MCDA el ' + new Date().toLocaleString() + '. La hoja oculta «_datos» guarda el estado completo (incluida la priorización) para volver a cargarlo en la plataforma o en la herramienta HTML.', stl.note, { hpt: 20 }],
+      ['Exportado desde la plataforma MCDA v' + APP_VERSION + ' el ' + new Date().toLocaleString() + '. La hoja oculta «_datos» guarda el estado completo (incluida la priorización) para volver a cargarlo en la plataforma o en la herramienta HTML.', stl.note, { hpt: 20 }],
     ];
     lines.forEach(([t, s], i) => put(i + 1, 0, t, { s }));
     add('Notas', fin([100], lines.map((l) => l[2])));
@@ -187,7 +188,7 @@ export function buildPrioWorkbook(XLSX: any, study: Study) {
       ['Orden de hojas: Notas → Prior 1. Lluvia de ideas → Prior 2. Tamizaje → Prior 3. Independencia → Prior 4. Panel → Prior 5. Resultado final.', stl.wrap],
       ['Esta es la priorización de criterios de la Sesión 1 del curso: de una lluvia de ideas amplia a los criterios finales que entran al método (AHP/TOPSIS/...), documentando cada descarte. El Excel del método (Criterios, Matriz de decisión, etc.) se descarga aparte, desde la misma pestaña Compartir.', stl.wrap],
       ['', null],
-      ['Exportado desde la plataforma MCDA el ' + new Date().toLocaleString() + '.', stl.note],
+      ['Exportado desde la plataforma MCDA v' + APP_VERSION + ' el ' + new Date().toLocaleString() + '.', stl.note],
     ];
     lines.forEach(([t, s], i) => put(i + 1, 0, t, { s }));
     add('Notas', fin([100], [{ hpt: 22 }, {}, { hpt: 32 }, { hpt: 32 }, { hpt: 60 }, {}, { hpt: 20 }]));

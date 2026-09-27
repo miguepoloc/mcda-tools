@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import Logo from './Logo';
 import UserMenu from './UserMenu';
+import { APP_VERSION, APP_RELEASE_TAG } from '@/lib/version';
 
 const NAV_LINKS = [
   { href: '/', label: 'Inicio' },
@@ -30,7 +31,7 @@ export default function Topbar({
   hideAuthAction = false,
   children,
 }: {
-  badge: string;
+  badge?: string;
   subtitle: string;
   href?: string;
   title?: string;
@@ -49,7 +50,10 @@ export default function Topbar({
         <div>
           <div className="brand-row">
             <span>Plataforma MCDA</span>
-            <span className="brand-badge">{badge}</span>
+            {badge && badge !== APP_RELEASE_TAG && <span className="brand-badge">{badge}</span>}
+            <span className="brand-ver" title={`Versión ${APP_VERSION} (MCDA Tools)`}>
+              {APP_RELEASE_TAG}
+            </span>
           </div>
           <span className="brand-sub">{subtitle}</span>
         </div>

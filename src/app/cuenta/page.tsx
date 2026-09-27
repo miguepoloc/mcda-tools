@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import Topbar from '@/components/Topbar';
+import Footer from '@/components/Footer';
 import AccountActions from '@/components/AccountActions';
 import { fmtDate } from '@/lib/admin';
+import { APP_VERSION, APP_RELEASE_URL } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,12 +51,20 @@ export default async function CuentaPage() {
             {profile?.role === 'admin' && <><dt>Rol</dt><dd>Administrador</dd></>}
             <dt>Proyectos</dt><dd>{proyectos ?? '—'}</dd>
             {user.created_at && <><dt>Cuenta creada</dt><dd>{fmtDate(user.created_at)}</dd></>}
+            <dt>Versión</dt>
+            <dd className="mono">
+              v{APP_VERSION}{' '}
+              <a href={APP_RELEASE_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, marginLeft: 4 }}>
+                (Notas de la versión)
+              </a>
+            </dd>
           </dl>
           <p style={{ marginTop: 14 }}><Link className="btn sm" href="/update-password">Cambiar contraseña</Link></p>
         </section>
 
         <AccountActions uid={user.id} email={user.email ?? ''} isAdmin={profile?.role === 'admin'} projects={proyectos} />
       </div>
+      <Footer />
     </div>
   );
 }

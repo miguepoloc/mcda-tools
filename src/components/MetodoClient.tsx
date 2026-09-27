@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import Topbar from '@/components/Topbar';
+import Footer from '@/components/Footer';
 import ScientificMethodModal, { METHOD_SPECS, type MethodKey } from '@/components/ScientificMethodModal';
 import { FAMILY, METHOD_GUIDE, METHOD_ORDER, WEIGHTING_GUIDE, WEIGHTING_ORDER } from '@/lib/methodGuide';
 import { WEIGHTING_REFS } from '@/lib/references';
@@ -332,6 +333,7 @@ export default function MetodoClient({ loggedIn, userEmail }: { loggedIn: boolea
       </div>
 
       {modalMethod && <ScientificMethodModal methodKey={modalMethod} onClose={() => setModalMethod(null)} />}
+      <Footer />
     </div>
   );
 }
