@@ -9,11 +9,14 @@ authors:
     orcid: "https://orcid.org/0000-0002-7461-2558"
 version: 0.1.1
 date-released: "2026-09-27"
-doi: 10.5281/zenodo.23002791
+doi: 10.5281/zenodo.23002866
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.23002791
-    description: "The concept and version DOI of this software release on Zenodo"
+    value: 10.5281/zenodo.23002866
+    description: "The version-specific DOI for this exact release (v0.1.1) on Zenodo"
+  - type: doi
+    value: 10.5281/zenodo.23002790
+    description: "The concept DOI, which always resolves to the latest version on Zenodo"
 license: MIT
 repository-code: "https://github.com/miguepoloc/mcda-tools"
 url: "https://mcda.tools"
