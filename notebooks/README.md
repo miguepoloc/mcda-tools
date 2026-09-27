@@ -17,7 +17,8 @@ Cada cuaderno resuelve de extremo a extremo casos reales utilizando implementaci
 | 04 | [`04_electre_iot_palmor.ipynb`](04_electre_iot_palmor.ipynb) | ELECTRE I | Red IoT/WSN Palmor | Roy (1968) / `pyDecision` |
 | 05 | [`05_promethee_iot_palmor.ipynb`](05_promethee_iot_palmor.ipynb) | PROMETHEE II | Red IoT/WSN Palmor | Brans & Vincke (1985) / `pyDecision` |
 | 06 | [`06_anp_iot_palmor.ipynb`](06_anp_iot_palmor.ipynb) | ANP (Analytic Network Process) | Red IoT/WSN Palmor | Saaty (1996) / Supermatriz |
-| 07 | [`07_ahp_sig_cacao_snsm.ipynb`](07_ahp_sig_cacao_snsm.ipynb) | AHP + SIG (Zonificación Espacial) | Idoneidad cacaotera Sierra Nevada | Rasterio / GDAL / WorldClim / SoilGrids |
+
+El notebook 07 (AHP + SIG, caso de aptitud cacaotera en la Sierra Nevada de Santa Marta) se retiró de este repositorio público el 28 de septiembre de 2026: combinaba capas derivadas de WorldClim 2.1, cuya licencia (CC BY-NC-SA 4.0) prohíbe la redistribución. El caso real del geovisor de la plataforma (`kind:'spatial'`) es ahora la boya de monitoreo oceanográfico del artículo Polo-Castañeda et al. (2021) — ver [`src/lib/geo/examples.ts`](../src/lib/geo/examples.ts).
 
 ---
 

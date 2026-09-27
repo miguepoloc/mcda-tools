@@ -24,7 +24,10 @@ venv/
 /*.docx
 /*.xlsx
 
-# Caches pesados de validación geoespacial
-/notebooks/data/ahp_sig_snsm/cache/
-/notebooks/data/ahp_sig_snsm/dem_tiles/
-/notebooks/data/ahp_sig_snsm/runap_extracted/
+# Caso "aptitud cacaotera SNSM" (retirado de la plataforma el 28 sep 2026: el paquete combinaba
+# capas derivadas de WorldClim 2.1, cuya licencia CC BY-NC-SA prohíbe la redistribución — ver
+# src/lib/geo/examples.ts). Queda solo en local para seguir trabajándolo; cubre también los caches
+# de validación geoespacial que antes se ignoraban aparte (cache/, dem_tiles/, runap_extracted/).
+/public/geo-packs/snsm-cacao-v1/
+/notebooks/07_ahp_sig_cacao_snsm.ipynb
+/notebooks/data/ahp_sig_snsm/

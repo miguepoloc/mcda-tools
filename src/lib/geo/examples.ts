@@ -1,32 +1,19 @@
 /** Proyectos de ejemplo del geovisor. Se cargan con un botón (nunca automáticamente): el estudiante
- * decide si parte de cero o de un caso guiado. */
-import { SNSM_CACAO_RULES, type FnSpec } from './membership.ts';
+ * decide si parte de cero o de un caso guiado.
+ *
+ * El único ejemplo con datos es la boya (caso real del artículo de 2021, con capas ya clasificadas
+ * por el autor). El caso «aptitud cacaotera · Sierra Nevada» (notebook 07 de la Sesión 5) se retiró de
+ * la plataforma el 28 sep 2026: su paquete (`snsm-cacao-v1`) combinaba capas derivadas de WorldClim
+ * 2.1, cuya licencia (CC BY-NC-SA 4.0) prohíbe expresamente la redistribución. El notebook y el paquete
+ * siguen existiendo fuera de este repositorio para trabajo local del docente; no se referencian aquí. */
+import type { FnSpec } from './membership.ts';
 import { uid } from '../types.ts';
 import type { Criterion, GeoConfig } from '../types.ts';
 
-export type ExampleId = 'cacao-snsm' | 'boya-2021';
+export type ExampleId = 'boya-2021';
 /** Expertos sembrados con el ejemplo (opcional). Solo respuestas reales del autor o, si se reconstruyen, marcadas expresamente como tales. */
 export type ExampleExpert = { name: string; roleDesc: string; judgments: { key: string; value: number }[] };
 export type Example = { id: string; source?: 'builtin' | 'catalog'; label: string; blurb: string; hasData: boolean; title: string; objective: string; criteria: Criterion[]; geo: GeoConfig; experts?: ExampleExpert[] };
-
-const CLASSES = { alta: 0.70, media: 0.45 };
-
-function cacao(): Example {
-  const criteria: Criterion[] = [];
-  const rules: GeoConfig['rules'] = {};
-  for (const [layerKey, r] of Object.entries(SNSM_CACAO_RULES)) {
-    const id = uid('k');
-    criteria.push({ id, name: r.label, hint: r.why, src: null });
-    rules[id] = { layerKey, fn: r.fn, veto: r.veto };
-  }
-  return {
-    id: 'cacao-snsm', label: 'Aptitud cacaotera · Sierra Nevada de Santa Marta', hasData: true,
-    blurb: 'Caso guiado de la Sesión 5 (notebook 07). Trae los datos: clima, suelo y pendiente. Solo falta que tus expertos pesen los criterios.',
-    title: 'Aptitud cacaotera — Sierra Nevada de Santa Marta (ejemplo del curso)',
-    objective: 'Zonificar dónde es biofísicamente apto cultivar cacao en la Sierra Nevada de Santa Marta, combinando clima, suelo y relieve con los pesos de un panel de expertos.',
-    criteria, geo: { packId: 'snsm-cacao-v1', rules, classes: { ...CLASSES } },
-  };
-}
 
 /** Reglas del caso de la boya con datos: cada capa del paquete `boya-wsn-v1` ya trae la clase 1/2/3 del autor (1 apto · 2 moderado · 3 no apto)
  * y aquí se pasa a idoneidad 1 / 0.5 / 0. Con S = Σ wᵢ·sᵢ, «S del geovisor» = (3 − S del artículo)/2: los cortes 1.5 y 2.5 del resultado
@@ -75,7 +62,8 @@ function boyaDatos(): Example {
   };
 }
 
-export function buildExample(id: ExampleId): Example {
-  return { ...(id === 'cacao-snsm' ? cacao() : boyaDatos()), source: 'builtin' };
+// Un solo ejemplo con datos por ahora (boya-2021); el parámetro queda por si se agrega otro.
+export function buildExample(_id: ExampleId): Example {
+  return { ...boyaDatos(), source: 'builtin' };
 }
-export const EXAMPLE_IDS: ExampleId[] = ['cacao-snsm', 'boya-2021'];
+export const EXAMPLE_IDS: ExampleId[] = ['boya-2021'];

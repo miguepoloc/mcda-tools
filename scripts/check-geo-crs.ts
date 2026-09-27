@@ -1,17 +1,17 @@
 // Prueba de humo de pixelToLonLat: recupera (aprox.) el lon/lat de los 4 puntos de ejemplo del
-// notebook 07 a partir de su (row,col) en la grilla real (manifest.json del paquete snsm-cacao-v1)
-// — tolerancia de medio píxel (250 m ≈ 0.0022° en esta latitud), porque el punto real no cae
-// exacto en el centro del píxel.
-import { readFileSync } from 'node:fs';
+// notebook 07 (Sesión 5, fuera de este repositorio desde el 28 sep 2026 — ver examples.ts) a partir
+// de su (row,col) en la grilla real de esa validación (transform/crs copiados de su manifest.json
+// original, no del paquete en sí) — tolerancia de medio píxel (250 m ≈ 0.0022° en esta latitud),
+// porque el punto real no cae exacto en el centro del píxel.
 import { crsDef, lonLatToPixel, pixelToLonLat, projector, registerCrs, utmCrsFor, type Transform } from '../src/lib/geo/crs.ts';
 
 let fallos = 0;
 const ok = (cond: boolean, msg: string) => { console.log((cond ? 'OK   ' : 'FALLA') + ' ' + msg); if (!cond) fallos++; };
 const cerca = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
 
-const manifest = JSON.parse(readFileSync(new URL('../public/geo-packs/snsm-cacao-v1/manifest.json', import.meta.url), 'utf8'));
-const t = manifest.grid.transform as Transform;
-const crs = manifest.grid.crs as string;
+// Grilla de la validación original (608×576, 250 m, EPSG:9377) — solo georreferenciación, sin datos.
+const t: Transform = [250.0, 0.0, 4864301.714038274, 0.0, -250.0, 2827946.1570288334];
+const crs = 'EPSG:9377';
 
 // (row,col) calculados en Python con rasterio.transform.rowcol contra el mismo dem_250m.tif.
 const PUNTOS = {

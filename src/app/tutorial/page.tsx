@@ -150,8 +150,8 @@ export default async function TutorialPage() {
 
             <div className="titem">
               <span className="no">4</span>
-              <h3>Dos casos para practicar</h3>
-              <p>Al crear un proyecto de tipo «Mapa de aptitud» elige un punto de partida: <b>Aptitud cacaotera · Sierra Nevada</b> (trae los datos del notebook de la Sesión 5), o la <b>boya con datos</b> (el caso real del artículo de 2021: sus 4 capas, las concesiones y los 4 expertos de la encuesta). Con cualquiera de las dos puedes añadir después tus propios mapas. Si tu docente publicó paquetes en el catálogo, aparecen ahí como «del curso».</p>
+              <h3>Un caso para practicar</h3>
+              <p>Al crear un proyecto de tipo «Mapa de aptitud» elige un punto de partida: en blanco, o la <b>boya con datos</b> (el caso real del artículo de 2021: sus 4 capas, las concesiones y los 4 expertos de la encuesta). Puedes añadir después tus propios mapas. Si tu docente publicó paquetes en el catálogo, aparecen ahí como «del curso».</p>
             </div>
 
             <div className="titem">
