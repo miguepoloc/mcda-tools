@@ -103,7 +103,7 @@ export default function MetodoClient({ loggedIn, userEmail }: { loggedIn: boolea
 
   return (
     <div className="wrap">
-      <Topbar badge="TEORÍA" subtitle="← Ir al inicio" loggedIn={loggedIn} userEmail={userEmail} />
+      <Topbar subtitle="Ingeniería de Decisión" loggedIn={loggedIn} userEmail={userEmail} />
 
       <div className="ttl">
         <div className="eyebrow">Guía de selección</div>

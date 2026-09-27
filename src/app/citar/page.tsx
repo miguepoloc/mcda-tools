@@ -28,7 +28,7 @@ export default async function CitarPage() {
   return (
     <>
       <div className="wrap">
-        <Topbar subtitle="Citación Académica" loggedIn={logged} userEmail={userEmail} />
+        <Topbar subtitle="Ingeniería de Decisión" loggedIn={logged} userEmail={userEmail} />
 
         <div className="lhero" style={{ paddingBottom: 24 }}>
           <div>

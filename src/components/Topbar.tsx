@@ -23,7 +23,7 @@ const NAV_LINKS = [
  * para flujos anónimos por token (experto, vista pública) donde no aplica o distraería de la tarea. */
 export default function Topbar({
   badge,
-  subtitle,
+  subtitle = 'Ingeniería de Decisión',
   href = '/',
   title = 'Plataforma MCDA · Inicio',
   loggedIn = false,
@@ -33,7 +33,7 @@ export default function Topbar({
   children,
 }: {
   badge?: string;
-  subtitle: string;
+  subtitle?: string;
   href?: string;
   title?: string;
   loggedIn?: boolean;

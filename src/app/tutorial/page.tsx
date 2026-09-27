@@ -19,7 +19,7 @@ export default async function TutorialPage() {
 
   return (
     <div className="wrap">
-      <Topbar badge="GUÍA" subtitle="← Ir al inicio" loggedIn={logged} userEmail={userEmail} />
+      <Topbar subtitle="Ingeniería de Decisión" loggedIn={logged} userEmail={userEmail} />
 
       <div className="ttl">
         <div className="eyebrow">Guía completa</div>
