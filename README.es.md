@@ -253,12 +253,12 @@ Si utilizas **MCDA Tools** en cursos académicos, tesis de maestría o investiga
 
 ### APA (7.ª edición)
 ```text
-Polo-Castañeda, M. A., Hernandez-Solorzano, H. D., Espinosa-Valdez, A. E., & Gómez-Rojas, J. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.3) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23003288
+Polo-Castañeda, M. A., Hernandez-Solorzano, H. D., Espinosa-Valdez, A. E., & Gómez-Rojas, J. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.3) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23024510
 ```
 
 ### IEEE
 ```text
-M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. Gómez-Rojas, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.3, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23003288. [En línea]. Disponible: https://mcda.tools
+M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. Gómez-Rojas, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.3, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23024510. [En línea]. Disponible: https://mcda.tools
 ```
 
 ### BibTeX
@@ -270,8 +270,8 @@ M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. 
   month        = sep,
   publisher    = {Zenodo},
   version      = {v0.1.3},
-  doi          = {10.5281/zenodo.23003288},
-  url          = {https://doi.org/10.5281/zenodo.23003288}
+  doi          = {10.5281/zenodo.23024510},
+  url          = {https://doi.org/10.5281/zenodo.23024510}
 }
 ```
 
