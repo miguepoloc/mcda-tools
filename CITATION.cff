@@ -7,7 +7,19 @@ authors:
     given-names: "Miguel Angel"
     affiliation: "Universidad del Magdalena"
     orcid: "https://orcid.org/0000-0002-7461-2558"
-version: 0.1.2
+  - family-names: "Hernandez-Solorzano"
+    given-names: "Harold David"
+    affiliation: "Universidad del Magdalena"
+    orcid: "https://orcid.org/0009-0003-4837-3797"
+  - family-names: "Espinosa-Valdez"
+    given-names: "Alexander Esteban"
+    affiliation: "Universidad del Magdalena"
+    orcid: "https://orcid.org/0000-0001-6281-8156"
+  - family-names: "Gómez-Rojas"
+    given-names: "Jorge"
+    affiliation: "Universidad del Magdalena"
+    orcid: "https://orcid.org/0000-0002-0840-8743"
+version: 0.1.3
 date-released: "2026-09-28"
 doi: 10.5281/zenodo.23003288
 identifiers:

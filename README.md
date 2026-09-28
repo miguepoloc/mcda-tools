@@ -253,29 +253,29 @@ If you use **MCDA Tools** in academic courses, master's theses, or scientific re
 
 ### APA (7th Edition)
 ```text
-Polo-Castañeda, M. A. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.2) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23003288
+Polo-Castañeda, M. A., Hernandez-Solorzano, H. D., Espinosa-Valdez, A. E., & Gómez-Rojas, J. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.3) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23003288
 ```
 
 ### IEEE
 ```text
-M. A. Polo-Castañeda, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.2, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23003288. [Online]. Available: https://mcda.tools
+M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. Gómez-Rojas, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.3, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23003288. [Online]. Available: https://mcda.tools
 ```
 
 ### BibTeX
 ```bibtex
 @software{polo_castaneda_2026_mcda_tools,
-  author       = {Polo-Castañeda, Miguel Angel},
+  author       = {Polo-Castañeda, Miguel Angel and Hernandez-Solorzano, Harold David and Espinosa-Valdez, Alexander Esteban and Gómez-Rojas, Jorge},
   title        = {{mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA}},
   year         = {2026},
   month        = sep,
   publisher    = {Zenodo},
-  version      = {v0.1.2},
+  version      = {v0.1.3},
   doi          = {10.5281/zenodo.23003288},
   url          = {https://doi.org/10.5281/zenodo.23003288}
 }
 ```
 
-The formats above cite this exact version (v0.1.2). To always cite the latest release, use the concept DOI instead: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
+The formats above cite this exact version (v0.1.3). To always cite the latest release, use the concept DOI instead: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
 
 You can also generate these references (plus RIS / Chicago) directly from the platform at [`/citar`](https://mcda.tools/citar).
 

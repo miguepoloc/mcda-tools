@@ -7,7 +7,7 @@ import {
   METHODOLOGY_SNIPPET,
   type CitationFormat,
 } from '@/lib/citation';
-import { APP_VERSION, APP_DOI, APP_DOI_URL, APP_AUTHOR, APP_ORCID } from '@/lib/version';
+import { APP_VERSION, APP_DOI, APP_DOI_URL, APP_AUTHOR, APP_ORCID, APP_RESEARCHERS } from '@/lib/version';
 
 export default function CitationBox() {
   const [selectedFormat, setSelectedFormat] = useState<CitationFormat>('apa');
@@ -60,9 +60,32 @@ export default function CitationBox() {
           <div className="cite-author-info">
             <span className="cite-tag">Software Científico y Académico</span>
             <h3 className="cite-title">mcda-tools <span className="cite-ver">v{APP_VERSION}</span></h3>
-            <p className="cite-by">
-              Por <strong>{APP_AUTHOR}</strong> · Universidad del Magdalena
-            </p>
+            <div className="cite-by-team">
+              <span className="cite-by-label">Investigadores · Universidad del Magdalena:</span>
+              <div className="cite-researchers-list">
+                {APP_RESEARCHERS.map((r, idx) => (
+                  <span key={r.name} className="cite-researcher-item">
+                    <strong>{r.name}</strong>
+                    {r.orcidUrl && (
+                      <a
+                        href={r.orcidUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cite-orcid-link"
+                        title={`Perfil ORCID de ${r.name}`}
+                        aria-label={`ORCID de ${r.name}`}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#A6CE39" aria-hidden="true">
+                          <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zM7.369 4.378c.525 0 .947.431.947.947s-.422.947-.947.947a.95.95 0 0 1-.947-.947c0-.525.422-.947.947-.947zm-.722 3.038h1.444v10.041H6.647V7.416zm3.562 0h3.9c3.712 0 5.344 2.653 5.344 5.025 0 2.578-2.016 5.016-5.325 5.016h-3.919V7.416zm1.444 1.306v7.444h2.244c2.531 0 3.716-1.528 3.716-3.722 0-2.016-1.122-3.722-3.691-3.722h-2.269z"/>
+                        </svg>
+                        <span>ORCID</span>
+                      </a>
+                    )}
+                    {idx < APP_RESEARCHERS.length - 1 && <span className="cite-researcher-sep">·</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="cite-doi-badge-wrap">
             <a

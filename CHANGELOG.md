@@ -4,6 +4,17 @@ All notable changes to **MCDA Tools** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-09-28
+
+### Added
+- Co-authors and researchers from Universidad del Magdalena added to the platform's official academic citations, software metadata, and Citation File Format (`CITATION.cff`):
+  - **Harold David Hernandez-Solorzano** (`https://orcid.org/0009-0003-4837-3797`)
+  - **Alexander Esteban Espinosa-Valdez** (`https://orcid.org/0000-0001-6281-8156`)
+  - **Jorge Gómez-Rojas** (`https://orcid.org/0000-0002-0840-8743`)
+- Standardized compound Spanish surnames and institutional affiliations across all generated citation formats: APA (7th ed.), IEEE, BibTeX, RIS, and Chicago.
+- Interactive research team display with direct verified ORCID profile links in `CitationBox` on `/citar`.
+- Updated contributors list in `package.json` and bibliographic references in `ExecutiveReportModal`.
+
 ---
 
 ## [0.1.2] - 2026-09-28
