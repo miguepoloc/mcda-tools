@@ -19,10 +19,19 @@ venv/
 .claude/
 .agents/
 
-# Temporary local files
+# Temporary local files and text dumps
 /*.pdf
 /*.docx
 /*.xlsx
+/*.txt
+!notebooks/requirements.txt
+
+# Scratch scripts and experimental notebooks in progress
+/scripts/calcular-viaje.ts
+/scripts/generar_notebook_solar.py
+/scripts/preparar_granja_solar.py
+/notebooks/08_ahp_sig_granja_solar_magdalena.ipynb
+/notebooks/data/
 
 # Caso "aptitud cacaotera SNSM" (retirado de la plataforma el 28 sep 2026: el paquete combinaba
 # capas derivadas de WorldClim 2.1, cuya licencia CC BY-NC-SA prohíbe la redistribución — ver
@@ -30,4 +39,3 @@ venv/
 # de validación geoespacial que antes se ignoraban aparte (cache/, dem_tiles/, runap_extracted/).
 /public/geo-packs/snsm-cacao-v1/
 /notebooks/07_ahp_sig_cacao_snsm.ipynb
-/notebooks/data/ahp_sig_snsm/
