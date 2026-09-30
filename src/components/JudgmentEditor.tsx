@@ -36,11 +36,15 @@ export default function JudgmentEditor({ criteria, alternatives, method = 'ahp',
 
   useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
 
+  // Hojas por alternativa solo tienen sentido si hay alternativas que comparar de a pares — un
+  // proyecto espacial (alternatives: []) no las necesita, sin importar qué valor tenga guardado
+  // `method` en el proyecto (hallazgo real, 30 sep 2026: `method` puede quedar en 'ahp' en un
+  // proyecto espacial por datos viejos o edición directa, no solo por el flujo de creación).
   const sheets = useMemo(
-    () => (method === 'ahp'
+    () => (method === 'ahp' && alternatives.length > 0
       ? [{ key: CRIT_SHEET, label: 'Criterios' }, ...criteria.map((c) => ({ key: altSheet(c.id), label: c.name }))]
       : [{ key: CRIT_SHEET, label: 'Criterios' }]),
-    [criteria, method],
+    [criteria, method, alternatives.length],
   );
   const cur = sheets.find((s) => s.key === sheet) ?? sheets[0];
   const items = sheetItems(cur.key, criteria, alternatives);
