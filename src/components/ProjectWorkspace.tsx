@@ -346,6 +346,14 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             <div><label className="lbl" htmlFor="o">Objetivo de decisión</label><textarea id="o" value={project.objective} onChange={(e) => patch({ objective: e.target.value })} placeholder="Ej.: seleccionar la mejor arquitectura IoT que maximice cobertura y minimice costo de despliegue" /></div>
           </div>
 
+          {project.kind === 'spatial' ? (
+            <div className="card form">
+              <label className="lbl">Cómo se ponderan los criterios</label>
+              <p className="muted" style={{ fontSize: 13 }}>
+                En un mapa de aptitud no hay alternativas que rankear con un algoritmo — los pesos de los criterios siempre salen de la comparación por pares (AHP) que hacen tus expertos en la pestaña «Expertos».
+              </p>
+            </div>
+          ) : (
           <div className="card form">
             <div className="acts" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
@@ -426,7 +434,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
               );
             })()}
 
-            {project.method !== 'ahp' && project.kind !== 'spatial' && (
+            {project.method !== 'ahp' && (
               <div style={{ marginTop: 14 }}>
                 <label className="lbl">Método de ponderación de criterios</label>
                 <div className="weights-grid" role="group" aria-label="Ponderación de criterios">
@@ -462,6 +470,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
               </div>
             )}
           </div>
+          )}
           <div className="card form">
             <div className="fgrp">
               <label className="lbl">Criterios ({project.criteria.length}), su regla de lectura{project.method !== 'ahp' ? ' y su unidad' : ''}</label>

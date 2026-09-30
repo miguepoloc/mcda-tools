@@ -585,7 +585,7 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-wrap{--accent:var(--geo-accent);--accent-soft:var(--geo-accent-soft);--accent-ink:#0B0F17;position:relative;left:50%;transform:translateX(-50%);width:min(1560px,calc(100vw - 40px))}
 .gv-shell{display:grid;grid-template-columns:392px minmax(0,1fr);gap:14px;align-items:start}
 @media(max-width:1000px){.gv-wrap{left:0;transform:none;width:100%}.gv-shell{grid-template-columns:1fr}.gv-side{order:2}.gv-main{order:1}}
-.gv-side{background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;position:sticky;top:12px;max-height:calc(100vh - 24px)}
+.gv-side{background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;position:sticky;top:64px;z-index:40;max-height:calc(100vh - 76px)}
 @media(max-width:1000px){.gv-side{position:static;max-height:none}}
 .gv-steps-bar{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 0}
 .gv-steps-bar span{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
@@ -605,6 +605,15 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-howto li>i{font:700 11px var(--f-mono);font-style:normal;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--line)}
 .gv-howto li.done>i{background:var(--geo-alta);border-color:var(--geo-alta);color:#fff}
 .gv-howto b{color:var(--ink)}
+.gv-help{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 10px;background:var(--surface)}
+.gv-help summary{cursor:pointer;font:600 12.5px var(--f-body);color:var(--muted);list-style:none}
+.gv-help summary::-webkit-details-marker{display:none}
+.gv-help summary:hover{color:var(--ink)}
+.gv-help[open] summary{color:var(--accent);margin-bottom:8px}
+.gv-help-body{font-size:12.5px;line-height:1.5;color:var(--muted);display:grid;gap:8px}
+.gv-help-body p{margin:0}
+.gv-help-body b{color:var(--ink)}
+.gv-help-body ul{margin:0;padding-left:18px;display:grid;gap:4px}
 .gv-field{display:grid;gap:4px;font-size:12.5px}
 .gv-field>span{font:600 11.5px var(--f-body);color:var(--muted)}
 .gv-field input[type=text],.gv-field input[type=number],.gv-field select,.gv-sec select,.gv-sec input[type=number]{width:100%;min-height:34px;padding:5px 9px;font-size:13px}
@@ -634,10 +643,13 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-modes label.off{opacity:.5;cursor:not-allowed}
 .gv-layer{display:grid;grid-template-columns:auto 14px minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line)}
 .gv-layer:last-child{border-bottom:0}
-.gv-layer .eye,.gv-layer .del{appearance:none;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:6px;width:28px;height:28px;display:grid;place-items:center;cursor:pointer;padding:0}
+.gv-layer .eye,.gv-layer .del,.gv-layer .btn.icon.sm{appearance:none;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:6px;width:28px;height:28px;display:grid;place-items:center;cursor:pointer;padding:0}
 .gv-layer .del.ask{width:auto;padding:0 6px;font:600 11px var(--f-mono);color:var(--warn);border-color:var(--warn)}
 .gv-layer.on .eye{color:var(--accent);background:var(--accent-soft)}
-.gv-layer .eye:hover,.gv-layer .del:hover{border-color:var(--line)}
+.gv-layer .eye:hover,.gv-layer .del:hover,.gv-layer .btn.icon.sm:hover{border-color:var(--line)}
+.gv-layer-acts{display:flex;gap:2px}
+.gv-layer .btn.icon.sm.on{color:var(--accent);background:var(--accent-soft);border-color:var(--accent)}
+.gv-layer.editing{background:var(--accent-soft)}
 .gv-layer .sw{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);display:block}
 .gv-layer .nm{font-size:12.5px;line-height:1.25;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gv-layer .nm small{display:block;font:500 10.5px var(--f-mono);color:var(--muted)}
@@ -940,8 +952,8 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 }
 /* Pantallas táctiles: objetivos de al menos 44 px y campos de 16 px (iOS no hace zoom al enfocarlos). */
 @media (pointer:coarse){
-  .gv-tabs button,.gv-chips button,.gv-fit,.gv-wrap .btn.sm,.gv-layer .eye,.gv-layer .del,.gv-point .x,.gv-parcel,.gv-explore-banner button,.gv-tour-card .btn{min-height:44px;min-width:44px}
-  .gv-layer .eye,.gv-layer .del{width:44px;height:44px}
+  .gv-tabs button,.gv-chips button,.gv-fit,.gv-wrap .btn.sm,.gv-layer .eye,.gv-layer .del,.gv-layer .btn.icon.sm,.gv-point .x,.gv-parcel,.gv-explore-banner button,.gv-tour-card .btn{min-height:44px;min-width:44px}
+  .gv-layer .eye,.gv-layer .del,.gv-layer .btn.icon.sm{width:44px;height:44px}
   .gv-leaflet .leaflet-control-zoom a{width:44px;height:44px;line-height:44px;font-size:22px}
   .gv-wrap select,.gv-wrap input[type=text],.gv-wrap input[type=number]{min-height:44px;font-size:16px}
   .gv-step input,.gv-nums input,.gv-bbox input{min-height:44px!important;font-size:16px!important}

@@ -40,6 +40,7 @@ export const ICONS = {
   minus: 'M5 12h14',
   square: 'M3 3h18v18H3z',
   download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  edit: 'M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z',
 };
 
 

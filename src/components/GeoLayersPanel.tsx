@@ -85,6 +85,7 @@ export default function GeoLayersPanel(p: Props) {
   const [res, setRes] = useState(250);
   const [editingArea, setEditingArea] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [editKey, setEditKey] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const layers = geo.layers ?? {};
   const maxPx = p.quota?.max_pixels ?? MAX_PIXELS;
@@ -151,6 +152,33 @@ export default function GeoLayersPanel(p: Props) {
     });
     p.setVecs((v) => v.filter((x) => x.id !== key));
     p.onQuotaChange();
+  }
+
+  // Edición segura post-carga: nombre/unidad/criterio no tocan el array ya procesado (solo metadatos
+  // y a qué criterio apunta en `rules`). Cambiar rol/modo/cómo se calculó sí lo tocaría — eso sigue
+  // requiriendo borrar y volver a subir el archivo original, que no se conserva tras añadir la capa.
+  function saveLayerEdit(key: string, patch: { label: string; unit: string; criterionId?: string }) {
+    p.commit((c) => {
+      const meta = c.layers?.[key];
+      if (!meta) return c;
+      const nextLayers = { ...(c.layers ?? {}), [key]: { ...meta, label: patch.label.trim() || meta.label, unit: patch.unit.trim() } };
+      let nextRules = c.rules;
+      if (meta.role === 'criterion' && patch.criterionId !== undefined) {
+        const prevCriterionId = Object.entries(c.rules).find(([, r]) => r.layerKey === key)?.[0];
+        if (prevCriterionId !== patch.criterionId) {
+          nextRules = { ...c.rules };
+          if (prevCriterionId) delete nextRules[prevCriterionId];
+          if (patch.criterionId) {
+            const existing = nextRules[patch.criterionId];
+            nextRules[patch.criterionId] = existing?.layerKey === key
+              ? existing
+              : { layerKey: key, fn: defaultFn(meta.min, meta.max) };
+          }
+        }
+      }
+      return { ...c, layers: nextLayers, rules: nextRules };
+    });
+    setEditKey(null);
   }
 
   async function resetArea() {
@@ -310,6 +338,19 @@ export default function GeoLayersPanel(p: Props) {
       {(!isPack || data) && (
         <section className="gv-sec">
           <header><h4>2 · Añadir mapas</h4></header>
+          <details className="gv-help">
+            <summary>❓ ¿Qué pasa cuando subo un mapa? · Qué guarda la app</summary>
+            <div className="gv-help-body">
+              <p>Todo lo que subas — un <b>ráster</b> (una imagen con un valor por celda, como temperatura o elevación) o un <b>vector</b> (líneas o puntos, como vías o subestaciones) — se convierte en <b>un solo número por cada celda de tu área de estudio</b>. Así, sin importar de dónde vino, todos los criterios quedan comparables entre sí y se pueden combinar.</p>
+              <ul>
+                <li><b>Vector, «Distancia al elemento más cercano»:</b> para cada celda de la grilla se mide la distancia en línea recta hasta el punto más cercano de esa capa. Cerca = número chico; lejos = número grande.</li>
+                <li><b>Vector, «Dentro / fuera»:</b> cada celda dentro del polígono vale 1; fuera, 0.</li>
+                <li><b>Ráster:</b> se remuestrea (se ajusta) a la resolución y el encuadre de tu grilla, celda por celda.</li>
+              </ul>
+              <p><b>El archivo que arrastraste no se guarda.</b> Lo que queda guardado es el resultado ya calculado: esa grilla de números. Por eso puedes editar después el nombre, la unidad o a qué criterio alimenta una capa (es solo una etiqueta) — pero no cómo se calculó: para eso la app necesitaría el archivo original, que ya no tiene.</p>
+              <p>Ese número por celda se vuelve idoneidad (0 a 1) con la regla que defines en la pestaña <b>Modelo</b>. Lo que el mapa pinta con colores es esa idoneidad, no el dato crudo.</p>
+            </div>
+          </details>
           <ol className="gv-howto" aria-label="Cómo cargar tu mapa">
             <li className={targetGrid ? 'done' : ''}><i>{targetGrid ? '✓' : '1'}</i><span><b>Área de estudio</b> {targetGrid ? (isPack ? 'lista: la fija el paquete del curso.' : 'lista.') : 'pendiente: arriba, o se propone sola desde tu primer archivo.'}</span></li>
             <li className={pending.length ? 'done' : ''}><i>{pending.length ? '✓' : '2'}</i><span><b>Sube tu archivo</b> aquí abajo (GeoTIFF, GeoJSON, shapefile .zip, KML/KMZ o GPX).</span></li>
@@ -407,12 +448,30 @@ export default function GeoLayersPanel(p: Props) {
         )}
         <LayerRow id="result" label="Resultado (idoneidad)" role="resultado" vis={p.vis} setVis={p.setVis} swatch={rampCss(p.palette)} />
         {p.virtual.map((x) => <LayerRow key={x.id} id={x.id} label={x.label} role={x.role} vis={p.vis} setVis={p.setVis} swatch={x.swatch} />)}
-        {data && Object.entries(data.info).map(([k, l]) => (
-          <LayerRow key={k} id={`l:${k}`} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
-            swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette) : RAW_RAMP_CSS}
-            note={[l.origin ? `${l.origin}${layers[k] && !layers[k].path ? ' · sin guardar (solo esta sesión)' : ''}` : '', !layers[k] && isPack ? 'Del paquete del curso · solo lectura (no se puede borrar)' : '', l.license ? `Licencia: ${l.license}` : ''].filter(Boolean).join(' · ') || undefined}
-            onDelete={layers[k] ? () => dropLayer(k) : undefined} />
-        ))}
+        {data && Object.entries(data.info).map(([k, l]) => {
+          const meta = layers[k];
+          return (
+            <div key={k}>
+              <LayerRow id={`l:${k}`} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
+                swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette) : RAW_RAMP_CSS}
+                note={[l.origin ? `${l.origin}${meta && !meta.path ? ' · sin guardar (solo esta sesión)' : ''}` : '', !meta && isPack ? 'Del paquete del curso · solo lectura (no se puede borrar)' : '', l.license ? `Licencia: ${l.license}` : ''].filter(Boolean).join(' · ') || undefined}
+                onDelete={meta ? () => dropLayer(k) : undefined}
+                onEdit={meta ? () => setEditKey((cur) => (cur === k ? null : k)) : undefined}
+                editing={editKey === k} />
+              {editKey === k && meta && (
+                <LayerEditForm
+                  meta={meta}
+                  criteria={p.criteria}
+                  currentCriterionId={Object.entries(geo.rules).find(([, r]) => r.layerKey === k)?.[0]}
+                  rules={geo.rules}
+                  layers={layers}
+                  onCancel={() => setEditKey(null)}
+                  onSave={(patch) => saveLayerEdit(k, patch)}
+                />
+              )}
+            </div>
+          );
+        })}
         {p.vecs.map((v) => (
           <LayerRow key={v.id} id={`v:${v.id}`} label={`${v.name} · vector original`} role="vector" vis={p.vis} setVis={p.setVis} swatch={v.color} />
         ))}
@@ -422,25 +481,67 @@ export default function GeoLayersPanel(p: Props) {
   );
 }
 
-function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete }: {
+function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit, editing }: {
   id: string; label: string; role: string; vis: VisState; setVis: Dispatch<SetStateAction<VisState>>; swatch: string; note?: string; onDelete?: () => void;
+  onEdit?: () => void; editing?: boolean;
 }) {
   const v = vis[id] ?? { on: id === 'result' || id === 'parcels' || id === 'diff', op: id === 'result' ? 0.9 : 0.85 };
   const [ask, setAsk] = useState(false);
   return (
-    <div className={'gv-layer' + (v.on ? ' on' : '')}>
+    <div className={'gv-layer' + (v.on ? ' on' : '') + (editing ? ' editing' : '')}>
       <button type="button" className="eye" aria-pressed={v.on} aria-label={`${v.on ? 'Ocultar' : 'Mostrar'} ${label}`} onClick={() => setVis((s) => ({ ...s, [id]: { ...v, on: !v.on } }))}>
         <Icon d={v.on ? ICONS.eye : ICONS.eyeOff} />
       </button>
       <span className="sw" style={{ background: swatch }} />
       <span className="nm" title={label}>{label}<small>{role}</small></span>
-      {onDelete && (
-        <button type="button" className={'del' + (ask ? ' ask' : '')} aria-label={`Borrar ${label}`} onClick={() => (ask ? onDelete() : (setAsk(true), setTimeout(() => setAsk(false), 3000)))}>
-          {ask ? '¿Seguro?' : <Icon d={ICONS.trash} size={14} />}
-        </button>
-      )}
+      <span className="gv-layer-acts">
+        {onEdit && (
+          <button type="button" className={'btn icon sm' + (editing ? ' on' : '')} aria-pressed={editing} aria-label={`${editing ? 'Cerrar edición de' : 'Editar'} ${label}`} onClick={onEdit}>
+            <Icon d={ICONS.edit} size={14} />
+          </button>
+        )}
+        {onDelete && (
+          <button type="button" className={'del' + (ask ? ' ask' : '')} aria-label={`Borrar ${label}`} onClick={() => (ask ? onDelete() : (setAsk(true), setTimeout(() => setAsk(false), 3000)))}>
+            {ask ? '¿Seguro?' : <Icon d={ICONS.trash} size={14} />}
+          </button>
+        )}
+      </span>
       <input type="range" min={0.1} max={1} step={0.05} value={v.op} aria-label={`Opacidad de ${label}`} onChange={(e) => setVis((s) => ({ ...s, [id]: { ...v, op: Number(e.target.value) } }))} />
       {note && <small className="note">{note}</small>}
+    </div>
+  );
+}
+
+function LayerEditForm({ meta, criteria, currentCriterionId, rules, layers, onCancel, onSave }: {
+  meta: GeoLayerMeta; criteria: Criterion[]; currentCriterionId?: string;
+  rules: GeoConfig['rules']; layers: Record<string, GeoLayerMeta>;
+  onCancel: () => void; onSave: (patch: { label: string; unit: string; criterionId?: string }) => void;
+}) {
+  const [label, setLabel] = useState(meta.label);
+  const [unit, setUnit] = useState(meta.unit);
+  const [criterionId, setCriterionId] = useState(currentCriterionId ?? '');
+  const conflictKey = meta.role === 'criterion' && criterionId && criterionId !== currentCriterionId ? rules[criterionId]?.layerKey : undefined;
+  const conflictLabel = conflictKey ? layers[conflictKey]?.label : undefined;
+  return (
+    <div className="gv-pending">
+      <label className="gv-field"><span>Nombre de la capa</span><input type="text" value={label} onChange={(e) => setLabel(e.target.value)} /></label>
+      {meta.role === 'criterion' && (
+        <>
+          <label className="gv-field"><span>Unidad</span><input type="text" value={unit} placeholder="m, °C, mm…" onChange={(e) => setUnit(e.target.value)} /></label>
+          <label className="gv-field"><span>Criterio al que alimenta</span>
+            <select value={criterionId} onChange={(e) => setCriterionId(e.target.value)}>
+              <option value="">— ninguno todavía (solo verla) —</option>
+              {criteria.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          {conflictLabel && <p className="gv-hint warn">Ese criterio ya lo alimenta «{conflictLabel}» — al guardar, esta capa lo reemplaza.</p>}
+        </>
+      )}
+      <p className="gv-hint">Para cambiar el tipo de capa (criterio/exclusión/área) o cómo se calculó (distancia, presencia…), bórrala y súbela de nuevo: eso sí necesita reprocesar el archivo original.</p>
+      <div className="gv-row-acts">
+        <button type="button" className="btn primary sm" onClick={() => onSave({ label, unit, criterionId: meta.role === 'criterion' ? criterionId : undefined })}>Guardar</button>
+        <button type="button" className="btn sm" onClick={onCancel}>Cancelar</button>
+      </div>
     </div>
   );
 }
