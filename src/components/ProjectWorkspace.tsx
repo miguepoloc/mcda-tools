@@ -550,7 +550,9 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           ) : (
             <>
               <p className="muted" style={{ maxWidth: '70ch' }}>Cada experto tiene su propio enlace: lo abre sin crear cuenta y solo ve sus preguntas. También puedes llenar los juicios tú mismo por él o ella (por ejemplo tras una entrevista).
-                {project.method !== 'ahp' && ` Con ${METHOD_OPTIONS.find((m) => m.key === project.method)?.label}, tus expertos solo pesan los criterios (hoja «Criterios»); las alternativas se comparan con la matriz de datos de la pestaña «Matriz de decisión», no de a pares.`}
+                {project.kind === 'spatial'
+                  ? ' En un mapa de aptitud, tus expertos comparan los criterios de a pares (hoja «Criterios») — no hay alternativas que comparar, son las celdas del territorio.'
+                  : project.method !== 'ahp' && ` Con ${METHOD_OPTIONS.find((m) => m.key === project.method)?.label}, tus expertos solo pesan los criterios (hoja «Criterios»); las alternativas se comparan con la matriz de datos de la pestaña «Matriz de decisión», no de a pares.`}
               </p>
               <div className="plist">
                 {experts.map((e) => {

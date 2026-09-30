@@ -585,7 +585,12 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-wrap{--accent:var(--geo-accent);--accent-soft:var(--geo-accent-soft);--accent-ink:#0B0F17;position:relative;left:50%;transform:translateX(-50%);width:min(1560px,calc(100vw - 40px))}
 .gv-shell{display:grid;grid-template-columns:392px minmax(0,1fr);gap:14px;align-items:start}
 @media(max-width:1000px){.gv-wrap{left:0;transform:none;width:100%}.gv-shell{grid-template-columns:1fr}.gv-side{order:2}.gv-main{order:1}}
-.gv-side{background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;position:sticky;top:64px;z-index:40;max-height:calc(100vh - 76px)}
+/* top/max-height son un valor fijo pensado para el .topbar de 1 sola línea (hallazgo real, 30
+ * sep 2026): con pantalla angosta (~1000-1300px, típico de un proyector) .topbar envuelve a 2
+ * líneas (flex-wrap) y este panel volvía a quedar tapado. 120px cubre también el caso de 2
+ * líneas; el arreglo correcto de fondo (medir el alto real del topbar con ResizeObserver y
+ * pasarlo como variable CSS) queda pendiente, esto es una cota segura mientras tanto. */
+.gv-side{background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;position:sticky;top:120px;z-index:40;max-height:calc(100vh - 132px)}
 @media(max-width:1000px){.gv-side{position:static;max-height:none}}
 .gv-steps-bar{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 0}
 .gv-steps-bar span{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
