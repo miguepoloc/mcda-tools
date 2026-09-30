@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Corre TODAS las migraciones y supabase/tests/{geo_rls,account_status}.sql en un PostgreSQL 17 temporal (initdb en /tmp,
+# Corre TODAS las migraciones y supabase/tests/{geo_rls,account_status,open_link}.sql en un PostgreSQL 17 temporal (initdb en /tmp,
 # puerto 54329). Requiere los binarios de PostgreSQL (brew install postgresql@17). No toca ninguna base real.
 set -euo pipefail
 PGBIN="${PGBIN:-/opt/homebrew/opt/postgresql@17/bin}"
@@ -19,8 +19,8 @@ for f in "$HERE"/../migrations/*.sql; do
   "${P[@]}" -f "$f" >/dev/null
 done
 # Idempotencia: pegar las migraciones (10 en adelante) dos veces en el SQL Editor no debe romper nada.
-for f in "$HERE"/../migrations/2024010100001{0,1,2,3,4,5}_*.sql; do "${P[@]}" -f "$f" >/dev/null; done
-echo "→ migraciones 10–15 re-aplicadas sin error (idempotentes)"
-for T in geo_rls account_status; do
+for f in "$HERE"/../migrations/2024010100001{0,1,2,3,4,5,6}_*.sql; do "${P[@]}" -f "$f" >/dev/null; done
+echo "→ migraciones 10–16 re-aplicadas sin error (idempotentes)"
+for T in geo_rls account_status open_link; do
   "${P[@]}" -f "$HERE/$T.sql" 2>&1 | sed -e 's/^psql:[^ ]* //' | grep -E "ok  |FALLA|Todo OK|ERROR" | sed 's/^NOTICE:  //'
 done

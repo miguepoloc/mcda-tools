@@ -116,6 +116,10 @@ export type ProjectRow = {
   geo: GeoConfig | Record<string, never>;
   is_public: boolean;
   public_token: string;
+  /** Enlace abierto de autorregistro (migración 16): un solo enlace/QR para todo un grupo base, cada
+   * quien llega escribe su nombre y rol y queda como un experto normal. */
+  open_token: string;
+  open_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -128,6 +132,8 @@ export type ExpertRow = {
   invite_token: string;
   status: ExpertStatus;
   filled_by: 'expert' | 'owner';
+  /** Cómo se creó esta fila: a mano por el dueño, o autorregistrado por /o/<open_token>. */
+  joined_via: 'owner' | 'open';
   submitted_at: string | null;
   position: number;
 };

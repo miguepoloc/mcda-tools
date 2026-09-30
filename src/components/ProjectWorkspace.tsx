@@ -24,9 +24,10 @@ import { useExamples } from '@/lib/geo/useExamples';
 import { seedExampleExpert } from '@/lib/geo/exampleExpert';
 import Results, { accentStyleFor } from './Results';
 import ScientificMethodModal, { type MethodKey } from './ScientificMethodModal';
+import QrModal from './QrModal';
 
 type Props = { initialProject: ProjectRow; initialExperts: ExpertRow[]; initialJudgments: JudgmentRow[] };
-type Patch = Partial<Pick<ProjectRow, 'title' | 'objective' | 'method' | 'weighting_method' | 'criteria' | 'alternatives' | 'decision_matrix' | 'prioritization' | 'is_public' | 'public_token' | 'geo'>>;
+type Patch = Partial<Pick<ProjectRow, 'title' | 'objective' | 'method' | 'weighting_method' | 'criteria' | 'alternatives' | 'decision_matrix' | 'prioritization' | 'is_public' | 'public_token' | 'open_token' | 'open_enabled' | 'geo'>>;
 const TABS_AHP = ['Proyecto', 'Priorización (A)', 'Expertos', 'Resultados', 'Comparativa', 'Compartir'];
 const TABS_MATRIX = ['Proyecto', 'Priorización (A)', 'Expertos', 'Matriz de decisión', 'Resultados', 'Comparativa', 'Compartir'];
 // kind:'spatial' — ver GeoVisor.tsx y docs/PLAN_geovisor_ahp_sig.md. Sin «Matriz de
@@ -116,6 +117,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
   // Edición en línea de nombre/perfil de un experto ya creado.
   const [editData, setEditData] = useState<{ id: string; name: string; role: string } | null>(null);
   const [msg, setMsg] = useState('');
+  const [qr, setQr] = useState<{ title: string; url: string; caption?: string; fileBase: string; card?: { heading: string; subheading?: string } } | null>(null);
 
   const prio = useMemo(() => normalizePrio(project.prioritization), [project.prioritization]);
   const idx = useMemo(() => indexJudgments(judgments), [judgments]);
@@ -308,6 +310,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
 
   const editingExpert = experts.find((e) => e.id === editing);
   const publicUrl = `${origin()}/p/${project.public_token}`;
+  const openUrl = `${origin()}/o/${project.open_token}`;
 
   return (
     <div>
@@ -554,6 +557,24 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                   ? ' En un mapa de aptitud, tus expertos comparan los criterios de a pares (hoja «Criterios») — no hay alternativas que comparar, son las celdas del territorio.'
                   : project.method !== 'ahp' && ` Con ${METHOD_OPTIONS.find((m) => m.key === project.method)?.label}, tus expertos solo pesan los criterios (hoja «Criterios»); las alternativas se comparan con la matriz de datos de la pestaña «Matriz de decisión», no de a pares.`}
               </p>
+              <div className="card form" style={{ marginBottom: 16 }}>
+                <h3>Enlace abierto (para un grupo)</h3>
+                <p className="muted" style={{ maxWidth: '70ch', fontSize: 13 }}>
+                  Un solo enlace o QR para todo un grupo base: cada quien lo abre, escribe su nombre y su rol, y queda inscrito como un experto normal de este proyecto (lo ves, editas y quitas igual que a los de abajo). Útil para no crear cada experto a mano antes de un taller presencial.
+                </p>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
+                  <input type="checkbox" checked={project.open_enabled} onChange={(e) => patch({ open_enabled: e.target.checked }, true)} /> Activar enlace abierto
+                </label>
+                {project.open_enabled ? (
+                  <>
+                    <div className="linkbox"><input type="text" readOnly value={openUrl} aria-label="Enlace abierto" onFocus={(ev) => ev.target.select()} /><button type="button" className="btn sm" onClick={() => copy(openUrl)}>Copiar enlace</button></div>
+                    <div className="acts">
+                      <button type="button" className="btn sm" onClick={() => setQr({ title: 'Enlace abierto', url: openUrl, caption: project.title, fileBase: `${fileBase()}_enlace_abierto`, card: { heading: project.title, subheading: 'Escanea para inscribirte como experto de este proyecto' } })}>Ver QR</button>
+                      <button type="button" className={'btn sm' + (pendDel === 'otok' ? ' danger' : '')} onClick={() => twoClick('otok', () => patch({ open_token: hexToken() }, true))}>{pendDel === 'otok' ? '¿Seguro? El enlace/QR anterior deja de funcionar' : 'Generar enlace nuevo'}</button>
+                    </div>
+                  </>
+                ) : <p className="muted" style={{ fontSize: 13 }}>Ahora mismo está apagado: nadie puede inscribirse por este medio.</p>}
+              </div>
               <div className="plist">
                 {experts.map((e) => {
                   const n = judgments.filter((j) => j.expert_id === e.id).length;
@@ -573,7 +594,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                         ) : (
                           <div>
                             <b>{e.name}</b> {e.role_desc && <span className="muted">· {e.role_desc}</span>}
-                            <div className="savest">{n} juicios · {e.filled_by === 'owner' ? 'llenado por ti' : 'llenado por el experto'}</div>
+                            <div className="savest">{n} juicios · {e.filled_by === 'owner' ? 'llenado por ti' : 'llenado por el experto'}{e.joined_via === 'open' && ' · vía enlace abierto'}</div>
                           </div>
                         )}
                         <span className={'pill ' + (e.status === 'submitted' ? '' : e.status === 'in_progress' ? 'warn' : 'neutral')}>
@@ -583,6 +604,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                       <div className="linkbox"><input type="text" readOnly value={link} aria-label={`Enlace de ${e.name}`} onFocus={(ev) => ev.target.select()} /><button type="button" className="btn sm" onClick={() => copy(link)}>Copiar enlace</button></div>
                       <div className="acts">
                         <button type="button" className="btn sm primary" onClick={() => setEditing(e.id)}>Llenar yo por él/ella</button>
+                        <button type="button" className="btn sm" onClick={() => setQr({ title: `QR de ${e.name}`, url: link, caption: e.role_desc || undefined, fileBase: `${fileBase()}_${e.name.replace(/[^\w-]+/g, '_').slice(0, 30)}` })}>Ver QR</button>
                         <button type="button" className="btn sm" onClick={() => setEditData({ id: e.id, name: e.name, role: e.role_desc })}>Editar datos</button>
                         <button type="button" className={'btn sm' + (pendDel === 'l' + e.id ? ' danger' : '')} onClick={() => twoClick('l' + e.id, () => updateExpert(e.id, { invite_token: hexToken() }))}>{pendDel === 'l' + e.id ? '¿Seguro? El enlace anterior deja de funcionar' : 'Enlace nuevo'}</button>
                         {e.status === 'submitted' && <button type="button" className="btn sm" onClick={() => updateExpert(e.id, { status: 'in_progress', submitted_at: null })}>Reabrir para que edite</button>}
@@ -751,6 +773,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           onClose={() => setShowSciModal(false)}
         />
       )}
+      {qr && <QrModal {...qr} onClose={() => setQr(null)} />}
     </div>
   );
 }
