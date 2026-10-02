@@ -19,13 +19,13 @@ authors:
     given-names: "Jorge"
     affiliation: "Universidad del Magdalena"
     orcid: "https://orcid.org/0000-0002-0840-8743"
-version: 0.1.3
-date-released: "2026-09-28"
+version: 1.0.0
+date-released: "2026-10-02"
 doi: 10.5281/zenodo.23024510
 identifiers:
   - type: doi
     value: 10.5281/zenodo.23024510
-    description: "The version-specific DOI for this exact release (v0.1.3) on Zenodo"
+    description: "The version-specific DOI for this exact release (v1.0.0) on Zenodo"
   - type: doi
     value: 10.5281/zenodo.23002790
     description: "The concept DOI, which always resolves to the latest version on Zenodo"

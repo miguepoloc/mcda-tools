@@ -33,7 +33,7 @@ export const CITATION_DATA: Record<CitationFormat, CitationItem> = {
     label: 'IEEE',
     badge: 'Ingeniería y Sistemas',
     description: 'Estándar para artículos técnicos en computación, electrónica, telecomunicaciones y conferencias IEEE.',
-    text: `${APP_AUTHORS_IEEE}, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. ${APP_VERSION}, Zenodo, Sep. 2026. doi: ${APP_DOI}. [En línea]. Disponible: https://mcda.tools`,
+    text: `${APP_AUTHORS_IEEE}, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. ${APP_VERSION}, Zenodo, Oct. 2026. doi: ${APP_DOI}. [En línea]. Disponible: https://mcda.tools`,
   },
   bibtex: {
     id: 'bibtex',
@@ -46,7 +46,7 @@ export const CITATION_DATA: Record<CitationFormat, CitationItem> = {
   author       = {Polo-Castañeda, Miguel Angel and Hernandez-Solorzano, Harold David and Espinosa-Valdez, Alexander Esteban and Gómez-Rojas, Jorge},
   title        = {{mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA}},
   year         = {2026},
-  month        = sep,
+  month        = oct,
   publisher    = {Zenodo},
   version      = {v${APP_VERSION}},
   doi          = {${APP_DOI}},

@@ -253,12 +253,12 @@ Si utilizas **MCDA Tools** en cursos académicos, tesis de maestría o investiga
 
 ### APA (7.ª edición)
 ```text
-Polo-Castañeda, M. A., Hernandez-Solorzano, H. D., Espinosa-Valdez, A. E., & Gómez-Rojas, J. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 0.1.3) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23024510
+Polo-Castañeda, M. A., Hernandez-Solorzano, H. D., Espinosa-Valdez, A. E., & Gómez-Rojas, J. (2026). mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA (Version 1.0.0) [Software de computación]. Zenodo. https://doi.org/10.5281/zenodo.23024510
 ```
 
 ### IEEE
 ```text
-M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. Gómez-Rojas, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 0.1.3, Zenodo, Sep. 2026. doi: 10.5281/zenodo.23024510. [En línea]. Disponible: https://mcda.tools
+M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. Gómez-Rojas, "mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA," ver. 1.0.0, Zenodo, Oct. 2026. doi: 10.5281/zenodo.23024510. [En línea]. Disponible: https://mcda.tools
 ```
 
 ### BibTeX
@@ -267,15 +267,15 @@ M. A. Polo-Castañeda, H. D. Hernandez-Solorzano, A. E. Espinosa-Valdez, and J. 
   author       = {Polo-Castañeda, Miguel Angel and Hernandez-Solorzano, Harold David and Espinosa-Valdez, Alexander Esteban and Gómez-Rojas, Jorge},
   title        = {{mcda-tools: Open-source web platform for multi-criteria decision analysis (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS) and GIS-MCDA}},
   year         = {2026},
-  month        = sep,
+  month        = oct,
   publisher    = {Zenodo},
-  version      = {v0.1.3},
+  version      = {v1.0.0},
   doi          = {10.5281/zenodo.23024510},
   url          = {https://doi.org/10.5281/zenodo.23024510}
 }
 ```
 
-Estos formatos citan esta versión exacta (v0.1.3). Para citar siempre la última versión, usa el DOI de concepto: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
+Estos formatos citan esta versión exacta (v1.0.0). Para citar siempre la última versión, usa el DOI de concepto: [10.5281/zenodo.23002790](https://doi.org/10.5281/zenodo.23002790).
 
 También puedes generar estas referencias (y RIS / Chicago) desde la propia plataforma en [`/citar`](https://mcda.tools/citar).
 

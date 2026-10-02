@@ -4,6 +4,21 @@ All notable changes to **MCDA Tools** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-02
+
+### First stable release
+The platform is declared stable for citation and publication: the seven methods (AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE, SAW, Fuzzy TOPSIS), the live-formula Excel export and the AHP+SIG spatial geoviewer are verified against the reference notebooks (`npm test`, `npm run test:excel`). ANP (Session 6) is planned for a later minor release.
+
+### Added
+- QR codes and an open self-registration link for experts (migration `…16_open_expert_link`).
+- Edit functionality in the geo layers panel and an expanded help section.
+
+### Fixed
+- `JudgmentEditor` sheet logic with empty alternatives.
+- Panel positioning for spatial projects; clearer expert instructions.
+
+---
+
 ## [0.1.3] - 2026-09-28
 
 ### Added
