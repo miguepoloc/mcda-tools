@@ -8,7 +8,7 @@ export const APP_FULL_NAME = 'MCDA Tools';
 export const APP_RELEASE_TAG = `v${APP_VERSION}`;
 export const APP_RELEASE_URL = `https://github.com/miguepoloc/mcda-tools/releases/tag/${APP_RELEASE_TAG}`;
 export const APP_REPO_URL = 'https://github.com/miguepoloc/mcda-tools';
-export const APP_DOI = '10.5281/zenodo.23024510';
+export const APP_DOI = '10.5281/zenodo.23223008';
 export const APP_DOI_URL = `https://doi.org/${APP_DOI}`;
 /** Concept DOI: always resolves to the latest version's record on Zenodo. Use this one when citing "the software" in general rather than this exact version. */
 export const APP_CONCEPT_DOI = '10.5281/zenodo.23002790';
