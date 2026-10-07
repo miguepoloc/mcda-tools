@@ -81,7 +81,13 @@ Cuando el usuario solicite un cambio de versión o se prepare un nuevo release, 
    git push origin vX.Y.Z
    ```
    *(Si se necesita corregir el commit apuntado por el tag actual antes de que Zenodo lo archive, usar `git tag -f -a vX.Y.Z -m "..." && git push -f origin vX.Y.Z`).*
-3. **Regla de Ejecución para Agentes:**
+3. **El tag NO basta: hay que crear el GitHub Release.** El webhook de Zenodo en `miguepoloc/mcda-tools` escucha solo el evento `release`; un push de tag no lo dispara (v1.0.0 quedó sin archivar en Zenodo por esto). Justo después del push del tag:
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z - Descripción" --notes-file <notas-del-CHANGELOG> --latest
+   ```
+   Zenodo archiva en ~1 min y es irreversible. Comprobar con `curl -sL https://zenodo.org/api/records/23002790/versions/latest` (campos `doi` y `metadata.version`).
+4. **El DOI de versión solo se conoce después del release.** Zenodo lo asigna al archivar, así que el commit del release lleva el DOI de la versión anterior. Tras archivar, hacer un commit `docs: point to the real vX.Y.Z Zenodo DOI (…)` que cambie el DOI en `CITATION.cff`, `src/lib/version.ts`, `README.md` y `README.es.md`. El tag no se mueve, por lo que el `CITATION.cff` archivado en Zenodo conserva el DOI viejo (pasó con v0.1.3 y v1.0.0). El badge usa el concept DOI y no se toca.
+5. **Regla de Ejecución para Agentes:**
    - Si el usuario pide guardar cambios, hacer commit o preparar release, el agente **DEBE** ejecutar el commit, tag y push directamente en el shell con `run_command` (sin pedirle al usuario que lo haga él manualmente).
    - Siempre verificar previamente `npm run typecheck`, `npm test` y `npm run test:excel`.
    - El árbol de trabajo (`git status`) SIEMPRE debe terminar limpio (`working tree clean`).
