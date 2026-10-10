@@ -73,7 +73,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     if (!L || !host.current || map.current) return;
     // Con «reducir movimiento» del sistema, sin animaciones de zoom, fundido ni vuelo.
     const calm = reducedMotion();
-    const m = L.map(host.current, { zoomControl: false, attributionControl: true, worldCopyJump: true, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, zoomAnimation: !calm, fadeAnimation: !calm, markerZoomAnimation: !calm });
+    const m = L.map(host.current, { zoomControl: false, attributionControl: true, worldCopyJump: true, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, scrollWheelZoom: false, zoomAnimation: !calm, fadeAnimation: !calm, markerZoomAnimation: !calm });
     m.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>');
     L.control.zoom({ position: 'topleft', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(m);
     L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 140 }).addTo(m);
@@ -92,12 +92,39 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
       cb.current.onClick(c.lat, c.lng);
     };
     m.getContainer().addEventListener('keydown', onKey);
+    // La rueda solo acerca con Ctrl/⌘ (o el pellizco del panel táctil, que llega como Ctrl + rueda): sin tecla, la
+    // página sigue desplazándose y se muestra un aviso breve. Zoom táctil y teclado (+/−) no pasan por aquí.
+    const box = m.getContainer();
+    const hint = document.createElement('div');
+    hint.className = 'gv-wheelhint';
+    hint.setAttribute('role', 'status');
+    box.appendChild(hint);
+    let hintTimer: ReturnType<typeof setTimeout> | undefined;
+    let acc = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) {
+        hint.textContent = navigator.platform?.includes('Mac') ? '⌘ + rueda para acercar' : 'Ctrl + rueda para acercar';
+        hint.classList.add('on');
+        clearTimeout(hintTimer);
+        hintTimer = setTimeout(() => { hint.classList.remove('on'); hint.textContent = ''; }, 1600);
+        return;
+      }
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 18 : e.deltaMode === 2 ? 400 : 1);
+      acc -= dy;
+      const snap = m.options.zoomSnap || 0.25;
+      const steps = Math.trunc(acc / (90 * snap));
+      if (!steps) return;
+      acc -= steps * 90 * snap;
+      m.setZoomAround(m.mouseEventToContainerPoint(e), m.getZoom() + steps * snap, { animate: false });
+    };
+    box.addEventListener('wheel', onWheel, { passive: false });
     m.on('mousemove', (e) => cb.current.onMove(e.latlng.lat, e.latlng.lng));
     map.current = m;
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(host.current);
     const el = m.getContainer();
-    return () => { ro.disconnect(); el.removeEventListener('keydown', onKey); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); draftRect.current = null; };
+    return () => { ro.disconnect(); el.removeEventListener('keydown', onKey); el.removeEventListener('wheel', onWheel); clearTimeout(hintTimer); hint.remove(); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); draftRect.current = null; };
   }, [L]);
 
   // mapa base

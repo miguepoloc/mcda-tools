@@ -5,6 +5,7 @@ import { MASK_EXCLUDED, MASK_NODATA, MASK_VALID } from './suitability.ts';
 import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
+import type { SigParts } from './publishSig.ts';
 
 /** Códigos del plano de clase publicado. */
 export const CODE_EXCLUDED = 0;
@@ -27,6 +28,8 @@ export type PublishedMeta = {
   ahp?: AhpSummary;
   /** Firma de lo que produjo este mapa (pesos, reglas, umbrales, capas): para avisar si quedó desactualizado. */
   sig?: string;
+  /** Firma por partes (pesos, reglas, umbrales, capas, área) para decir QUÉ cambió. Ausente en publicaciones anteriores. */
+  sigParts?: SigParts;
 };
 
 async function pipe(bytes: Uint8Array, s: CompressionStream | DecompressionStream): Promise<Uint8Array> {
