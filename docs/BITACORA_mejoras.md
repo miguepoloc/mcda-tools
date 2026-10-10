@@ -15,6 +15,7 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 | Diseño | Dirección «Afinado» (identidad actual con contraste arreglado); tipografía actual; modo compacto solo en tablas del Geovisor | 9 oct |
 | Animación | CSS + FLIP; sin anime.js por ahora | 9 oct |
 | Número de clases | Mínimo 2, **máximo 8** (confirmado por el docente), con nombre, color y rango editables | 10 oct |
+| Exportar / Compartir | «Exportar» solo descarga (grupos: Para tu informe · Para QGIS o Google Earth · Más formatos plegado · Todo junto). «Compartir» (pestaña del proyecto) pasa a ser donde se publica: enlace con Copiar y **código QR**, estado y qué cambió, casillas de qué ve el público (mapa siempre; puntos y ranking; resumen por zonas), enlace para expertos, Excel de priorización y catálogo del curso (docente, plegado). Maqueta aprobada; se implementa **después** de integrar R1/R2 para no chocar en «Exportar». | 10 oct |
 | Decisiones delegadas (el docente pidió que se decidan por él) | Guía de consistencia: solo aplica con botón y no se registra si la aplicó · Orden agregado: Borda por defecto, Copeland alternativo · Cortes por cuantiles/Jenks: se congelan al elegirlos · Clases: el docente pidió (10 oct) que sean **N, no solo 3**: el usuario agrega las que quiera y define el rango de cada una (sustituye la decisión anterior de 3 fijas) · Ranking por índice (%) · Puntos: por archivo (CSV/GeoJSON) primero; «desde capa subida» después · Exclusión se muestra siempre como «Excluido», nunca como 0 % | 10 oct |
 
 ## Entradas
