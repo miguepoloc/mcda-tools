@@ -9,7 +9,7 @@ export type SigParts = Record<SigPart, string>;
 export const SIG_PART_LABEL: Record<SigPart, string> = {
   pesos: 'los pesos de los criterios',
   reglas: 'las reglas de idoneidad (funciones o vetos)',
-  umbrales: 'los umbrales de las clases',
+  umbrales: 'las clases del mapa (cortes, nombres, colores o dirección del índice)',
   capas: 'las capas que alimentan o recortan el cálculo',
   area: 'el área de estudio',
 };
@@ -21,6 +21,9 @@ export type SigInput = {
   weights: number[];
   rules: GeoConfig['rules'];
   thresholds: { alta: number; media: number };
+  /** Dirección + cortes + nombres + colores de las N clases (`classSigValue` de classes.ts). Ausente = solo
+   * `thresholds`: así una publicación anterior de 3 clases en aptitud conserva su firma y no aparece «desactualizada». */
+  classSig?: unknown;
   /** Capas disponibles (paquete + propias): rol y rango de valores; `bytes` si se conoce. */
   layers: Record<string, { role: 'criterion' | 'exclusion' | 'area'; min: number; max: number; bytes?: number }>;
   packId?: string;
@@ -65,7 +68,7 @@ export function publishParts(inp: SigInput): SigParts {
   return {
     pesos: hash36(stableStringify(eff)),
     reglas: hash36(stableStringify(live.map(([id, r]) => [id, r.layerKey, r.fn, r.veto ?? null]).sort(byFirst))),
-    umbrales: hash36(stableStringify([Math.round(inp.thresholds.alta * 1e4), Math.round(inp.thresholds.media * 1e4)])),
+    umbrales: hash36(stableStringify(inp.classSig !== undefined ? ['clases', inp.classSig] : [Math.round(inp.thresholds.alta * 1e4), Math.round(inp.thresholds.media * 1e4)])),
     capas: hash36(stableStringify(layers)),
     area: hash36(stableStringify([inp.packId ?? '', inp.grid ?? null])),
   };

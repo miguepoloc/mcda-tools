@@ -140,6 +140,11 @@ export function classSigValue(setup: ClassSetup): unknown {
   return { dir: setup.direction, breaks: setup.breaks.map((b) => Math.round(b * 1e4)), names: setup.classes.map((c) => c.name ?? null), colors: setup.classes.map((c) => c.color ?? null) };
 }
 
+/** Para `publishParts`: undefined si es equivalente al modelo antiguo (la firma de «umbrales» no cambia). */
+export function publishClassSig(setup: ClassSetup): unknown {
+  return isLegacyEquivalent(setup) ? undefined : classSigValue(setup);
+}
+
 /** Escribe el modelo en el `GeoConfig`: `direction` solo si no es la de por defecto; `classes` {alta, media} se
  * mantiene al día cuando hay 3 clases (lo leen el catálogo y versiones anteriores). */
 export function applySetup<T extends GeoClassFields>(geo: T, setup: ClassSetup): T & GeoClassFields {
