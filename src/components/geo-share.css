@@ -1,0 +1,56 @@
+/* Pestañas «Exportar» (grupos de descargas) y «Compartir» (publicación) del geovisor. Archivo aparte para no mezclar con globals.css. */
+.gx-group{display:grid;gap:8px}
+.gx-title{margin:6px 0 0;font:600 12px var(--f-mono,ui-monospace,monospace);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.gx-items{display:grid;gap:8px}
+details.gx-group>summary{cursor:pointer;list-style:none;font:600 12px var(--f-mono,ui-monospace,monospace);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:8px 2px;min-height:32px;display:flex;align-items:center;gap:8px}
+details.gx-group>summary::-webkit-details-marker{display:none}
+details.gx-group>summary::before{content:"▸";display:inline-block;transition:transform .15s}
+details.gx-group[open]>summary::before{transform:rotate(90deg)}
+details.gx-group>summary:focus-visible{outline:2px solid var(--accent,#4D7C0F);outline-offset:2px;border-radius:6px}
+.gx-count{font-weight:500;background:var(--surface2);border:1px solid var(--line);border-radius:99px;padding:0 7px;color:var(--muted)}
+.gx-group .gv-export>div{min-width:0}
+.gx-group .gv-export p{overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){details.gx-group>summary::before{transition:none}}
+
+/* ---- Compartir ---- */
+.gs-slot{display:grid;gap:16px}
+.gs-card{display:grid;gap:12px}
+.gs-card h3{margin:0}
+.gs-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.gs-switch{display:flex;gap:8px;align-items:center;font-weight:600;min-height:32px}
+.gs-link{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
+.gs-qr{display:grid;gap:6px;justify-items:center}
+.gs-qr img{width:132px;height:132px;border-radius:8px;border:1px solid var(--line);background:#fff}
+.gs-qr .gs-qr-ph{width:132px;height:132px;border-radius:8px;border:1px dashed var(--line);display:grid;place-items:center;font-size:12px;color:var(--muted);text-align:center;padding:6px}
+.gs-kv{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+.gs-kv b{color:var(--ink,inherit);font-variant-numeric:tabular-nums}
+.gs-state{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface2)}
+.gs-state.ok{border-color:color-mix(in srgb,#16a34a 55%,var(--line))}
+.gs-state.stale{border-color:color-mix(in srgb,#d97706 65%,var(--line))}
+.gs-state .dot{flex:none;width:10px;height:10px;border-radius:99px;margin-top:5px;background:var(--muted)}
+.gs-state.ok .dot{background:#16a34a}
+.gs-state.stale .dot{background:#d97706}
+.gs-rows{display:grid;gap:10px}
+.gs-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:start}
+.gs-row input[type=checkbox]{margin-top:3px;width:18px;height:18px}
+.gs-row b{display:block}
+.gs-row p{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.45}
+.gs-row .gs-warn{grid-column:2;margin:4px 0 0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#d97706 12%,var(--surface));border:1px solid color-mix(in srgb,#d97706 55%,var(--line));color:var(--ink,inherit);font-size:13px}
+.gs-other{display:grid;gap:10px}
+.gs-other-row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.gs-other-row>div{min-width:0;flex:1 1 240px}
+.gs-other-row b{display:block}
+.gs-other-row p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.gs-details{border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.gs-details>summary{cursor:pointer;font-weight:600;padding:10px 0;min-height:44px;display:flex;align-items:center}
+.gs-details[open]>summary{border-bottom:1px solid var(--line);margin-bottom:10px}
+.gs-details>.gs-card{padding-bottom:12px}
+.gs-msg{font-size:13px;color:var(--muted);margin:0}
+.gs-warn-inline{font-size:13px;color:var(--ink,inherit);margin:0}
+@media (max-width:640px){.gs-link{grid-template-columns:1fr}.gs-qr{justify-items:start}}
+
+/* Geovisor montado pero fuera de pantalla (pestaña Compartir): mantiene su tamaño para que Leaflet no mida 0 px. */
+.gv-wrap.gs-away{position:absolute;left:-10000px;top:0;transform:none;visibility:hidden;pointer-events:none;height:0;overflow:hidden}
+.gs-host{max-width:760px}
+.gs-host:empty::before{content:"Cargando el mapa para poder publicarlo…";display:block;color:var(--muted);font-size:14px;padding:12px 0}
+.gs-details{--accent:var(--geo-accent,#84CC16);--accent-soft:var(--geo-accent-soft,rgba(132,204,22,.14))}

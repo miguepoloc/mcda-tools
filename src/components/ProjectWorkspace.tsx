@@ -60,6 +60,8 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
   const [experts, setExperts] = useState(initialExperts);
   const [judgments, setJudgments] = useState(initialJudgments);
   const [tabState, setTab] = useState('Proyecto');
+  // Contenedor (en la pestaña Compartir) donde el geovisor pinta, con un portal, la tarjeta de publicación de un mapa.
+  const [shareSlot, setShareSlot] = useState<HTMLElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveErr, setSaveErr] = useState('');
@@ -638,8 +640,9 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         </div>
       )}
 
-      {tab === 'Geovisor' && project.kind === 'spatial' && (
-        <div className="gv-wrap">
+      {/* El geovisor sigue montado (oculto fuera de pantalla) en «Compartir»: conserva capas y mapa calculado para publicar. */}
+      {(tab === 'Geovisor' || tab === 'Compartir') && project.kind === 'spatial' && (
+        <div className={'gv-wrap' + (tab === 'Geovisor' ? '' : ' gs-away')} aria-hidden={tab !== 'Geovisor'} inert={tab !== 'Geovisor'}>
           <GeoVisor
             projectId={project.id}
             ownerId={project.owner_id}
@@ -653,7 +656,11 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             onChangeGeo={(g, immediate) => patch({ geo: g }, immediate)}
             examples={examples}
             onApplyExample={applyExample}
-            share={{ isPublic: project.is_public, token: project.public_token, onTogglePublic: (on) => patch({ is_public: on }, true) }}
+            share={{
+              isPublic: project.is_public, token: project.public_token, onTogglePublic: (on) => patch({ is_public: on }, true),
+              slot: tab === 'Compartir' ? shareSlot : null, away: tab !== 'Geovisor', fileBase: fileBase(),
+              onGoExperts: () => goTab('Expertos'), onPrioExcel: () => { void exportPrioExcel(); },
+            }}
           />
         </div>
       )}
@@ -728,13 +735,14 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         </div>
       )}
 
-      {tab === 'Compartir' && (
+      {/* Mapa de aptitud: la publicación vive en el geovisor (necesita el mapa calculado); GeoVisor pinta aquí su tarjeta con un portal. */}
+      {tab === 'Compartir' && project.kind === 'spatial' && (
+        <div className="panel"><div ref={setShareSlot} className="gs-host" /></div>
+      )}
+      {tab === 'Compartir' && project.kind !== 'spatial' && (
         <div className="panel">
           <div className="card form">
             <h3>Resultados públicos</h3>
-            {project.kind === 'spatial' ? (
-              <p className="muted" style={{ maxWidth: '70ch' }}>Un mapa de aptitud se publica desde «Geovisor → Exportar → Vista pública»: ahí activas el enlace y eliges cuándo publicar o actualizar el mapa. La vista pública muestra solo el resultado (no tus capas ni tus expertos).</p>
-            ) : (
               <>
                 <p className="muted" style={{ maxWidth: '70ch' }}>Por defecto, nadie más que tú ve tu proyecto. Si activas el enlace público, cualquier persona con el enlace podrá ver los resultados ({objectiveWeighting
                   ? `ranking y los pesos ${WEIGHTING_SHORT[weighting]}, calculados de la matriz de decisión, que también verá`
@@ -749,18 +757,9 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                   </>
                 ) : <p className="muted" style={{ fontSize: 13 }}>Ahora mismo es privado: solo tú lo ves.</p>}
               </>
-            )}
           </div>
           <div className="card form">
             <h3>Exportar</h3>
-            {project.kind === 'spatial' ? (
-              <>
-                <p className="muted">El mapa se exporta desde «Geovisor → Exportar»: GeoTIFF (con estilo para QGIS), PNG, KMZ para Google Earth, CSV, Excel de resumen y un paquete .zip con todo. Aquí abajo, el Excel de la priorización de criterios.</p>
-                <div className="acts">
-                  <button className="btn" type="button" onClick={exportPrioExcel}>Descargar Excel de priorización</button>
-                </div>
-              </>
-            ) : (
               <>
                 <p className="muted">
                   {project.method === 'ahp'
@@ -773,7 +772,6 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                   <button className="btn" type="button" onClick={exportPrioExcel}>Descargar Excel de priorización</button>
                 </div>
               </>
-            )}
           </div>
         </div>
       )}
