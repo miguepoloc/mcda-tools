@@ -1,0 +1,23 @@
+/* Resumen por zonas del geovisor (pestaña «Zonas» y vista pública). Archivo aparte para no mezclar con .gv-ptable*. */
+.gv-ztable-wrap{max-height:min(60vh,520px);overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.gv-ztable-wrap:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.gv-ztable{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.gv-ztable caption{text-align:left;padding:7px 10px;font-size:12px;color:var(--muted);position:sticky;top:0;left:0;background:var(--surface2);z-index:2;border-bottom:1px solid var(--line)}
+.gv-ztable caption b{color:var(--ink)}
+.gv-ztable th,.gv-ztable td{padding:0 8px;height:36px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+.gv-ztable thead th{position:sticky;top:31px;z-index:1;background:var(--surface2);font:600 11px var(--f-mono);color:var(--muted);height:32px;white-space:nowrap}
+.gv-ztable .num{text-align:right;white-space:nowrap}
+.gv-ztable tbody th{font-weight:600;min-width:110px}
+.gv-ztable tbody tr[aria-selected]{cursor:pointer}
+.gv-ztable tbody tr.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.gv-ztable tbody tr.na{color:var(--muted)}
+.gv-ztable .na-cell{font-style:italic}
+.gv-ztable .dot{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:6px;border:1px solid rgba(0,0,0,.45);vertical-align:-1px}
+.gv-zsort{appearance:none;background:transparent;border:0;padding:6px 0;font:inherit;color:inherit;cursor:pointer;min-height:28px}
+.gv-zsort:hover{color:var(--ink)}
+.gv-zsort:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
+.gv-zlabel{background:rgba(11,15,23,.78);border:0;color:#fff;font:600 11px var(--f-body,system-ui,sans-serif);padding:1px 5px;box-shadow:none}
+.gv-zlabel::before{display:none}
+.gv-zramp{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+.gv-zramp i{flex:1;height:8px;border-radius:99px;border:1px solid var(--line)}
+@media (max-width:700px){.gv-ztable th,.gv-ztable td{height:40px}}

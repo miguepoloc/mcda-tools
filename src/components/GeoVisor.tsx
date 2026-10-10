@@ -14,7 +14,7 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } from '@/lib/geo/data';
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
-import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, rampCss, type PaletteKey } from '@/lib/geo/paint';
 import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import { normalizeBreaks } from '@/lib/geo/classes';
 import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
@@ -22,7 +22,9 @@ import { findParcels } from '@/lib/geo/patches';
 import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
-import { downloadRef } from '@/lib/geo/refLayer';
+import { downloadRef, nameFields } from '@/lib/geo/refLayer';
+import { buildZoneGrid, cellOf, defaultZoneOrder, zonalStats, zonesCsv } from '@/lib/geo/zonal';
+import { fcBounds } from '@/lib/geo/vector';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
@@ -42,6 +44,8 @@ import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, t
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
 import GeoPointsPanel from './GeoPointsPanel';
+import GeoZonesPanel from './GeoZonesPanel';
+import type { ZoneRowView } from './GeoZonesTable';
 import type { RankRow } from './GeoPointsTable';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
@@ -57,7 +61,7 @@ type Props = {
   share: { isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void } | null;
 };
 
-type Tab = 'capas' | 'modelo' | 'puntos' | 'exportar';
+type Tab = 'capas' | 'modelo' | 'puntos' | 'zonas' | 'exportar';
 
 const TOUR: TourStep[] = [
   { sel: '.gv-steps-bar', tab: 'capas', title: 'Cuatro pasos', text: 'Área → Capas → Reglas → Pesos. Cada marca se pone verde cuando ese paso está listo. Los pesos vienen de tus expertos (pestaña «Expertos» del proyecto).' },
@@ -98,6 +102,9 @@ export default function GeoVisor(props: Props) {
   // Puntos con ranking: modo «Agregar punto» (explícito), punto resaltado (tabla <-> mapa) y aviso del último intento.
   const [addMode, setAddMode] = useState(false);
   const [selPoint, setSelPoint] = useState<string | null>(null);
+  // Resumen por zonas: mapa coroplético (color por índice medio) y zona resaltada en la tabla.
+  const [choro, setChoro] = useState(false);
+  const [selZone, setSelZone] = useState<string | null>(null);
   const [addNote, setAddNote] = useState('');
   // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
   // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
@@ -296,6 +303,26 @@ export default function GeoVisor(props: Props) {
   }, [addMode]);
   useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
 
+  // ------------------------------------------------------------------ resumen por zonas
+  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref).map((v) => ({ key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: v.fc.features.length, fields: nameFields(v.fc) })), [vecs, geo.layers]);
+  const zoneVec = useMemo(() => (geo.zonal ? vecs.find((v) => v.ref && v.id === geo.zonal!.layer) ?? null : null), [vecs, geo.zonal]);
+  const zoneGrid = useMemo(() => (zoneVec && data ? buildZoneGrid(zoneVec.fc, data.grid, geo.zonal?.nameField) : null), [zoneVec, data, geo.zonal?.nameField]);
+  const zoneStats = useMemo(() => {
+    if (!zoneGrid || !data || !ev) return null;
+    const pointCells = points.map((p) => cellOf(data.grid, p.lon, p.lat));
+    return zonalStats({ zones: zoneGrid, pct: ev.pct, cls: ev.cls, mask: data.mask, haPerPixel: data.grid.haPerPixel, nClasses: rm.n, direction: rm.direction, pointCells });
+  }, [zoneGrid, data, ev, rm.n, rm.direction, points]);
+  const zoneRows = useMemo<ZoneRowView[] | null>(() => (zoneStats ? defaultZoneOrder(zoneStats).map((z) => ({
+    key: String(z.index), name: z.name, meanPct: z.meanPct, ha: z.ha, classPct: z.classPct, points: points.length ? z.points : null,
+    color: z.meanPct === null ? undefined : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`,
+  })) : null), [zoneStats, points.length, palette, rm.direction]);
+  const onZoneSel = useCallback((key: string) => {
+    setSelZone(key);
+    const f = zoneVec?.fc.features[Number(key)];
+    const b = f ? fcBounds({ type: 'FeatureCollection', features: [f] }) : null;
+    if (b) mapRef.current?.fit(b);
+  }, [zoneVec]);
+
   // ------------------------------------------------------------------ imágenes sobre el mapa
   const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
   const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
@@ -357,11 +384,17 @@ export default function GeoVisor(props: Props) {
     const meta = v.ref ? geo.layers?.[v.id]?.ref : undefined;
     if (!v.ref) return { id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false };
     const nf = meta?.labels ? meta.nameField : undefined;
-    return {
+    const base: VectorOverlay = {
       id: v.id, fc: v.fc, color: meta?.color ?? v.color, visible: vis[`v:${v.id}`]?.on ?? true, weight: meta?.weight ?? 2, fillOpacity: 0,
       ...(nf ? { labels: v.fc.features.map((f) => { const t = f.properties?.[nf]; return t === undefined || t === null || t === '' ? null : String(t); }) } : {}),
     };
-  }), [vecs, vis, geo.layers]);
+    // Coroplético: la capa de zonas elegida se rellena con el color del índice medio de cada zona (gris = sin área evaluada).
+    if (choro && zoneStats && zoneVec?.id === v.id) {
+      base.fills = zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`));
+      base.labels = zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`);
+    }
+    return base;
+  }), [vecs, vis, geo.layers, choro, zoneStats, zoneVec, palette, rm.direction]);
 
   // ------------------------------------------------------------------ punto consultado
   const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, { breaks: rm.breaks, direction: rm.direction }, selected), rm) : null), [selected, data, ev, rules, rm]);
@@ -613,8 +646,8 @@ export default function GeoVisor(props: Props) {
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
         <div className="gv-tabs" role="tablist">
-          {(['capas', 'modelo', 'puntos', 'exportar'] as Tab[]).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', exportar: 'Exportar' }[t]}</button>
+          {(['capas', 'modelo', 'puntos', 'zonas', 'exportar'] as Tab[]).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', zonas: 'Zonas', exportar: 'Exportar' }[t]}</button>
           ))}
         </div>
         <div className="gv-side-body">
@@ -649,6 +682,14 @@ export default function GeoVisor(props: Props) {
               onCenter={(id) => { const pt = points.find((x) => x.id === id); if (pt) { setSelPoint(id); mapRef.current?.flyTo(pt.lat, pt.lon, 13); } }}
               onChange={setPoints}
               onExportCsv={() => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv')} />
+          )}
+          {tab === 'zonas' && (
+            <GeoZonesPanel
+              layers={zoneLayers} sel={geo.zonal} ready={!!(data && ev && rules.length > 0)} rows={zoneRows} classNames={rm.names} direction={rm.direction}
+              rampCss={rampCss(palette, rm.direction)} choropleth={choro} onChoropleth={setChoro} nPoints={points.length}
+              selectedKey={selZone} onSelect={onZoneSel} onGoLayers={() => setTab('capas')}
+              onSel={(z) => commit((g) => { const o = { ...g }; if (z) o.zonal = z; else delete o.zonal; return o; })}
+              onCsv={() => { if (zoneStats) saveBytes(`${base}_zonas.csv`, zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction), 'text/csv'); }} />
           )}
           {tab === 'exportar' && (
             <div className="gv-sec-stack">
