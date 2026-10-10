@@ -151,6 +151,12 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); void flush(); }, [flush]);
 
+  // «Reportar un problema» (ReportIssueLink) lee solo el tipo de proyecto, nunca ids ni datos
+  useEffect(() => {
+    document.body.dataset.mcdaMethod = project.kind === 'spatial' ? 'geovisor-ahp-sig' : project.method;
+    return () => { delete document.body.dataset.mcdaMethod; };
+  }, [project.kind, project.method]);
+
   function patch(p: Patch, immediate = false) {
     setProject((prev) => ({ ...prev, ...p }) as ProjectRow);
     pending.current = { ...pending.current, ...p };
@@ -266,6 +272,10 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
   /* ---- matriz de decisión ---- */
   function setDMCell(altId: string, critId: string, value: number | null) {
     patch({ decision_matrix: setMatrixCell(dm, altId, critId, value) });
+  }
+  /** Escribe varias celdas de golpe (pegado desde una hoja de cálculo, o deshacerlo) en un solo guardado. */
+  function setDMCells(cells: { altId: string; critId: string; value: number | null }[]) {
+    patch({ decision_matrix: cells.reduce((m, c) => setMatrixCell(m, c.altId, c.critId, c.value), dm) }, true);
   }
   function setDMFuzzyCell(altId: string, critId: string, label: string) {
     const row = { ...dm.values[altId], [critId]: label };
@@ -655,6 +665,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           matrix={dm}
           method={project.method}
           onSetCell={setDMCell}
+          onSetCells={setDMCells}
           onSetFuzzyCell={setDMFuzzyCell}
           onSetType={setDMType}
           onSetTarget={setDMTarget}

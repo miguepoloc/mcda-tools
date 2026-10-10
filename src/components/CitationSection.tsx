@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import CitationBox from './CitationBox';
-import { APP_VERSION, APP_DOI } from '@/lib/version';
+import { APP_VERSION, APP_RELEASE_TAG, APP_DOI } from '@/lib/version';
 
 interface CitationSectionProps {
   showFullIntro?: boolean;
@@ -49,7 +49,7 @@ export default function CitationSection({ showFullIntro = true }: CitationSectio
             <div className="cite-principle-num">3</div>
             <h4>DOI de Versión vs. Concepto</h4>
             <p>
-              El DOI <code className="mono">{APP_DOI}</code> identifica con precisión el código de la versión 0.1.0 en el archivo global de Zenodo (CERN), garantizando su preservación a largo plazo.
+              El DOI <code className="mono">{APP_DOI}</code> identifica con precisión el código de la versión <code className="mono">{APP_RELEASE_TAG}</code> en el archivo global de Zenodo (CERN), garantizando su preservación a largo plazo.
             </p>
           </div>
         </div>

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Cómo citar la plataforma
+    url: https://mcda.tools/citar
+    about: Versión, DOI de Zenodo y formatos de cita (APA, IEEE, BibTeX).
+  - name: Qué método usar
+    url: https://mcda.tools/metodo
+    about: Asistente de tres preguntas para elegir entre AHP, TOPSIS, VIKOR, ELECTRE, PROMETHEE y otros.

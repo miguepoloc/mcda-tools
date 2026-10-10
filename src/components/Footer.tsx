@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ReportIssueLink from "./ReportIssueLink";
 import { APP_VERSION, APP_RELEASE_URL, APP_REPO_URL } from "@/lib/version";
 
 export default function Footer() {
@@ -40,6 +41,7 @@ export default function Footer() {
                 >
                     Notas de versión
                 </a>
+                <ReportIssueLink>Reportar un problema</ReportIssueLink>
             </nav>
         </footer>
     );

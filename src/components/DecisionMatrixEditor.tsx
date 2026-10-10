@@ -1,12 +1,16 @@
 'use client';
 
 import WeightBars from './WeightBars';
-import { useState } from 'react';
+import { useState, type ClipboardEvent } from 'react';
 import { missingUnits, withUnit } from '@/lib/units';
 import ReorderList from './ReorderList';
 import type { Alternative, Criterion, DecisionMatrix, MatrixKind, TargetSpec } from '@/lib/types';
 import { getCell, getKind, getTarget, targetDistance } from '@/lib/topsis';
 import { LINGUISTIC_LABELS, type LinguisticLabel } from '@/lib/fuzzy_topsis';
+import { isBlockPaste, parsePastedBlock, type PasteResult } from '@/lib/paste-matrix';
+
+type PendingPaste = { result: PasteResult; originRow: number; originCol: number };
+type PasteUndo = { count: number; prev: { altId: string; critId: string; value: number | null }[] };
 
 const LINGUISTIC_ES: Record<LinguisticLabel, string> = {
   VP: 'Muy mala (VP)',
@@ -29,6 +33,8 @@ type Props = {
   matrix: DecisionMatrix;
   method?: string;
   onSetCell: (altId: string, critId: string, value: number | null) => void;
+  /** Escribe varias celdas en un solo guardado (pegado desde Excel/Sheets y su «Deshacer»). `null` borra la celda. */
+  onSetCells?: (cells: { altId: string; critId: string; value: number | null }[]) => void;
   onSetFuzzyCell?: (altId: string, critId: string, value: LinguisticLabel) => void;
   onSetType: (critId: string, type: MatrixKind) => void;
   /** Objetivo (valor y tolerancia) de un criterio de tipo «Objetivo». */
@@ -52,7 +58,7 @@ type Props = {
 /** Unidad como sufijo dentro de la celda solo si es corta («km», «USD»); las largas («escala 1–5») quedan en la cabecera. */
 const cellUnit = (u?: string): string => { const t = u?.trim() ?? ''; return t.length > 0 && t.length <= 6 ? t : ''; };
 
-export default function DecisionMatrixEditor({ criteria, alternatives, matrix, method, onSetCell, onSetFuzzyCell, onSetType, onSetTarget, objective, onEditObjective, liveWeights, weightingLabel, noExpertWeights, onGoExperts, onSetUnit, onReorder }: Props) {
+export default function DecisionMatrixEditor({ criteria, alternatives, matrix, method, onSetCell, onSetCells, onSetFuzzyCell, onSetType, onSetTarget, objective, onEditObjective, liveWeights, weightingLabel, noExpertWeights, onGoExperts, onSetUnit, onReorder }: Props) {
   const isFuzzy = method === 'fuzzy_topsis';
   const [ordering, setOrdering] = useState(false);
   const [scrolled, setScrolled] = useState(false); // la sombra de la columna fija solo aparece cuando hay algo debajo
@@ -61,6 +67,34 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
   // ancho mínimo por columna: los 3 botones (Beneficio · Costo · Objetivo) caben sin apretarse y la tabla
   // hace scroll horizontal (envoltorio .tbl) si hay muchos criterios, en vez de deformarse
   const minWidth = 200 + criteria.length * 232;
+
+  // Pegado de un bloque desde Excel/Sheets: vista previa con avisos, aplicar y deshacer
+  const [pending, setPending] = useState<PendingPaste | null>(null);
+  const [undo, setUndo] = useState<PasteUndo | null>(null);
+  const pasteEnabled = !isFuzzy && !!onSetCells;
+
+  function handlePaste(e: ClipboardEvent<HTMLInputElement>, row: number, col: number) {
+    if (!pasteEnabled) return;
+    const text = e.clipboardData.getData('text/plain');
+    if (!isBlockPaste(text)) return; // un valor suelto: el input lo pega como siempre
+    e.preventDefault();
+    setUndo(null);
+    setPending({ result: parsePastedBlock(text, { row, col }, { rows: alternatives.length, cols: criteria.length }), originRow: row, originCol: col });
+  }
+  function applyPaste() {
+    if (!pending || !onSetCells) return;
+    const cells = pending.result.cells.map((c) => ({ altId: alternatives[c.row].id, critId: criteria[c.col].id, value: c.value as number | null }));
+    const prev = cells.map((c) => ({ altId: c.altId, critId: c.critId, value: getCell(matrix, c.altId, c.critId) ?? null }));
+    onSetCells(cells);
+    setUndo({ count: cells.length, prev });
+    setPending(null);
+  }
+  function undoPaste() {
+    if (!undo || !onSetCells) return;
+    onSetCells(undo.prev);
+    setUndo(null);
+  }
+  const cellName = (row: number, col: number) => `«${alternatives[row]?.name ?? '?'}» × «${criteria[col]?.name ?? '?'}»`;
 
   return (
     <div className="panel">
@@ -136,6 +170,45 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
           )}
         </div>
       )}
+      {pasteEnabled && !pending && !undo && alternatives.length > 0 && (
+        <p className="muted" style={{ margin: '0 0 12px', fontSize: 13.5, maxWidth: '110ch' }}>
+          Tip: copia un rango de tu hoja de cálculo y pégalo (Ctrl/Cmd+V) estando en una celda de la tabla. Verás una vista previa antes de aplicarlo.
+        </p>
+      )}
+      {pending && (() => {
+        const { result } = pending;
+        const empties = result.issues.filter((i) => i.kind === 'empty');
+        const nans = result.issues.filter((i) => i.kind === 'nan');
+        const ambig = result.issues.filter((i) => i.kind === 'ambiguous');
+        const dropped = result.droppedOutside;
+        const show = <T,>(xs: T[], f: (x: T) => string) => xs.slice(0, 6).map(f).join('; ') + (xs.length > 6 ? `; … (+${xs.length - 6})` : '');
+        return (
+          <div className="card" role="region" aria-label="Vista previa del pegado" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
+            <div className="eyebrow">Vista previa del pegado</div>
+            <p style={{ margin: '4px 0 6px' }}>
+              {result.cells.length > 0
+                ? <>Se escribirán <b>{result.cells.length}</b> {result.cells.length === 1 ? 'celda' : 'celdas'} a partir de {cellName(pending.originRow, pending.originCol)}.</>
+                : <b>No hay ninguna celda numérica que escribir.</b>}
+              {(result.skippedHeaderRow || result.skippedHeaderCol) && <> Se omitió {result.skippedHeaderRow && result.skippedHeaderCol ? 'la fila y la columna' : result.skippedHeaderRow ? 'la fila' : 'la columna'} de encabezados.</>}
+            </p>
+            {nans.length > 0 && <p className="muted" style={{ margin: '0 0 4px' }}><b>No son números (se omiten):</b> {show(nans, (i) => `${cellName(i.row, i.col)} = «${i.raw.trim()}»`)}.</p>}
+            {empties.length > 0 && <p className="muted" style={{ margin: '0 0 4px' }}><b>Celdas vacías (no se tocan):</b> {show(empties, (i) => cellName(i.row, i.col))}.</p>}
+            {ambig.length > 0 && <p className="muted" style={{ margin: '0 0 4px' }}><b>Revisa estos separadores:</b> {show(ambig, (i) => `${cellName(i.row, i.col)} = «${i.raw.trim()}» se leyó como ${Number(i.raw.trim().replace(',', '.'))}`)}. Se interpreta la coma o el punto como decimal.</p>}
+            {dropped > 0 && <p className="muted" style={{ margin: '0 0 4px' }}><b>{dropped} {dropped === 1 ? 'celda cae' : 'celdas caen'} fuera de la matriz</b> y no se escribirán: los datos de más se descartan sin crear alternativas ni criterios.</p>}
+            <div className="acts" style={{ marginTop: 8 }}>
+              <button type="button" className="btn primary" disabled={result.cells.length === 0} onClick={applyPaste}>Aplicar</button>
+              <button type="button" className="btn" onClick={() => setPending(null)}>Cancelar</button>
+            </div>
+          </div>
+        );
+      })()}
+      {undo && (
+        <div className="banner" role="status" style={{ marginBottom: 12 }}>
+          <span>Se pegaron <b>{undo.count}</b> {undo.count === 1 ? 'valor' : 'valores'} en la matriz.</span>
+          <button type="button" className="btn" onClick={undoPaste}>Deshacer el pegado</button>
+          <button type="button" className="btn" onClick={() => setUndo(null)}>Listo</button>
+        </div>
+      )}
       <div className={'card mx' + (scrolled ? ' scrolled' : '')}>
         <div className="tbl" onScroll={(e) => setScrolled(e.currentTarget.scrollLeft > 2)}>
           <table style={{ minWidth }}>
@@ -199,10 +272,10 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
                   </tr>
                 </>
               )}
-              {alternatives.map((a) => (
+              {alternatives.map((a, ai) => (
                 <tr key={a.id}>
                   <th scope="row" className="alt">{a.name}</th>
-                  {criteria.map((c) => {
+                  {criteria.map((c, ci) => {
                     const t = getTarget(matrix, c.id), x = getCell(matrix, a.id, c.id);
                     return (
                       <td key={c.id}>
@@ -226,6 +299,7 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
                                 aria-label={`${a.name}, ${withUnit(c)}`}
                                 value={x ?? ''}
                                 onChange={(e) => onSetCell(a.id, c.id, e.target.value === '' ? null : Number(e.target.value))}
+                                onPaste={(e) => handlePaste(e, ai, ci)}
                               />
                               {cellUnit(c.unit) && <span className="mx-u" aria-hidden="true" title={c.unit?.trim()}>{cellUnit(c.unit)}</span>}
                             </div>
