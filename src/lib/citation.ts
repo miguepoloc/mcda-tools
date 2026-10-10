@@ -6,7 +6,7 @@ import {
   APP_AUTHORS_APA,
   APP_AUTHORS_IEEE,
   APP_IN_TEXT_CITATION,
-} from './version';
+} from './version.ts';
 
 export type CitationFormat = 'apa' | 'ieee' | 'bibtex' | 'ris' | 'chicago';
 

@@ -1,0 +1,20 @@
+/* Diálogo «Componer mapa para entregar» del geovisor. Usa las variables del tema del geovisor. */
+.gv-cmp-ov{position:fixed;inset:0;z-index:3000;background:rgba(5,8,14,.8);display:flex;align-items:center;justify-content:center;padding:16px}
+.gv-cmp{background:var(--surface,#fff);color:var(--ink,#0f172a);border:1px solid var(--line,#cbd5e1);border-radius:12px;width:min(1100px,100%);max-height:94vh;overflow:auto;display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:0}
+.gv-cmp:focus-visible{outline:2px solid var(--accent,#0369a1)}
+.gv-cmp-form{padding:18px;border-right:1px solid var(--line,#cbd5e1);display:grid;gap:14px;align-content:start}
+.gv-cmp-form h2{margin:0;font-size:17px}
+.gv-cmp-form fieldset{border:1px solid var(--line,#cbd5e1);border-radius:8px;margin:0;padding:10px 12px;display:grid;gap:4px}
+.gv-cmp-form legend{font:600 12px var(--f-mono,monospace);color:var(--muted,#475569);padding:0 6px}
+.gv-cmp-form label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.gv-cmp-form input[type=text],.gv-cmp-form select{min-height:36px;padding:4px 8px;border:1px solid var(--line,#cbd5e1);border-radius:6px;background:var(--surface2,#f8fafc);color:inherit;font:inherit;font-weight:400;width:100%}
+.gv-cmp-chk{display:flex!important;align-items:center;gap:8px;min-height:36px;font-weight:400!important;cursor:pointer}
+.gv-cmp-chk input{width:18px;height:18px;flex:none}
+.gv-cmp-form input:focus-visible,.gv-cmp-form select:focus-visible,.gv-cmp-chk input:focus-visible{outline:2px solid var(--accent,#0369a1);outline-offset:1px}
+.gv-cmp-prev{padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
+.gv-cmp-prev .frame{border:1px solid var(--line,#cbd5e1);border-radius:8px;background:#fff;min-height:240px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.gv-cmp-prev img{display:block;max-width:100%;height:auto}
+.gv-cmp-warn{margin:0;font-size:12.5px;color:var(--warn-text,#92400e)}
+.gv-cmp-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.gv-cmp-actions .btn{min-height:36px}
+@media (max-width:760px){.gv-cmp{grid-template-columns:1fr}.gv-cmp-form{border-right:0;border-bottom:1px solid var(--line,#cbd5e1)}}
