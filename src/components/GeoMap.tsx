@@ -20,7 +20,12 @@ export const BASEMAPS: Record<BasemapKey, { label: string; url: string; attr: st
 };
 
 export type RasterOverlay = { id: string; url: string; bounds: Bounds; opacity: number; visible: boolean; z: number };
-export type VectorOverlay = { id: string; fc: FC; color: string; visible: boolean };
+/** `weight`/`fillOpacity`: estilo del contorno y del relleno (referencia: relleno 0 = solo contorno). `fills[i]`: color de
+ * relleno del elemento i (coroplético; null = sin color). `labels[i]`: etiqueta permanente del elemento i. */
+export type VectorOverlay = {
+  id: string; fc: FC; color: string; visible: boolean;
+  weight?: number; fillOpacity?: number; fills?: (string | null)[]; labels?: (string | null)[];
+};
 export type MapMarker = { id: string; lat: number; lon: number; label?: string; selected?: boolean };
 /** Punto del ranking: `color` = el de su clase (gris si no se evaluó), `tip` = «nombre · índice», `rank` = puesto (null = sin puesto). */
 export type PointMark = { id: string; lat: number; lon: number; tip: string; color: string; rank: number | null };
@@ -74,6 +79,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
   const base = useRef<Lf.TileLayer | null>(null);
   const imgs = useRef(new Map<string, Lf.ImageOverlay>());
   const vecs = useRef(new Map<string, Lf.GeoJSON>());
+  const vsig = useRef(new Map<string, string>());
   const marks = useRef(new Map<string, Lf.CircleMarker>());
   /** Marcadores del ranking: `sig` = lo que determina su estilo, `tip` = el texto del tooltip ya puesto. */
   const pmarks = useRef(new Map<string, { o: Lf.CircleMarker; sig: string; tip: string; mark: PointMark }>());
@@ -185,18 +191,32 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     const m = map.current;
     if (!L || !m) return;
     const live = new Set(props.vectors.map((v) => v.id));
-    for (const [id, o] of vecs.current) if (!live.has(id)) { o.remove(); vecs.current.delete(id); }
+    for (const [id, o] of vecs.current) if (!live.has(id)) { o.remove(); vecs.current.delete(id); vsig.current.delete(id); }
     for (const v of props.vectors) {
       let o = vecs.current.get(v.id);
+      // Estilo/relleno/etiquetas cambian la capa: se recrea (el FeatureCollection es el mismo objeto; la firma evita rehacerla sin motivo).
+      const sig = `${v.fc.features.length}|${v.color}|${v.weight ?? ''}|${v.fillOpacity ?? ''}|${(v.fills ?? []).join(',')}|${(v.labels ?? []).join('¦')}`;
+      if (o && (vsig.current.get(v.id) !== sig || (o as unknown as { __fc?: FC }).__fc !== v.fc)) { o.remove(); vecs.current.delete(v.id); o = undefined; }
       if (!o) {
         const renderer = L.canvas({ pane: 'gv-vector' });
+        const order = new Map(v.fc.features.map((f, i) => [f, i] as const));
         o = L.geoJSON(v.fc as never, {
           pane: 'gv-vector', renderer,
-          style: () => ({ color: v.color, weight: 1.5, fillColor: v.color, fillOpacity: 0.12, opacity: 0.95 }),
+          style: (f: unknown) => {
+            const i = order.get(f as never) ?? -1;
+            const fill = v.fills?.[i];
+            return { color: v.color, weight: v.weight ?? 1.5, fillColor: fill ?? v.color, fillOpacity: fill ? 0.55 : (v.fillOpacity ?? 0.12), opacity: 0.95 };
+          },
           pointToLayer: (_f: unknown, ll: Lf.LatLngExpression) => L.circleMarker(ll, { radius: 4, color: v.color, weight: 1.5, fillOpacity: 0.7, pane: 'gv-vector', renderer }),
+          onEachFeature: (f: unknown, lyr: Lf.Layer) => {
+            const t = v.labels?.[order.get(f as never) ?? -1];
+            if (t) lyr.bindTooltip(tipEl(t), { permanent: true, direction: 'center', className: 'gv-zlabel' });
+          },
           interactive: false,
         } as never);
+        (o as unknown as { __fc?: FC }).__fc = v.fc;
         vecs.current.set(v.id, o);
+        vsig.current.set(v.id, sig);
       }
       if (v.visible && !m.hasLayer(o)) o.addTo(m);
       if (!v.visible && m.hasLayer(o)) o.remove();

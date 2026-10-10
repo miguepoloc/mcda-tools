@@ -21,7 +21,7 @@ export default function GeoCatalogPanel(p: Props) {
   const [lic, setLic] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(p.geo.layers ?? {}).map(([k, l]) => [k, l.license ?? ''])));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const layers = Object.entries(p.geo.layers ?? {});
+  const layers = Object.entries(p.geo.layers ?? {}).filter(([, l]) => l.role !== 'reference');
   const unsaved = layers.filter(([k]) => !p.cache.current[k]).length;
   const idOk = /^[a-z0-9][a-z0-9-]{1,40}$/.test(id);
 

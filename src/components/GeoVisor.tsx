@@ -22,6 +22,7 @@ import { findParcels } from '@/lib/geo/patches';
 import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
+import { downloadRef } from '@/lib/geo/refLayer';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
@@ -37,7 +38,7 @@ import { kmz, parcelsCsv, pixelsCsv, qmlClasses, qmlPct, resultRaster, safeName,
 import { downloadGeoExcelBytes, type GeoSummary } from '@/lib/geoExcel';
 import type { Criterion, ExpertRow, GeoConfig, GeoLayerMeta } from '@/lib/types';
 import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rankHeading, rankingCsv, rankPoints, round6, sanitizePoints, toPublishedPoints, type GeoPoint } from '@/lib/geo/points';
-import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
+import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
 import GeoPointsPanel from './GeoPointsPanel';
@@ -141,7 +142,8 @@ export default function GeoVisor(props: Props) {
 
   // ------------------------------------------------------------------ carga de datos
   const gridSig = geo.grid ? JSON.stringify(geo.grid) : '';
-  const layersSig = geo.packId + '|' + JSON.stringify(Object.entries(geo.layers ?? {}).map(([k, l]) => [k, l.path, l.role, l.bytes, l.min, l.max]));
+  // Las capas de referencia (polígonos) no alimentan el cálculo: no entran a la firma ni disparan la recarga de rásters.
+  const layersSig = geo.packId + '|' + JSON.stringify(Object.entries(geo.layers ?? {}).filter(([, l]) => l.role !== 'reference').map(([k, l]) => [k, l.path, l.role, l.bytes, l.min, l.max]));
   useEffect(() => {
     let alive = true;
     setError('');
@@ -150,7 +152,7 @@ export default function GeoVisor(props: Props) {
     // intermedio la vaciaría a mitad de un lote. Borrar una capa o cambiar el área limpia la caché de
     // forma explícita en GeoLayersPanel.
     const load = async (metas: Record<string, GeoLayerMeta>, fetchOne: (m: GeoLayerMeta) => Promise<Float32Array>, cells: number, errs: string[]) => {
-      const need = Object.keys(metas).filter((k) => !cache.current[k] && metas[k].path);
+      const need = Object.keys(metas).filter((k) => !cache.current[k] && metas[k].path && metas[k].role !== 'reference');
       if (need.length) setLoading(true);
       let done = 0;
       for (const k of need) {
@@ -166,6 +168,7 @@ export default function GeoVisor(props: Props) {
       const layers: Record<string, Float32Array> = {}; const info: Record<string, LayerInfo> = {};
       let missing = 0;
       for (const [k, m] of Object.entries(metas)) {
+        if (m.role === 'reference') continue; // polígonos de referencia: viven en `vecs`, no en la grilla
         if (!cache.current[k]) { missing++; continue; }
         layers[k] = cache.current[k];
         info[k] = { label: m.label, unit: m.unit, role: m.role, min: m.min, max: m.max, origin: m.origin, source: m.source, bytes: m.bytes, license: m.license };
@@ -334,7 +337,31 @@ export default function GeoVisor(props: Props) {
     }));
   }, [imgs, om, vis]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const vectors = useMemo(() => vecs.map((v) => ({ id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false })), [vecs, vis]);
+  // Polígonos de referencia: se bajan de Storage al abrir el proyecto (el FC ya no vive solo en memoria).
+  const refLoading = useRef(new Set<string>());
+  const refSig = Object.entries(geo.layers ?? {}).filter(([, l]) => l.role === 'reference' && l.path).map(([k, l]) => `${k}:${l.path}`).join('|');
+  useEffect(() => {
+    if (!supabase) return;
+    const sb = supabase;
+    for (const [k, l] of Object.entries(geoRef.current.layers ?? {})) {
+      if (l.role !== 'reference' || !l.path || refLoading.current.has(k) || vecs.some((v) => v.id === k)) continue;
+      refLoading.current.add(k);
+      downloadRef(sb, l.path)
+        .then((fc) => setVecs((cur) => (cur.some((v) => v.id === k) || !geoRef.current.layers?.[k] ? cur : [...cur, { id: k, name: l.label, fc, color: l.ref?.color ?? '#22D3EE', ref: true }])))
+        .catch((e) => setLayerErrs((cur) => [...cur, `«${l.label}»: ${e instanceof Error ? e.message : String(e)}`]))
+        .finally(() => refLoading.current.delete(k));
+    }
+  }, [refSig, supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const vectors = useMemo<VectorOverlay[]>(() => vecs.map((v) => {
+    const meta = v.ref ? geo.layers?.[v.id]?.ref : undefined;
+    if (!v.ref) return { id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false };
+    const nf = meta?.labels ? meta.nameField : undefined;
+    return {
+      id: v.id, fc: v.fc, color: meta?.color ?? v.color, visible: vis[`v:${v.id}`]?.on ?? true, weight: meta?.weight ?? 2, fillOpacity: 0,
+      ...(nf ? { labels: v.fc.features.map((f) => { const t = f.properties?.[nf]; return t === undefined || t === null || t === '' ? null : String(t); }) } : {}),
+    };
+  }), [vecs, vis, geo.layers]);
 
   // ------------------------------------------------------------------ punto consultado
   const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, { breaks: rm.breaks, direction: rm.direction }, selected), rm) : null), [selected, data, ev, rules, rm]);

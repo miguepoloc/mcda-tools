@@ -77,8 +77,11 @@ export type GeoGrid = {
  * 'area' (valor > 0 = dentro del estudio, p. ej. la isóbata de 200 m). `origin` cuenta cómo se
  * derivó del archivo original (para mostrarlo en la UI, no se recalcula). */
 export type GeoLayerMeta = {
-  label: string; unit: string; role: 'criterion' | 'exclusion' | 'area';
+  /** 'reference' = polígonos originales (`<key>.geojson.gz`) que solo se dibujan y sirven de zonas: NO entran al modelo. */
+  label: string; unit: string; role: 'criterion' | 'exclusion' | 'area' | 'reference';
   origin: string; source: string; min: number; max: number; path: string; bytes: number;
+  /** Solo en `role:'reference'`: estilo (contorno, no relleno) y atributo con el nombre de cada polígono. */
+  ref?: { color: string; weight: number; labels: boolean; nameField?: string; count: number };
   /** Licencia / condiciones de uso del dato (texto libre; la fija el docente al publicar en el catálogo). */
   license?: string;
 };
@@ -109,6 +112,11 @@ export type GeoConfig = {
   points?: { id: string; name: string; lat: number; lon: number }[];
   /** Mostrar los puntos y su ranking en la vista pública (por defecto NO: nombres y ubicaciones serían públicos). */
   publicPoints?: boolean;
+  /** Zonas del análisis zonal: capa de polígonos de referencia (clave en `layers`) + atributo con el nombre; opcionalmente
+   * una capa con población (p. ej. manzanas) y su campo numérico. Ver `lib/geo/zonal.ts`. */
+  zonal?: { layer: string; nameField?: string; popLayer?: string; popField?: string };
+  /** Publicar en la vista pública el resumen AGREGADO por zona (por defecto NO: nombres de zonas y cifras serían públicos). */
+  publicZones?: boolean;
 };
 
 export type ProjectRow = {
