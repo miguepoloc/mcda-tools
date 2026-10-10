@@ -15,6 +15,14 @@ Modelo: `geo.direction?: 'suitability'|'risk'` (ausente = suitability), `geo.cla
 Lugares con semántica fija: `paint.ts` (CLASS_LABEL, paletas, rampas, diff), `GeoHud.tsx`, `GeoVisor.tsx` (resumen, PNG, nombres de archivo, LEEME, textos de exportación, notas), `GeoModelPanel.tsx` (umbrales; el color del delta usa `noapta`), `export.ts` (QML, cabeceras CSV), `patches.ts`, `geoExcel.ts`, `publish.ts` (`PublishedMeta` v2), `PublicGeoView.tsx`, `NewProject.tsx`, `examples.ts`, `resultSig`.
 Compatibilidad: sin `direction` = suitability; `meta.v===1` se lee como suitability; sin migración.
 
+### Cambio de requisito (10 oct): número de clases variable
+El docente pidió que el usuario pueda **agregar las clases que quiera y fijar el rango de cada una**, no solo 3.
+- Modelo: `geo.classes` pasa de `{alta, media}` (2 cortes) a una lista ordenada `breaks: number[]` + `classes: {name, color}[]` (N clases, N−1 cortes, 0–100). Los proyectos antiguos se leen como 3 clases con sus cortes actuales.
+- Reglas de edición: los rangos son contiguos (editar un corte mueve la frontera entre dos vecinas); mínimo 2 y máximo 8 clases; cada clase con nombre y color editables; color por defecto tomado de una rampa según la dirección del índice.
+- Códigos de clase: 0 = excluido y 254 = sin dato se conservan; las clases evaluadas ocupan 1..N (hoy `CLASS_*` es posicional 0–4: **verificar** su mapeo exacto antes de cambiarlo).
+- Toca todo lo que hoy asume 3 clases: leyendas (`GeoHud`), resumen y barras de área, `paint.ts`, `export.ts` (QML con N entradas), CSV, Excel, `PublishedMeta` (v:2 con `classes`), vista pública y `resultSig`.
+- Va dentro del commit 3 (G2), no después, para no migrar dos veces.
+
 ## B) Puntos con ranking
 - `geo.points?: {id,name,lat,lon}[]`, `geo.publicPoints?: boolean`, tope 300.
 - Extraer `evaluateOnePoint` a `src/lib/geo/pointEval.ts` (delegando en `evaluatePixel`); devuelve `status: ok|excluded|outside|nodata`.
