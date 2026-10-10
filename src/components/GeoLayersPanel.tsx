@@ -16,6 +16,7 @@ import type { FnSpec } from '@/lib/geo/membership';
 import { RAW_RAMP_CSS, rampCss, type PaletteKey } from '@/lib/geo/paint';
 import type { Criterion, GeoConfig, GeoGrid, GeoLayerMeta } from '@/lib/types';
 import { Icon, ICONS, Num } from './GeoBits';
+import ConfirmDialog from './ConfirmDialog';
 
 const kmFmt = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
 
@@ -27,6 +28,8 @@ type Pending = {
   pid: string; parsed: Parsed; label: string; unit: string; role: Role; criterionId: string;
   mode: 'distance' | 'presence' | 'attr' | 'surface'; field: string; categorical: boolean;
   status: 'idle' | 'working' | 'error'; err?: string;
+  /** Hay una capa con el mismo archivo de origen: true = reemplazarla (conserva reglas), false = subir como nueva. */
+  replace?: boolean;
 };
 
 const COLORS = ['#22D3EE', '#F472B6', '#FACC15', '#A78BFA', '#FB923C', '#34D399'];
@@ -83,6 +86,7 @@ export default function GeoLayersPanel(p: Props) {
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const [confirmArea, setConfirmArea] = useState(false);
+  const [confirmDrop, setConfirmDrop] = useState<string | null>(null);
   const [bbox, setBbox] = useState<Bounds | null>(null);
   const [res, setRes] = useState(250);
   const [editingArea, setEditingArea] = useState(false);
@@ -110,6 +114,9 @@ export default function GeoLayersPanel(p: Props) {
     setBbox(b); setRes(suggestRes(b)); p.setDraft(b); p.fit(b);
   }, [pendingBounds]); // eslint-disable-line react-hooks/exhaustive-deps
   const px = bbox ? estimatePixels(bbox, res) : 0;
+
+  // Capa ya cargada desde un archivo con el mismo nombre (la clave de `geo.layers`), si la hay.
+  const dupKeyOf = (name: string) => Object.entries(layers).find(([, m]) => m.source === name)?.[0];
 
   async function onFiles(files: FileList | File[]) {
     setMsg('');
@@ -250,16 +257,35 @@ export default function GeoLayersPanel(p: Props) {
         }
       }
       p.cache.current[key] = arr;
+      // «Reemplazar»: la capa anterior del mismo archivo se retira al final, y sus reglas pasan a la nueva.
+      const repKey = pn.replace ? dupKeyOf(ps.name) : undefined;
+      const repMeta = repKey ? layers[repKey] : undefined;
       const meta: GeoLayerMeta = { label: pn.label.trim() || key, unit: pn.unit.trim(), role: pn.role, origin, source: ps.name, min: range.min, max: range.max, path, bytes };
       p.commit((c) => {
         const next: GeoConfig = { ...c, layers: { ...(c.layers ?? {}), [key]: meta } };
+        if (repKey) {
+          const { [repKey]: _old, ...others } = next.layers ?? {};
+          next.layers = others;
+          const moved: GeoConfig['rules'] = {};
+          for (const [cid, r] of Object.entries(c.rules)) {
+            if (r.layerKey !== repKey) { moved[cid] = r; continue; }
+            // La regla (función, veto) sigue a la capa nueva solo si esta también es un criterio y no se la reasigna a otro.
+            if (pn.role === 'criterion' && (!pn.criterionId || pn.criterionId === cid)) moved[cid] = { ...r, layerKey: key };
+          }
+          next.rules = moved;
+        }
         if (pn.role === 'criterion' && pn.criterionId) {
           const prev = c.rules[pn.criterionId];
           next.rules = { ...c.rules, [pn.criterionId]: { layerKey: key, fn: prev?.fn ?? defaultFn(range.min, range.max), veto: prev?.veto } };
         }
         return next;
       });
-      if (ps.kind === 'vector') p.setVecs((v) => [...v, { id: key, name: meta.label, fc: ps.fc, color: COLORS[v.length % COLORS.length] }]);
+      if (repKey) {
+        delete p.cache.current[repKey];
+        if (repMeta?.path && p.sb) { try { await removeLayers(p.sb, [repMeta.path]); } catch { /* huérfano: no bloquea */ } }
+      }
+      if (ps.kind === 'vector') p.setVecs((v) => [...v.filter((x) => x.id !== repKey), { id: key, name: meta.label, fc: ps.fc, color: COLORS[v.length % COLORS.length] }]);
+      else if (repKey) p.setVecs((v) => v.filter((x) => x.id !== repKey));
       // Solo la última capa añadida queda visible (un lote de 6 apiladas tapa el mapa); el resultado no se toca.
       p.setVis((v) => ({ ...Object.fromEntries(Object.entries(v).map(([id, s]) => [id, id.startsWith('l:') ? { ...s, on: false } : s])), [`l:${key}`]: { on: true, op: 0.85 } }));
       setPending((cur) => cur.filter((x) => x.pid !== pn.pid));
@@ -285,6 +311,26 @@ export default function GeoLayersPanel(p: Props) {
 
   return (
     <div className="gv-sec-stack">
+      {confirmArea && (
+        <ConfirmDialog
+          title="¿Cambiar el área de estudio?"
+          description={<>Cambiar el área borra las <b>{Object.keys(layers).length}</b> capas del proyecto (se recortaron a la grilla actual) y sus reglas. No se puede deshacer.</>}
+          confirmLabel="Cambiar área y borrar capas"
+          onConfirm={() => void resetArea()}
+          onClose={() => setConfirmArea(false)}
+        />
+      )}
+      {confirmDrop && layers[confirmDrop] && (
+        <ConfirmDialog
+          title={`¿Borrar la capa «${layers[confirmDrop].label}»?`}
+          description={Object.values(geo.rules).some((r) => r.layerKey === confirmDrop)
+            ? 'Alimenta un criterio: su regla también se quita y el resultado se recalcula sin ese criterio. No se puede deshacer.'
+            : 'Se quita del proyecto y de tu espacio de mapas. No se puede deshacer.'}
+          confirmLabel="Borrar capa"
+          onConfirm={() => { const k = confirmDrop; setConfirmDrop(null); void dropLayer(k); }}
+          onClose={() => setConfirmDrop(null)}
+        />
+      )}
       <section className="gv-sec">
         <header><h4>1 · Área de estudio</h4></header>
         {isPack && data && (
@@ -300,9 +346,7 @@ export default function GeoLayersPanel(p: Props) {
             <div className="gv-kv"><span>Sistema</span><b className="mono">{grid.crs}</b></div>
             <div className="gv-row-acts">
               <button type="button" className="btn sm" onClick={() => p.fit(gridBoundsLonLat(grid))}><Icon d={ICONS.fit} size={13} /> Ver en el mapa</button>
-              {!confirmArea
-                ? <button type="button" className="btn sm" onClick={() => (Object.keys(layers).length ? setConfirmArea(true) : setEditingArea(true))}>Cambiar área</button>
-                : <button type="button" className="btn sm danger" onClick={resetArea}>¿Seguro? Borra las {Object.keys(layers).length} capas</button>}
+              <button type="button" className="btn sm" onClick={() => (Object.keys(layers).length ? setConfirmArea(true) : setEditingArea(true))}>Cambiar área</button>
             </div>
           </>
         )}
@@ -381,6 +425,7 @@ export default function GeoLayersPanel(p: Props) {
 
           {pending.map((pn) => {
             const ps = pn.parsed;
+            const dup = dupKeyOf(ps.name);
             const rng = ps.kind === 'raster' ? `${ps.width}×${ps.height} px · ${ps.res.toPrecision(3)} ${ps.unit}/px · ${ps.crs}` : `${ps.count.toLocaleString('es-CO')} elementos · ${ps.geoms.map((g) => ({ point: 'puntos', line: 'líneas', polygon: 'polígonos' }[g])).join(', ')}`;
             return (
               <div className="gv-pending" key={pn.pid}>
@@ -388,6 +433,14 @@ export default function GeoLayersPanel(p: Props) {
                 <div className="meta mono">{rng}</div>
                 {ps.kind === 'raster' && ps.bands > 1 && <p className="gv-hint warn">Este archivo trae {ps.bands} bandas: solo se usa la primera. Si es una imagen a color (RGB) no sirve como mapa de valores.</p>}
                 {targetGrid && outside(ps.bounds) && <p className="gv-hint warn">Este archivo está fuera del área de estudio{isPack ? ' del paquete (no se podrá añadir)' : ''}.</p>}
+                {dup && (
+                  <fieldset className="gv-modes" aria-describedby={`dup-${pn.pid}`}>
+                    <legend>Ya subiste este archivo</legend>
+                    <p className="gv-hint warn" id={`dup-${pn.pid}`}>La capa «{layers[dup].label}» viene de un archivo con el mismo nombre ({ps.name}).</p>
+                    <label><input type="radio" name={`dup-${pn.pid}`} checked={!!pn.replace} onChange={() => upd(pn.pid, { replace: true })} /> Reemplazar «{layers[dup].label}» (conserva sus reglas y pesos)</label>
+                    <label><input type="radio" name={`dup-${pn.pid}`} checked={!pn.replace} onChange={() => upd(pn.pid, { replace: false })} /> Subir como una capa nueva (quedan las dos)</label>
+                  </fieldset>
+                )}
                 <label className="gv-field"><span>Nombre de la capa</span><input type="text" value={pn.label} onChange={(e) => upd(pn.pid, { label: e.target.value })} /></label>
                 <label className="gv-field"><span>Qué es</span>
                   <select value={pn.role} onChange={(e) => { const role = e.target.value as Role; upd(pn.pid, { role, mode: role === 'criterion' ? 'distance' : 'presence', unit: role === 'criterion' && ps.kind === 'vector' ? 'm' : '' }); }}>
@@ -458,7 +511,7 @@ export default function GeoLayersPanel(p: Props) {
               <LayerRow id={`l:${k}`} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
                 swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette) : RAW_RAMP_CSS}
                 note={[l.origin ? `${l.origin}${meta && !meta.path ? ' · sin guardar (solo esta sesión)' : ''}` : '', !meta && isPack ? 'Del paquete del curso · solo lectura (no se puede borrar)' : '', l.license ? `Licencia: ${l.license}` : ''].filter(Boolean).join(' · ') || undefined}
-                onDelete={meta ? () => dropLayer(k) : undefined}
+                onDelete={meta ? () => setConfirmDrop(k) : undefined}
                 onEdit={meta ? () => setEditKey((cur) => (cur === k ? null : k)) : undefined}
                 editing={editKey === k} />
               {editKey === k && meta && (
@@ -489,7 +542,6 @@ function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit
   onEdit?: () => void; editing?: boolean;
 }) {
   const v = vis[id] ?? { on: id === 'result' || id === 'parcels' || id === 'diff', op: id === 'result' ? 0.9 : 0.85 };
-  const [ask, setAsk] = useState(false);
   return (
     <div className={'gv-layer' + (v.on ? ' on' : '') + (editing ? ' editing' : '')}>
       <button type="button" className="eye" aria-pressed={v.on} aria-label={`${v.on ? 'Ocultar' : 'Mostrar'} ${label}`} onClick={() => setVis((s) => ({ ...s, [id]: { ...v, on: !v.on } }))}>
@@ -504,8 +556,8 @@ function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit
           </button>
         )}
         {onDelete && (
-          <button type="button" className={'del' + (ask ? ' ask' : '')} aria-label={`Borrar ${label}`} onClick={() => (ask ? onDelete() : (setAsk(true), setTimeout(() => setAsk(false), 3000)))}>
-            {ask ? '¿Seguro?' : <Icon d={ICONS.trash} size={14} />}
+          <button type="button" className="del" aria-label={`Borrar ${label}`} onClick={onDelete}>
+            <Icon d={ICONS.trash} size={14} />
           </button>
         )}
       </span>
