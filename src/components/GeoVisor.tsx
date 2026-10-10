@@ -16,6 +16,7 @@ import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
 import { CLASS_LABEL, PALETTES, classHex, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, type PaletteKey } from '@/lib/geo/paint';
 import { findParcels } from '@/lib/geo/patches';
+import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
@@ -286,7 +287,7 @@ export default function GeoVisor(props: Props) {
   const vectors = useMemo(() => vecs.map((v) => ({ id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false })), [vecs, vis]);
 
   // ------------------------------------------------------------------ punto consultado
-  const point = useMemo(() => (selected && data && ev ? evaluateOnePoint(data, geo, rules, thresholds, selected) : null), [selected, data, ev, geo, rules, thresholds]);
+  const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, thresholds, selected)) : null), [selected, data, ev, rules, thresholds]);
 
   const markers = useMemo<MapMarker[]>(() => {
     const out: MapMarker[] = [];
@@ -658,30 +659,8 @@ function ExportList({ items, disabled }: { items: ExportItem[]; disabled: boolea
   );
 }
 
-function evaluateOnePoint(data: GeoData, geo: GeoConfig, allRules: CriterionRule[], thr: GeoConfig['classes'], sel: { col: number; row: number }) {
-  const i = sel.row * data.grid.width + sel.col;
-  const [lon, lat] = pixelToLonLat(sel.col, sel.row, data.grid.transform, data.grid.crs);
-  const m = data.mask[i];
-  if (m !== MASK_VALID) {
-    return { pct: null, cls: CLASS_EXCLUDED, label: m === 2 ? 'Exclusión' : 'Fuera del área de estudio', lat, lon, rows: [] as { label: string; value: string; contrib: string; veto: boolean }[] };
-  }
-  const rules = usableRules(data.layers, data.mask.length, allRules);
-  // Mismo cálculo que `evaluatePixel`: los criterios sin dato en este punto no votan y los pesos se reescalan entre los que sí.
-  const wUsed = rules.reduce((a, r) => (Number.isNaN(data.layers[r.key][i]) ? a : a + r.weight), 0);
-  let sum = 0, anyVeto = false;
-  const rows = rules.map((r) => {
-    const info = data.info[r.key];
-    const x = data.layers[r.key][i];
-    const s = suitability(x, r.fn);
-    const veto = vetoed(x, r.veto);
-    if (veto) anyVeto = true;
-    const wn = wUsed > 0 ? r.weight / wUsed : 0;
-    if (!Number.isNaN(x)) sum += wn * s;
-    const value = Number.isNaN(x) ? 'sin dato' : `${Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2)} ${info?.unit ?? ''}`.trim();
-    return { label: info?.label ?? r.key, value, contrib: Number.isNaN(x) ? 'no vota' : `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}`, veto };
-  });
-  const s = wUsed <= 0 ? NaN : anyVeto ? 0 : sum;
-  const cls = Number.isNaN(s) ? CLASS_EXCLUDED : anyVeto ? CLASS_VETO : s >= thr.alta ? CLASS_ALTA : s >= thr.media ? CLASS_MODERADA : CLASS_NO_APTA;
-  void geo;
-  return { pct: Number.isNaN(s) ? null : Math.round(s * 100), cls, label: Number.isNaN(s) ? 'Sin dato' : CLASS_LABEL[cls], lat, lon, rows };
+/** Texto de la ficha del punto a partir del cálculo puro (`lib/geo/pointEval.ts`). */
+function pointView(p: PointEval) {
+  const label = p.status === 'outside' ? 'Fuera del área de estudio' : p.status === 'excluded' ? 'Exclusión' : p.status === 'nodata' ? 'Sin dato' : CLASS_LABEL[p.cls];
+  return { pct: p.pct, cls: p.cls, label, lat: p.lat, lon: p.lon, rows: p.rows };
 }
