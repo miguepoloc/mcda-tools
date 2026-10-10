@@ -1541,3 +1541,13 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 @media (prefers-reduced-motion:reduce){
   .btn:hover,.prow:hover,.method-card:hover,.weight-card:hover,.topbar .brand:hover{transform:none}
 }
+
+/* ==== Header del Geovisor alineado con el contenido (oct 2026) ====
+   El Topbar vive dentro de .wrap (1100 px) y .gv-wrap se salía a 1560 px con translateX(-50%): la barra sticky quedaba
+   más angosta que el mapa y, al hacer scroll, el panel lateral pasaba por debajo y asomaba a los lados. Ahora, si la
+   página contiene un geovisor, el propio .wrap se ensancha y el geovisor ya no necesita escaparse con transform
+   (que además es el bloque contenedor de los elementos fixed: ver GeoTour). */
+.wrap:has(.gv-wrap){max-width:min(1560px,100%)}
+.wrap:has(.gv-wrap) .gv-wrap{left:0;transform:none;width:100%}
+/* La barra es sticky: con 85 % de opacidad se leía el contenido que pasa por debajo. */
+.topbar{background:color-mix(in srgb,var(--bg) 94%,transparent)}
