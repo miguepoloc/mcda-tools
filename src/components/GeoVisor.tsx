@@ -21,6 +21,7 @@ import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
+import { publishParts } from '@/lib/geo/publishSig';
 import type { Example } from '@/lib/geo/examples';
 import GeoPublishPanel from './GeoPublishPanel';
 import GeoCatalogPanel from './GeoCatalogPanel';
@@ -416,6 +417,16 @@ export default function GeoVisor(props: Props) {
     return (h >>> 0).toString(36);
   }, [weightResult, geo.rules, thresholds, layersSig, geo.packId]);
 
+  // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
+  const sigParts = useMemo(() => {
+    if (!data) return null;
+    return publishParts({
+      criteria, weights: weightResult.agg.w, rules: geo.rules, thresholds,
+      layers: Object.fromEntries(Object.entries(data.info).map(([k, l]) => [k, { role: l.role, min: l.min, max: l.max, bytes: l.bytes }])),
+      packId: geo.packId, grid: data.grid,
+    });
+  }, [data, criteria, weightResult, geo.rules, geo.packId, thresholds]);
+
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
     const b64 = await encodePlanes(ev.pct, ev.cls, data.mask);
@@ -427,7 +438,7 @@ export default function GeoVisor(props: Props) {
       weightsOrigin: expertIds.length ? 'Panel de expertos (AHP)' : 'Pesos iguales (sin juicios de expertos)',
       thresholds, classes: { alta: stats.alta.ha, media: stats.media.ha, noapta: stats.noapta.ha, excl: stats.excl.ha },
       pct: { alta: stats.alta.pct, media: stats.media.pct, noapta: stats.noapta.pct }, evaluableHa: stats.evaluableHa,
-      attribution: data.attribution, sig: resultSig,
+      attribution: data.attribution, sig: resultSig, sigParts: sigParts ?? undefined,
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
     };
     return { b64, meta };
@@ -501,7 +512,7 @@ export default function GeoVisor(props: Props) {
               {!ready && <p className="gv-hint">Para exportar hace falta un mapa calculado: define el área, sube capas y asígnalas a criterios con su regla.</p>}
               {props.share && (
                 <GeoPublishPanel sb={supabase} projectId={props.projectId} isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
-                  ready={ready} exploring={exploring} sig={resultSig} build={buildPublish}
+                  ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
                   warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined} />
               )}
               {isAdmin && supabase && !geo.packId && (

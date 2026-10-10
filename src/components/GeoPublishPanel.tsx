@@ -4,12 +4,17 @@
  * (`geo_publish_result`). La vista pública solo recibe el resultado: nunca las capas de entrada. */
 import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { changedParts, describeChanges, type SigParts } from '@/lib/geo/publishSig';
 
-type Status = { updated_at: string; sig: string | null; size_bytes: number } | null;
+type Status = { updated_at: string; sig: string | null; parts: SigParts | null; size_bytes: number } | null;
 type Props = {
   sb: SupabaseClient | null; projectId: string;
   isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void;
-  ready: boolean; exploring: boolean; sig: string;
+  ready: boolean; exploring: boolean;
+  /** Firma antigua (un solo hash): solo para publicaciones hechas antes de la firma por partes. */
+  sig: string;
+  /** Firma por partes de lo calculado ahora (null mientras cargan las capas). */
+  parts: SigParts | null;
   /** Advertencia sobre la calidad de lo que se va a publicar (p. ej. pesos inconsistentes, CR ≥ 0.10). */
   warn?: string;
   build: () => Promise<{ b64: string; meta: unknown }>;
@@ -23,7 +28,7 @@ export default function GeoPublishPanel(p: Props) {
 
   const load = useCallback(async () => {
     if (!p.sb) return;
-    const { data } = await p.sb.from('geo_results').select('updated_at,size_bytes,sig:meta->>sig').eq('project_id', p.projectId).maybeSingle();
+    const { data } = await p.sb.from('geo_results').select('updated_at,size_bytes,sig:meta->>sig,parts:meta->sigParts').eq('project_id', p.projectId).maybeSingle();
     setStatus((data as Status) ?? null);
   }, [p.sb, p.projectId]);
   useEffect(() => { void load(); }, [load]);
@@ -41,7 +46,9 @@ export default function GeoPublishPanel(p: Props) {
     setBusy(false);
   }
 
-  const stale = status && status.sig !== p.sig;
+  // Con firma por partes se dice QUÉ cambió; una publicación anterior solo tiene el hash viejo (aviso genérico).
+  const changed = status?.parts && p.parts ? changedParts(status.parts, p.parts) : [];
+  const stale = !!status && (status.parts ? changed.length > 0 : status.sig !== p.sig);
   return (
     <section className="gv-sec">
       <header><h4>Vista pública</h4><span className={'gv-badge ' + (p.isPublic ? 'ok' : 'warn')}>{p.isPublic ? 'público' : 'privado'}</span></header>
@@ -56,7 +63,7 @@ export default function GeoPublishPanel(p: Props) {
         </div>
       )}
       <div className="gv-kv"><span>Mapa publicado</span><b className="mono">{status ? new Date(status.updated_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : 'aún no'}</b></div>
-      {stale && <p className="gv-hint warn">Cambiaste pesos, reglas o capas desde la última publicación: la vista pública muestra la versión anterior.</p>}
+      {stale && <p className="gv-hint warn" role="status">{changed.length ? `Cambios desde la última publicación: ${describeChanges(changed)}.` : 'Cambiaste pesos, reglas o capas desde la última publicación.'} La vista pública muestra la versión anterior.</p>}
       {p.warn && <p className="gv-hint warn" role="alert">{p.warn}</p>}
       {!p.isPublic && status && <p className="gv-hint warn">El mapa ya está publicado, pero el enlace no funciona mientras el proyecto sea privado: activa «Hacer público con enlace».</p>}
       {p.exploring && <p className="gv-hint warn">Estás explorando otros pesos. Vuelve a los del panel para publicar.</p>}
