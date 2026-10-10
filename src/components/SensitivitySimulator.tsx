@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Criterion, Alternative, DecisionMatrix } from '@/lib/types';
 import { electreSynthesis } from '@/lib/electre';
 import { buildRankFn, redistribute } from '@/lib/sensitivity';
+import { criticalThresholds } from '@/lib/criticalThreshold';
 import type { MethodKey } from './ScientificMethodModal';
 
 export interface AhpSynthRow {
@@ -90,6 +91,12 @@ export default function SensitivitySimulator({
   const electreSim = useMemo(() => (isElectre ? electreView(simWeights) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isElectre, criteria, alternatives, decisionMatrix, simWeights]);
+
+  // Umbral crítico de cada peso (Triantaphyllou y Sánchez, 1997), sobre los pesos BASE (no sobre los de los sliders).
+  const thresholds = useMemo(
+    () => (rankFn && baseWeights.length > 1 && baseWeights.length === criteria.length ? criticalThresholds(rankFn, criteria.map((c) => c.name), baseWeights) : null),
+    [rankFn, criteria, baseWeights],
+  );
 
   // Después de todos los hooks (un return antes de ellos rompe el orden de hooks si cambia el número de criterios).
   if (!criteria.length || !alternatives.length || !baseWeights.length) {
@@ -313,6 +320,62 @@ export default function SensitivitySimulator({
           </div>
           <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
             Con c* y d* del proyecto. Núcleo con pesos base: {electreBase.winner ? `única alternativa ${electreBase.winner}` : `sin ganador único (${electreBase.members.join(', ') || 'sin relaciones'})`}.
+          </p>
+        </div>
+      )}
+
+      {/* Umbral crítico de cada peso: cuánto debe cambiar para que cambie el 1.er puesto */}
+      {!isElectre && thresholds && thresholds.hasWinner && (
+        <div>
+          <div style={{ fontSize: 12, fontFamily: 'var(--f-mono)', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+            Umbral crítico de cada peso
+          </div>
+          <p className="muted" style={{ fontSize: 13, margin: '0 0 8px', maxWidth: '72ch' }}>
+            Cuánto tiene que cambiar el peso de <b>un</b> criterio (los demás se reescalan proporcionalmente) para que {thresholds.baseWinners[0]} deje el 1.er lugar,
+            medido desde los pesos base (Triantaphyllou y Sánchez, 1997). Cuanto menor el cambio relativo, más crítico el criterio.
+          </p>
+          <div className="tbl">
+            <table>
+              <caption className="sr-only">Cambio mínimo de cada peso que altera el primer puesto</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Criterio</th>
+                  <th scope="col" className="n">Peso base</th>
+                  <th scope="col">Cambio mínimo que altera el 1.º</th>
+                  <th scope="col">Pasaría a ganar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {thresholds.rows.map((r) => {
+                  const t = r.threshold;
+                  return (
+                    <tr key={r.criterion}>
+                      <th scope="row" style={{ textAlign: 'left', fontWeight: 500, color: 'var(--ink)', textTransform: 'none', letterSpacing: 0, fontFamily: 'inherit', fontSize: 14 }}>{r.name}</th>
+                      <td className="n mono">{r.baseWeight.toFixed(3)}</td>
+                      {t ? (
+                        <>
+                          <td>
+                            {t.direction === 'down' ? 'Baja' : 'Sube'} a <b className="mono">{t.weight.toFixed(3)}</b>{' '}
+                            <span className="muted mono">({t.direction === 'down' ? '−' : '+'}{t.absChange.toFixed(3)}; {(t.relChange * 100).toFixed(1)} % de su peso)</span>
+                          </td>
+                          <td>{t.newWinners.join(' / ')}{t.newWinners.length > 1 ? ' (empate)' : ''}</td>
+                        </>
+                      ) : (
+                        <td colSpan={2} className="muted">Robusto: el 1.º no cambia con ningún valor de este peso en [0, 1].</td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
+            {thresholds.robust
+              ? `${thresholds.baseWinners[0]} se mantiene en 1.er lugar con cualquier peso de un solo criterio: el resultado es robusto frente a los pesos.`
+              : thresholds.rows[0].threshold
+                ? `El criterio más crítico es «${thresholds.rows[0].name}»: basta un cambio del ${(thresholds.rows[0].threshold.relChange * 100).toFixed(1)} % de su peso para que el 1.er lugar cambie.`
+                : ''}
+            {' '}El barrido avanza de a 0.01 y afina por bisección; se calcula con los pesos base, no con los controles de arriba.
           </p>
         </div>
       )}
