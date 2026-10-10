@@ -14,6 +14,7 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 | Dónde viven los puntos | Pestaña nueva «Puntos»; se guardan en `projects.geo` (jsonb), sin migración | 9 oct |
 | Diseño | Dirección «Afinado» (identidad actual con contraste arreglado); tipografía actual; modo compacto solo en tablas del Geovisor | 9 oct |
 | Animación | CSS + FLIP; sin anime.js por ahora | 9 oct |
+| Número de clases | Mínimo 2, **máximo 8** (confirmado por el docente), con nombre, color y rango editables | 10 oct |
 | Decisiones delegadas (el docente pidió que se decidan por él) | Guía de consistencia: solo aplica con botón y no se registra si la aplicó · Orden agregado: Borda por defecto, Copeland alternativo · Cortes por cuantiles/Jenks: se congelan al elegirlos · Clases: el docente pidió (10 oct) que sean **N, no solo 3**: el usuario agrega las que quiera y define el rango de cada una (sustituye la decisión anterior de 3 fijas) · Ranking por índice (%) · Puntos: por archivo (CSV/GeoJSON) primero; «desde capa subida» después · Exclusión se muestra siempre como «Excluido», nunca como 0 % | 10 oct |
 
 ## Entradas
