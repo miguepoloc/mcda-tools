@@ -738,6 +738,10 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-legend .row{display:flex;align-items:center;gap:7px}
 .gv-legend i{width:11px;height:11px;border-radius:3px;flex:none}
 .gv-legend .ramp{height:9px;border-radius:99px}
+.gv-legend .ramp-wrap{position:relative}
+.gv-legend .ramp-wrap .tick{position:absolute;top:-2px;height:13px;width:2px;border-radius:1px;margin-left:-1px;background:var(--text,#111);box-shadow:0 0 0 1px rgba(255,255,255,.7);border-radius:1px}
+.gv-legend .cuts{position:relative;height:12px;font-size:9px;color:var(--muted)}
+.gv-legend .cuts span{position:absolute;transform:translateX(-50%)}
 .gv-legend .ends{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
 .gv-point{position:absolute;z-index:1000;left:56px;top:10px;width:264px;max-height:calc(100% - 60px);overflow:auto;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px);box-shadow:0 8px 30px rgba(0,0,0,.35)}
 .gv-point .x{position:absolute;top:6px;right:8px;appearance:none;border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
