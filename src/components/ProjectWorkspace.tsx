@@ -267,6 +267,10 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
   function setDMCell(altId: string, critId: string, value: number | null) {
     patch({ decision_matrix: setMatrixCell(dm, altId, critId, value) });
   }
+  /** Escribe varias celdas de golpe (pegado desde una hoja de cálculo, o deshacerlo) en un solo guardado. */
+  function setDMCells(cells: { altId: string; critId: string; value: number | null }[]) {
+    patch({ decision_matrix: cells.reduce((m, c) => setMatrixCell(m, c.altId, c.critId, c.value), dm) }, true);
+  }
   function setDMFuzzyCell(altId: string, critId: string, label: string) {
     const row = { ...dm.values[altId], [critId]: label };
     patch({ decision_matrix: { ...dm, values: { ...dm.values, [altId]: row } } });
@@ -655,6 +659,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           matrix={dm}
           method={project.method}
           onSetCell={setDMCell}
+          onSetCells={setDMCells}
           onSetFuzzyCell={setDMFuzzyCell}
           onSetType={setDMType}
           onSetTarget={setDMTarget}
