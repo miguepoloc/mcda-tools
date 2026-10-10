@@ -19,6 +19,10 @@ export type GeoSummary = {
   /** Celdas evaluables con dato incompleto (un criterio sin dato se omite y los pesos se reescalan en esa celda). */
   coverage?: { valid: number; partial: number; none: number } | null;
   layers: { key: string; label: string; role: string; origin: string; source: string; unit: string; min: number; max: number }[];
+  /** Ranking de puntos ya ordenado (puesto null = no evaluado). Ausente o vacío = sin hoja «Puntos». */
+  points?: { rank: number | null; name: string; lat: number; lon: number; pct: number | null; classLabel: string; state: string }[];
+  /** Texto del orden: «Más apto primero» / «Mayor riesgo primero». */
+  pointsOrder?: string;
 };
 
 export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
@@ -48,6 +52,16 @@ export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
   add('Criterios', [['Criterio', 'Peso del panel', 'Peso efectivo', 'Capa', risk ? 'Regla de riesgo' : 'Regla de idoneidad', 'Veto'], ...s.criteria.map((c) => [c.name, Number(c.weight.toFixed(6)), Number((c.effective ?? 0).toFixed(6)), c.layer, c.rule, c.veto]), [], ['Suma de pesos', Number(s.criteria.reduce((a, c) => a + c.weight, 0).toFixed(6)), Number(s.criteria.reduce((a, c) => a + (c.effective ?? 0), 0).toFixed(6))], ['Nota', 'El peso efectivo reescala los pesos de los criterios que tienen mapa para que sumen 1; un criterio sin mapa no entra al cálculo.']], [38, 14, 14, 30, 70, 24]);
   add('Superficie por clase', [['Clase', 'Hectáreas', '% del área evaluada'], ...s.classes.map((c) => [c.label, Number(c.ha.toFixed(2)), Number(c.pct.toFixed(2))])], [26, 16, 22]);
   add('Capas', [['Clave', 'Nombre', 'Papel', 'Cómo se derivó', 'Archivo', 'Unidad', 'Mín', 'Máx'], ...s.layers.map((l) => [l.key, l.label, l.role, l.origin, l.source, l.unit, Number(l.min.toFixed(4)), Number(l.max.toFixed(4))])], [16, 32, 14, 28, 34, 8, 12, 12]);
+  if (s.points?.length) {
+    add('Puntos', [
+      [`Ranking de puntos · ${s.pointsOrder ?? ''}`.replace(/ · $/, '')], [],
+      ['Puesto', 'Nombre', 'Latitud', 'Longitud', risk ? 'Índice de riesgo (0–100)' : 'Índice de idoneidad (0–100)', 'Clase', 'Estado'],
+      // Los puntos sin evaluar llevan celdas vacías (nunca 0): no tienen puesto ni índice.
+      ...s.points.map((p) => [p.rank ?? '', p.name, Number(p.lat.toFixed(6)), Number(p.lon.toFixed(6)), p.pct ?? '', p.classLabel, p.state]),
+      [],
+      ['Nota', 'Valores calculados al exportar (no son fórmulas vivas). Cada punto toma el índice de la celda del mapa donde cae; empates comparten puesto (1, 2, 2, 4). Excluido, fuera del área o sin dato = sin puesto ni índice.'],
+    ], [9, 30, 12, 12, 24, 22, 24]);
+  }
   return wb;
 }
 

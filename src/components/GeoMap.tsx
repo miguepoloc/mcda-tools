@@ -22,6 +22,15 @@ export const BASEMAPS: Record<BasemapKey, { label: string; url: string; attr: st
 export type RasterOverlay = { id: string; url: string; bounds: Bounds; opacity: number; visible: boolean; z: number };
 export type VectorOverlay = { id: string; fc: FC; color: string; visible: boolean };
 export type MapMarker = { id: string; lat: number; lon: number; label?: string; selected?: boolean };
+/** Punto del ranking: `color` = el de su clase (gris si no se evaluó), `tip` = «nombre · índice», `rank` = puesto (null = sin puesto). */
+export type PointMark = { id: string; lat: number; lon: number; tip: string; color: string; rank: number | null };
+
+/** Estilo de un punto del ranking: el seleccionado es más grande y con aro blanco (no solo cambia el color); el que no
+ * se evaluó va con relleno traslúcido y borde discontinuo. */
+const pointStyle = (k: PointMark, selected: boolean): Lf.PathOptions & { radius: number } => ({
+  radius: selected ? 10 : 6, color: selected ? '#FFFFFF' : '#0B0F17', weight: selected ? 3 : 2, fillColor: k.color,
+  fillOpacity: k.rank === null ? 0.5 : 1, dashArray: k.rank === null && !selected ? '3 2' : undefined,
+});
 
 export type GeoMapHandle = {
   fit: (b: Bounds) => void;
@@ -38,6 +47,12 @@ type Props = {
   rasters: RasterOverlay[];
   vectors: VectorOverlay[];
   markers: MapMarker[];
+  /** Puntos del ranking (capa aparte de `markers`: cambiarlos no recrea los de referencia ni el de selección). */
+  pointMarks?: PointMark[];
+  selectedPointId?: string | null;
+  /** Modo «Agregar punto»: cursor de cruz; el clic lo interpreta quien lo recibe. */
+  addMode?: boolean;
+  onPointClick?: (id: string) => void;
   draft: Bounds | null;
   drawing: boolean;
   initialBounds: Bounds | null;
@@ -47,7 +62,9 @@ type Props = {
   onMarkerClick?: (id: string) => void;
 };
 
-const toLBounds = (L: typeof Lf, b: Bounds) => L.latLngBounds([b.south, b.west], [b.north, b.east]);
+/** Tooltip como nodo de texto: Leaflet interpreta un string como HTML y los nombres de los puntos los escribe (o importa) el usuario. */
+const tipEl = (text: string) => { const s = document.createElement('span'); s.textContent = text; return s; };
+const toLBounds =(L: typeof Lf, b: Bounds) => L.latLngBounds([b.south, b.west], [b.north, b.east]);
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
@@ -58,6 +75,9 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
   const imgs = useRef(new Map<string, Lf.ImageOverlay>());
   const vecs = useRef(new Map<string, Lf.GeoJSON>());
   const marks = useRef(new Map<string, Lf.CircleMarker>());
+  /** Marcadores del ranking: `sig` = lo que determina su estilo, `tip` = el texto del tooltip ya puesto. */
+  const pmarks = useRef(new Map<string, { o: Lf.CircleMarker; sig: string; tip: string; mark: PointMark }>());
+  const lastSel = useRef<string | null>(null);
   const draftRect = useRef<Lf.Rectangle | null>(null);
   const cb = useRef(props);
   cb.current = props;
@@ -124,7 +144,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(host.current);
     const el = m.getContainer();
-    return () => { ro.disconnect(); el.removeEventListener('keydown', onKey); el.removeEventListener('wheel', onWheel); clearTimeout(hintTimer); hint.remove(); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); draftRect.current = null; };
+    return () => { ro.disconnect(); el.removeEventListener('keydown', onKey); el.removeEventListener('wheel', onWheel); clearTimeout(hintTimer); hint.remove(); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); pmarks.current.clear(); lastSel.current = null; draftRect.current = null; };
   }, [L]);
 
   // mapa base
@@ -204,6 +224,50 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     }
   }, [L, props.markers]);
 
+  // puntos del ranking: se actualizan en sitio (posición, estilo y tooltip solo si cambian) para que 300 puntos no
+  // recreen capas en cada pasada.
+  useEffect(() => {
+    const m = map.current;
+    if (!L || !m) return;
+    const list = props.pointMarks ?? [];
+    const live = new Set(list.map((k) => k.id));
+    for (const [id, e] of pmarks.current) if (!live.has(id)) { e.o.remove(); pmarks.current.delete(id); }
+    const selId = cb.current.selectedPointId ?? null;
+    for (const k of list) {
+      const sig = `${k.color}|${k.rank === null}`;
+      const e = pmarks.current.get(k.id);
+      if (!e) {
+        const o = L.circleMarker([k.lat, k.lon], { ...pointStyle(k, k.id === selId), pane: 'gv-marks', bubblingMouseEvents: false }).addTo(m);
+        o.bindTooltip(tipEl(k.tip), { direction: 'top', offset: [0, -6] });
+        o.on('click', (ev) => { L.DomEvent.stopPropagation(ev); cb.current.onPointClick?.(k.id); });
+        pmarks.current.set(k.id, { o, sig, tip: k.tip, mark: k });
+        continue;
+      }
+      if (e.mark.lat !== k.lat || e.mark.lon !== k.lon) e.o.setLatLng([k.lat, k.lon]);
+      if (e.sig !== sig) { e.o.setStyle(pointStyle(k, k.id === selId)); e.sig = sig; }
+      if (e.tip !== k.tip) { e.o.setTooltipContent(tipEl(k.tip)); e.tip = k.tip; }
+      e.mark = k;
+    }
+  }, [L, props.pointMarks]);
+
+  // punto seleccionado (tabla <-> mapa): solo se re-estilan el anterior y el nuevo
+  useEffect(() => {
+    const id = props.selectedPointId ?? null;
+    const prev = lastSel.current;
+    lastSel.current = id;
+    if (prev && prev !== id) { const e = pmarks.current.get(prev); if (e) e.o.setStyle(pointStyle(e.mark, false)); }
+    if (id) { const e = pmarks.current.get(id); if (e) { e.o.setStyle(pointStyle(e.mark, true)); e.o.bringToFront(); } }
+  }, [L, props.selectedPointId]);
+
+  // modo «Agregar punto»: cursor de cruz sobre el mapa
+  useEffect(() => {
+    const m = map.current;
+    if (!L || !m) return;
+    const el = m.getContainer();
+    if (props.addMode) el.classList.add('gv-addmode'); else el.classList.remove('gv-addmode');
+    return () => el.classList.remove('gv-addmode');
+  }, [L, props.addMode]);
+
   // rectángulo del área de estudio (borrador) + dibujo
   useEffect(() => {
     const m = map.current;
@@ -270,6 +334,24 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
         const r = c.getBoundingClientRect();
         ctx.globalAlpha = 1; ctx.drawImage(c, r.left - rr.left, r.top - rr.top, r.width, r.height);
       });
+      // Los marcadores de puntos son SVG (no canvas): se dibujan aquí a mano con su posición actual en pantalla.
+      const pm = cb.current.pointMarks ?? [];
+      const labels = pm.length <= 100;
+      ctx.globalAlpha = 1;
+      for (const k of pm) {
+        const p = m.latLngToContainerPoint([k.lat, k.lon]);
+        if (p.x < -12 || p.y < -12 || p.x > cv.width + 12 || p.y > cv.height + 12) continue;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.globalAlpha = k.rank === null ? 0.55 : 1;
+        ctx.fillStyle = k.color; ctx.fill();
+        ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = '#0B0F17'; ctx.stroke();
+        if (k.rank !== null && labels) {
+          ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.lineWidth = 2.5; ctx.strokeStyle = '#0B0F17'; ctx.strokeText(String(k.rank), p.x, p.y + 0.5);
+          ctx.fillStyle = '#FFFFFF'; ctx.fillText(String(k.rank), p.x, p.y + 0.5);
+          ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+        }
+      }
       ctx.globalAlpha = 1;
       cv.toDataURL('image/png'); // lanza SecurityError si alguna tesela contaminó el lienzo
       return cv;

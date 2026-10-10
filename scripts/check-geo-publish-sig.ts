@@ -43,5 +43,26 @@ ok('varios cambios, en orden fijo', diff((i) => { i.thresholds.alta = 0.8; i.wei
 ok('sin partes publicadas (publicación antigua) no se afirma nada', changedParts(null, P0).length === 0);
 ok('mensaje', describeChanges(['pesos', 'reglas', 'area']) === 'los pesos de los criterios, las reglas de idoneidad (funciones o vetos) y el área de estudio');
 
+// --- puntos publicados (parte «puntos»)
+{
+  const list = [{ name: 'A', lat: 11.2, lon: -74.1 }, { name: 'B', lat: 11.3, lon: -74.2 }];
+  const withPts = (show: boolean, l = list) => { const i = base(); i.points = { show, list: l }; return publishParts(i); };
+  const off = withPts(false);
+  ok('apagado: con o sin puntos la firma es la misma', off.puntos === P0.puntos && withPts(false, []).puntos === off.puntos && withPts(false, [{ name: 'Z', lat: 1, lon: 1 }]).puntos === off.puntos);
+  ok('el interruptor cambia la firma', withPts(true).puntos !== off.puntos && changedParts(off, withPts(true)).join() === 'puntos');
+  ok('apagado no toca las demás partes', (['pesos', 'reglas', 'umbrales', 'capas', 'area'] as const).every((k) => withPts(true)[k] === P0[k]));
+  const on = withPts(true);
+  ok('renombrar o mover un punto publicado cambia la firma', withPts(true, [{ ...list[0], name: 'A2' }, list[1]]).puntos !== on.puntos && withPts(true, [{ ...list[0], lat: 11.200001 }, list[1]]).puntos !== on.puntos);
+  ok('agregar o quitar un punto publicado cambia la firma', withPts(true, list.slice(0, 1)).puntos !== on.puntos);
+  ok('el orden de la lista no cuenta', withPts(true, [...list].reverse()).puntos === on.puntos);
+  ok('con puntos publicados, cambiar un peso sigue marcando solo «pesos»', (() => { const i = base(); i.points = { show: true, list }; i.weights = [0.4, 0.4, 0.2]; return changedParts(on, publishParts(i)).join(); })() === 'pesos');
+  // Publicaciones anteriores a los puntos no traen la parte: valen «sin puntos».
+  const { puntos: _drop, ...legacy } = off;
+  void _drop;
+  ok('publicación anterior + interruptor apagado: al día', changedParts(legacy, off).length === 0 && changedParts(legacy, P0).length === 0);
+  ok('publicación anterior + interruptor encendido: desactualizada por «puntos»', changedParts(legacy, on).join() === 'puntos');
+  ok('mensaje de «puntos»', describeChanges(['pesos', 'puntos']) === 'los pesos de los criterios y los puntos y su ranking en la vista pública');
+}
+
 if (fails) { console.error(`${fails} falla(s)`); process.exit(1); }
 console.log('check-geo-publish-sig: todo bien');

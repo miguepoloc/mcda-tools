@@ -105,6 +105,10 @@ export type GeoConfig = {
   classModel?: { breaks: number[]; classes?: { name?: string; color?: string }[]; cut?: 'manual' | 'quantile' | 'jenks' };
   /** Área mínima (ha) de una parcela contigua de alta aptitud; 0 o ausente = sin filtro. */
   minPatchHa?: number;
+  /** Puntos del usuario para el ranking (máx. 300, ver `lib/geo/points.ts`). Ausente = sin puntos. */
+  points?: { id: string; name: string; lat: number; lon: number }[];
+  /** Mostrar los puntos y su ranking en la vista pública (por defecto NO: nombres y ubicaciones serían públicos). */
+  publicPoints?: boolean;
 };
 
 export type ProjectRow = {

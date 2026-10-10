@@ -65,5 +65,94 @@ ok(Number.isFinite(part.lat) && Number.isFinite(part.lon), 'devuelve lat/lon');
   const rv = evaluateOnePoint(data, rules, { breaks, direction: 'risk' }, { col: 4, row: 1 });
   ok(rv.vetoed && rv.s === 1 && rv.pct === 100 && rv.cls === CLASS_VETO, 'riesgo: el veto fuerza el índice al máximo');
 }
+
+// ---------------------------------------------------------------- ranking de puntos (lib/geo/points.ts)
+{
+  const { evaluateLonLat, rankPoints, rankHeading, rankingCsv, nextPointName, sanitizePoints, toPublishedPoints, STATUS_LABEL, MAX_POINTS } = await import('../src/lib/geo/points.ts');
+  const { pixelToLonLat } = await import('../src/lib/geo/crs.ts');
+  const A = new Float32Array(N).fill(50), B = new Float32Array(N).fill(0);
+  const cell = (c: number, r: number) => r * W + c;
+  A[cell(2, 2)] = 90; A[cell(3, 2)] = 70; A[cell(4, 2)] = 70; A[cell(5, 2)] = 10;
+  B[cell(0, 3)] = 1000;            // veto
+  A[cell(1, 3)] = NaN; B[cell(1, 3)] = NaN; // sin dato en todo
+  const m2 = new Uint8Array(N).fill(MASK_VALID);
+  m2[cell(0, 0)] = MASK_NODATA; m2[cell(1, 0)] = MASK_EXCLUDED;
+  const d2: GeoData = {
+    grid, layers: { a: A, b: B }, mask: m2, points: {},
+    info: { a: { label: 'A', unit: 'u', role: 'criterion', min: 0, max: 100 }, b: { label: 'B', unit: 'm', role: 'criterion', min: 0, max: 1000 } },
+  };
+  const r2: CriterionRule[] = [
+    { key: 'a', weight: 0.5, fn: { type: 'up', a: 0, b: 100 } },
+    { key: 'b', weight: 0.5, fn: { type: 'up', a: 0, b: 2000 }, veto: { op: '>', value: 500 } },
+  ];
+  const at = (c: number, r: number, name: string) => { const [lon, lat] = pixelToLonLat(c, r, grid.transform, grid.crs); return { id: name, name, lat, lon }; };
+  const pts = [
+    at(5, 2, 'bajo'), at(3, 2, 'empate1'), at(2, 2, 'alto'), at(4, 2, 'empate2'),
+    at(0, 0, 'fuera-mascara'), at(1, 0, 'excl'), at(1, 3, 'sin-dato'), at(0, 3, 'veto'),
+    { id: 'lejos', name: 'lejos', lat: 40, lon: 10 },
+  ];
+  const label = (c: number) => `clase ${c}`;
+  for (const direction of ['suitability', 'risk'] as const) {
+    const cfg2 = { breaks: [0.45, 0.7], direction };
+    const rows = rankPoints(pts, (p) => evaluateLonLat(d2, r2, cfg2, p), label);
+    const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+    const ev = rows.filter((r) => r.status === 'ok');
+    ok(ev.every((r, i) => i === 0 || (ev[i - 1].pct as number) >= (r.pct as number)), `${direction}: orden descendente por índice`);
+    ok(by.empate1.pct === by.empate2.pct && by.empate1.rank === by.empate2.rank, `${direction}: empate con el mismo puesto`);
+    const top = direction === 'risk' ? 'veto' : 'alto';
+    ok(by[top].rank === 1, `${direction}: puesto 1 = ${direction === 'risk' ? 'mayor riesgo (el veto fuerza 100)' : 'más apto'}`);
+    const ranks = ev.map((r) => r.rank);
+    const expectDown = direction === 'risk' ? [1, 2, 3, 3, 5] : [1, 2, 2, 4, 5];
+    ok(JSON.stringify(ranks) === JSON.stringify(expectDown), `${direction}: ranking de competencia ${JSON.stringify(ranks)}`);
+    ok(by.veto.vetoed && by.veto.status === 'ok' && by.veto.pct === (direction === 'risk' ? 100 : 0), `${direction}: veto evaluado con índice ${direction === 'risk' ? 100 : 0}`);
+    const tail = rows.slice(-4);
+    ok(tail.every((r) => r.status !== 'ok' && r.rank === null && r.pct === null && r.cls === 0), `${direction}: no evaluados al final, sin puesto, sin índice (nunca 0 %)`);
+    ok(by['fuera-mascara'].status === 'outside' && by.lejos.status === 'outside' && by.excl.status === 'excluded' && by['sin-dato'].status === 'nodata', `${direction}: fuera / excluido / sin dato`);
+    ok(by.excl.label === STATUS_LABEL.excluded && by.lejos.label === 'Fuera del área evaluada' && by['sin-dato'].label === 'Sin dato', `${direction}: rótulos de estado`);
+    // coincide con la celda del ráster
+    const idx = evaluateIndex(d2.layers, m2, r2, direction);
+    ok(by.alto.pct === idx.pct[cell(2, 2)] && by.empate1.pct === idx.pct[cell(3, 2)], `${direction}: índice del punto = índice de la celda`);
+    ok(rankHeading(direction) === (direction === 'risk' ? 'Mayor riesgo primero' : 'Más apto primero'), `${direction}: encabezado`);
+    const csv = rankingCsv(rows, direction).split('\n');
+    ok(csv[0].includes(direction === 'risk' ? 'riesgo_0_100' : 'idoneidad_0_100') && csv.length === pts.length + 2, `${direction}: CSV con cabecera de la dirección`);
+    ok(csv.filter((l) => /^,/.test(l)).length === 4 && !csv.some((l) => /,0,,/.test(l) && l.startsWith(',')), `${direction}: CSV deja puesto e índice vacíos si no se evaluó`);
+  }
+  // las clases del punto salen del mismo modelo
+  const e1 = evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'suitability' }, pts[2]);
+  {
+    const ix = evaluateIndex(d2.layers, m2, r2, 'suitability');
+    const cl = classify(ix.s, ix.veto, [0.45, 0.7]);
+    ok(e1.status === 'ok' && e1.cls === cl[cell(2, 2)], 'clase del punto = clase de la celda');
+  }
+  // nombres y saneado
+  ok(nextPointName([{ name: 'Punto 3' }, { name: 'Casa' }, { name: 'Punto 1' }]) === 'Punto 4', 'siguiente «Punto N» sin repetir tras borrar');
+  const san = sanitizePoints([{ id: 'a', name: 'x', lat: 1, lon: 2 }, { id: 'a', name: 'dup', lat: 3, lon: 4 }, { id: 'b', name: 'mal', lat: 95, lon: 0 }, null, { lat: 'x', lon: 1 }]);
+  ok(san.length === 2 && san[0].id !== san[1].id, 'saneado: descarta inválidos y repara ids repetidos');
+  ok(sanitizePoints(Array.from({ length: 500 }, (_, i) => ({ id: `i${i}`, name: 'n', lat: 0, lon: 0 }))).length === MAX_POINTS, `saneado: tope de ${MAX_POINTS}`);
+  const pub = toPublishedPoints(rankPoints(pts, (p) => evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'suitability' }, p), label));
+  ok(pub.length === pts.length && !('id' in pub[0]) && pub.filter((p) => p.pct === null).length === 4, 'publicables: sin ids y con pct null si no se evaluó');
+
+  // Excel: hoja «Puntos» solo con valores; los no evaluados con celdas vacías (nunca 0)
+  const { buildGeoWorkbook } = await import('../src/lib/geoExcel.ts');
+  const { pointState } = await import('../src/lib/geo/points.ts');
+  const XLSX = (await import('xlsx-js-style')).default as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const rowsR = rankPoints(pts, (p) => evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'risk' }, p), label);
+  const summary = {
+    title: 'T', objective: '', date: '2026-10-10', crs: 'EPSG:32618', resM: 100, width: W, height: H, cr: 0, nExperts: 0, weightsOrigin: '',
+    criteria: [], classes: [], layers: [], direction: 'risk' as const,
+    points: rowsR.map((r) => ({ rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, classLabel: r.status === 'ok' ? r.label : '', state: pointState(r, 'risk') })),
+    pointsOrder: rankHeading('risk'),
+  };
+  const wb = buildGeoWorkbook(XLSX, summary);
+  ok(wb.SheetNames.includes('Puntos'), 'Excel: existe la hoja «Puntos»');
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets.Puntos, { header: 1, defval: '' }) as unknown[][];
+  ok(String(aoa[0][0]).includes('Mayor riesgo primero') && aoa[2][0] === 'Puesto' && String(aoa[2][4]).includes('riesgo'), 'Excel: encabezado con la dirección');
+  const data = aoa.slice(3, 3 + pts.length);
+  ok(data[0][0] === 1 && data[0][1] === 'veto' && data[0][6] === 'Condición crítica', 'Excel: primer puesto = el veto en riesgo, con su estado');
+  ok(data.slice(-4).every((r) => r[0] === '' && r[4] === '' && r[5] === ''), 'Excel: no evaluados con puesto, índice y clase vacíos (no 0)');
+  ok(aoa.some((r) => String(r[1]).includes('no son fórmulas vivas')), 'Excel: nota de valores calculados');
+  const noPts = buildGeoWorkbook(XLSX, { ...summary, points: [] });
+  ok(!noPts.SheetNames.includes('Puntos'), 'Excel: sin puntos no hay hoja');
+}
 console.log(fails === 0 ? '\nTodo OK (check-geo-points)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);

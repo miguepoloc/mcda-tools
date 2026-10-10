@@ -31,14 +31,17 @@ import GeoPublishPanel from './GeoPublishPanel';
 import GeoCatalogPanel from './GeoCatalogPanel';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
-  classStats, classify, CLASS_EXCLUDED, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
+  classStats, classify, CLASS_EXCLUDED, CLASS_VETO, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
 } from '@/lib/geo/suitability';
 import { kmz, parcelsCsv, pixelsCsv, qmlClasses, qmlPct, resultRaster, safeName, slug, toGeoTiff, zipFiles } from '@/lib/geo/export';
 import { downloadGeoExcelBytes, type GeoSummary } from '@/lib/geoExcel';
 import type { Criterion, ExpertRow, GeoConfig, GeoLayerMeta } from '@/lib/types';
-import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type RasterOverlay } from './GeoMap';
+import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rankHeading, rankingCsv, rankPoints, round6, sanitizePoints, toPublishedPoints, type GeoPoint } from '@/lib/geo/points';
+import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import GeoPointsPanel from './GeoPointsPanel';
+import type { RankRow } from './GeoPointsTable';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
 import { canvasBytes, saveBytes, toCanvas, toUrl } from '@/lib/geo/canvas';
@@ -53,7 +56,7 @@ type Props = {
   share: { isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void } | null;
 };
 
-type Tab = 'capas' | 'modelo' | 'exportar';
+type Tab = 'capas' | 'modelo' | 'puntos' | 'exportar';
 
 const TOUR: TourStep[] = [
   { sel: '.gv-steps-bar', tab: 'capas', title: 'Cuatro pasos', text: 'Área → Capas → Reglas → Pesos. Cada marca se pone verde cuando ese paso está listo. Los pesos vienen de tus expertos (pestaña «Expertos» del proyecto).' },
@@ -91,6 +94,10 @@ export default function GeoVisor(props: Props) {
   const [vis, setVis] = useState<VisState>({});
   const [vecs, setVecs] = useState<VecItem[]>([]);
   const [selected, setSelected] = useState<{ col: number; row: number } | null>(null);
+  // Puntos con ranking: modo «Agregar punto» (explícito), punto resaltado (tabla <-> mapa) y aviso del último intento.
+  const [addMode, setAddMode] = useState(false);
+  const [selPoint, setSelPoint] = useState<string | null>(null);
+  const [addNote, setAddNote] = useState('');
   // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
   // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
   const [setup, setSetup] = useState<ClassSetup>(() => setupFromGeo(geo));
@@ -259,6 +266,33 @@ export default function GeoVisor(props: Props) {
   const boundsKey = gridBounds ? [gridBounds.west, gridBounds.south, gridBounds.east, gridBounds.north].map((n) => n.toFixed(4)).join(',') : '';
   useEffect(() => { if (gridBounds) setTimeout(() => mapRef.current?.fit(gridBounds), 60); }, [boundsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ------------------------------------------------------------------ puntos con ranking
+  const points = useMemo(() => sanitizePoints(geo.points), [geo.points]);
+  // Rótulo de clase: la vetada cuenta en la clase extrema de la dirección (así lo define pointEval) y lleva su insignia aparte.
+  const labelOf = useCallback((cls: number) => (cls === CLASS_VETO ? rm.names[rm.direction === 'risk' ? rm.n - 1 : 0] : (rm.names[cls - 1] ?? `Clase ${cls}`)), [rm]);
+  // Se evalúa con las reglas diferidas y el modelo diferido, igual que el mapa pintado: el ranking nunca contradice lo que se ve.
+  const ranked = useMemo(() => rankPoints(points, (pt) => (data
+    ? evaluateLonLat(data, dRules, { breaks: rm.breaks, direction: rm.direction }, pt)
+    : { status: 'nodata' as const, s: null, pct: null, cls: 0, vetoed: false, lat: pt.lat, lon: pt.lon, rows: [] }), labelOf), [points, data, dRules, rm, labelOf]);
+  const rankRows = useMemo<RankRow[]>(() => ranked.map((r) => ({
+    key: r.id, rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, label: r.label, status: r.status, vetoed: r.vetoed,
+    color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF',
+  })), [ranked, RHEX]);
+  const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
+  })), [rankRows, T]);
+  const setPoints = useCallback((next: GeoPoint[]) => commit((g) => { const o = { ...g }; if (next.length) o.points = next; else delete o.points; return o; }), [commit]);
+  // El modo «Agregar punto» no sobrevive a salir de la pestaña ni a Esc: un clic perdido no debe crear puntos.
+  useEffect(() => { if (tab !== 'puntos') setAddMode(false); }, [tab]);
+  useEffect(() => {
+    if (!addMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAddMode(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [addMode]);
+  useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
+
   // ------------------------------------------------------------------ imágenes sobre el mapa
   const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
   const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
@@ -313,12 +347,21 @@ export default function GeoVisor(props: Props) {
   }, [data, selected]);
 
   const onMapClick = useCallback((lat: number, lon: number) => {
+    if (addMode) {
+      // Modo explícito: cada clic crea un punto. Fuera del modo, el clic sigue siendo la consulta de un punto de siempre.
+      const cur = sanitizePoints(geoRef.current.points);
+      if (cur.length >= MAX_POINTS) { setAddNote(`Tope de ${MAX_POINTS} puntos alcanzado: elimina alguno para agregar más.`); return; }
+      const id = newPointId();
+      setPoints([...cur, { id, name: nextPointName(cur), lat: round6(lat), lon: round6(lon) }]);
+      setSelPoint(id); setAddNote('');
+      return;
+    }
     if (!data) return;
     const [c, r] = lonLatToPixel(lon, lat, data.grid.transform, data.grid.crs);
     const col = Math.round(c), row = Math.round(r);
     if (col < 0 || row < 0 || col >= data.grid.width || row >= data.grid.height) { setSelected(null); return; }
     setSelected({ col, row });
-  }, [data]);
+  }, [data, addMode, setPoints]);
 
   const onMarkerClick = useCallback((id: string) => {
     if (!data || !id.startsWith('ref:')) return;
@@ -351,7 +394,9 @@ export default function GeoVisor(props: Props) {
       { label: 'Exclusión (fuera del cálculo)', ha: stats.excl.ha, pct: 0 },
     ] : [],
     layers: data ? Object.entries(data.info).map(([k, l]) => ({ key: k, label: l.label, role: l.role, origin: l.origin ?? 'Paquete del catálogo', source: l.source ?? '', unit: l.unit, min: l.min, max: l.max })) : [],
-  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage]);
+    points: ranked.map((r) => ({ rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, classLabel: r.status === 'ok' ? r.label : '', state: pointState(r, rm.direction) })),
+    pointsOrder: rankHeading(rm.direction),
+  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage, ranked]);
 
   async function framePng(withBase: boolean): Promise<HTMLCanvasElement> {
     if (!data || !ev || !om || !stats) throw new Error('No hay mapa que exportar.');
@@ -437,22 +482,24 @@ export default function GeoVisor(props: Props) {
     files['google-earth.kmz'] = kmz(props.title, og.bounds, await canvasBytes(toCanvas(og, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette, rm))));
     if (parcelRes?.parcels.length) { files['parcelas.tif'] = await toGeoTiff(Uint16Array.from(parcelRes.labels), g, 0); files['parcelas.csv'] = parcelsCsv(parcelRes.parcels, g); }
     files['pixeles.csv'] = pixelsCsv(ev!.pct, ev!.cls, data!.mask, g, 200_000, rm);
+    if (ranked.length) files['puntos_ranking.csv'] = rankingCsv(ranked, rm.direction);
     files['resumen.xlsx'] = await downloadGeoExcelBytes(summary());
     const s = summary();
     files['receta.json'] = JSON.stringify({ ...s, grid: g, rules: geo.rules, layerMeta: Object.fromEntries(Object.entries(geo.layers ?? {}).map(([k, m]) => [k, { ...m, path: undefined }])), pack: geo.packId ?? null }, null, 2);
     // Códigos del GeoTIFF de clases: 1..N en orden ascendente del índice, N+1 = vetada, 0 = exclusión.
     const codes = rm.names.map((nm, i) => `${i + 1} = ${nm}`).concat([`${rm.n + 1} = ${T.critical.toLowerCase()}`, '0 = exclusión']).join(', ');
-    files['LEEME.txt'] = `${T.mapTitle} «${props.title}»\n\n- ${T.fileIdx}.tif: ${T.indexName.toLowerCase()} 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios; ${rm.direction === 'risk' ? 'un valor alto es más riesgo' : 'un valor alto es más apto'}) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: ${codes} (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n\nEl ${T.indexName.toLowerCase()} NO es una probabilidad.\n`;
+    files['LEEME.txt'] = `${T.mapTitle} «${props.title}»\n\n- ${T.fileIdx}.tif: ${T.indexName.toLowerCase()} 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios; ${rm.direction === 'risk' ? 'un valor alto es más riesgo' : 'un valor alto es más apto'}) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: ${codes} (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n${ranked.length ? `- puntos_ranking.csv: ranking de tus ${ranked.length} punto(s) (${rankHeading(rm.direction).toLowerCase()}); los no evaluados van al final, sin puesto ni índice. También en la hoja «Puntos» de resumen.xlsx.\n` : ''}\nEl ${T.indexName.toLowerCase()} NO es una probabilidad.\n`;
     saveBytes(`${base}_paquete.zip`, zipFiles(files), 'application/zip');
   };
 
   // ------------------------------------------------------------------ publicar
   const resultSig = useMemo(() => {
-    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? ""]);
+    // Los puntos solo entran con el interruptor encendido: sin él la firma es la de siempre.
+    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : [])]);
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
-  }, [weightResult, geo.rules, setup, layersSig, geo.packId]);
+  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points]);
 
   // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
   const sigParts = useMemo(() => {
@@ -463,8 +510,9 @@ export default function GeoVisor(props: Props) {
       thresholds: { alta: setup.breaks[setup.breaks.length - 1] ?? 0.7, media: setup.breaks[0] ?? 0.45 }, classSig: publishClassSig(setup),
       layers: Object.fromEntries(Object.entries(data.info).map(([k, l]) => [k, { role: l.role, min: l.min, max: l.max, bytes: l.bytes }])),
       packId: geo.packId, grid: data.grid,
+      points: { show: !!geo.publicPoints, list: points },
     });
-  }, [data, criteria, weightResult, geo.rules, geo.packId, setup]);
+  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points]);
 
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
@@ -485,6 +533,8 @@ export default function GeoVisor(props: Props) {
       evaluableHa: stats.evaluableHa,
       attribution: data.attribution, sig: resultSig, sigParts: sigParts ?? undefined,
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
+      // Con el interruptor apagado NO viaja ni la lista: el meta lo recibe cualquiera con el enlace.
+      ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked) } : {}),
     };
     return { b64, meta };
   }
@@ -536,8 +586,8 @@ export default function GeoVisor(props: Props) {
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
         <div className="gv-tabs" role="tablist">
-          {(['capas', 'modelo', 'exportar'] as Tab[]).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', exportar: 'Exportar' }[t]}</button>
+          {(['capas', 'modelo', 'puntos', 'exportar'] as Tab[]).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', exportar: 'Exportar' }[t]}</button>
           ))}
         </div>
         <div className="gv-side-body">
@@ -564,12 +614,23 @@ export default function GeoVisor(props: Props) {
               onSaveBaseline={(label) => { if (ev && stats) { setBaseline({ label, pct: ev.pct.slice(), stats }); setVis((v) => ({ ...v, diff: { on: true, op: 0.9 } })); } }}
               onClearBaseline={() => setBaseline(null)} />
           )}
+          {tab === 'puntos' && (
+            <GeoPointsPanel
+              points={points} ranked={ranked} rows={rankRows} direction={rm.direction} criticalLabel={T.critical}
+              ready={!!(data && rules.length > 0)} addMode={addMode} onAddMode={setAddMode} addNote={addNote}
+              selectedKey={selPoint} onSelect={setSelPoint}
+              onCenter={(id) => { const pt = points.find((x) => x.id === id); if (pt) { setSelPoint(id); mapRef.current?.flyTo(pt.lat, pt.lon, 13); } }}
+              onChange={setPoints}
+              onExportCsv={() => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv')} />
+          )}
           {tab === 'exportar' && (
             <div className="gv-sec-stack">
               {!ready && <p className="gv-hint">Para exportar hace falta un mapa calculado: define el área, sube capas y asígnalas a criterios con su regla.</p>}
               {props.share && (
                 <GeoPublishPanel sb={supabase} projectId={props.projectId} isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
                   ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
+                  showPoints={!!geo.publicPoints} nPoints={points.length}
+                  onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
                   warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined} />
               )}
               {isAdmin && supabase && !geo.packId && (
@@ -596,7 +657,7 @@ export default function GeoVisor(props: Props) {
 
       <section className="gv-main">
         <div className="gv-stage">
-          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} draft={draft} drawing={drawing}
+          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
             initialBounds={gridBounds} onClick={onMapClick} onMove={onMove} onMarkerClick={onMarkerClick}
             onDrawn={(b) => { setDraft(b); setDrawing(false); }} />
 
@@ -610,6 +671,12 @@ export default function GeoVisor(props: Props) {
 
           <div className="gv-coords mono"><span ref={coordRef}>—</span></div>
 
+          {addMode && (
+            <div className="gv-addbar" role="status">
+              <span><b>Agregar punto:</b> haz clic en el mapa para colocar cada punto.</span>
+              <button type="button" className="btn sm" onClick={() => setAddMode(false)}>Terminar (Esc)</button>
+            </div>
+          )}
           {loading && <div className="gv-toast" role="status">Cargando capas… {Math.round(progress * 100)}%</div>}
           {!ready && data && !loading && <div className="gv-toast" role="status">Asigna capas a tus criterios (pestaña Modelo) para ver el resultado.</div>}
 

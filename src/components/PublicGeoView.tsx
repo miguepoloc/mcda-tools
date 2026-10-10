@@ -8,10 +8,12 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
 import { PALETTES, classHexOf, paintResult } from '@/lib/geo/paint';
-import { decodePlanes, publishedView, type PublishedMeta } from '@/lib/geo/publish';
+import { decodePlanes, publishedPoints, publishedView, type PublishedMeta } from '@/lib/geo/publish';
 import { DIR_TEXT } from '@/lib/geo/classes';
+import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
-import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type RasterOverlay } from './GeoMap';
+import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
+import GeoPointsTable, { type RankRow } from './GeoPointsTable';
 import { BasemapChips, PaletteChips, ResultLegend, StyleChips } from './GeoHud';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import PublicAhp from './PublicAhp';
@@ -69,6 +71,23 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
   }, [sel, planes, meta.grid, model, T]);
   const markers = useMemo<MapMarker[]>(() => (point ? [{ id: 'sel', lat: point.lat, lon: point.lon, selected: true }] : []), [point]);
 
+  // Puntos con ranking: solo si el dueño los publicó (`showPoints`); publicaciones anteriores no los traen.
+  const pubPoints = useMemo(() => publishedPoints(meta), [meta]);
+  const [selPoint, setSelPoint] = useState<string | null>(null);
+  const rankRows = useMemo<RankRow[]>(() => (pubPoints ?? []).map((p, i) => {
+    const ok = p.status === 'ok';
+    const veto = ok && p.cls === CLASS_VETO;
+    return {
+      key: String(i), rank: p.rank, name: p.name || `Punto ${i + 1}`, lat: p.lat, lon: p.lon, pct: ok ? p.pct : null, status: p.status, vetoed: veto,
+      color: ok ? HEX[p.cls] ?? '#9CA3AF' : '#9CA3AF',
+      label: !ok ? STATUS_LABEL[p.status as Exclude<typeof p.status, 'ok'>] : veto ? model.names[view.direction === 'risk' ? model.n - 1 : 0] : (model.names[p.cls - 1] ?? `Clase ${p.cls}`),
+    };
+  }), [pubPoints, HEX, model, view.direction]);
+  const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
+  })), [rankRows, T]);
+
   if (error) return <div className="banner"><span><b>No se pudo mostrar el mapa:</b> {error}</span></div>;
   // De la clase más alta a la más baja (código = posición + 1).
   const rows = view.classes.map((c, i) => ({ code: i + 1, ...c })).reverse();
@@ -106,6 +125,16 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
               <p className="gv-hint">Área evaluada: {meta.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{view.exclHa > 0 ? ` · exclusión: ${view.exclHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha` : ''} · celdas de {meta.grid.resM} m.</p>
               {view.vetoHa > 0 && <p className="gv-hint">{view.vetoHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha vetadas por algún criterio («{T.critical.toLowerCase()}»): cuentan en la clase «{model.names[view.direction === 'risk' ? model.n - 1 : 0]}».</p>}
             </section>
+            {rankRows.length > 0 && (
+              <section className="gv-sec">
+                <header><h4>Puntos</h4><span className="gv-badge ok">{rankRows.length}</span></header>
+                <GeoPointsTable
+                  rows={rankRows} heading={rankHeading(view.direction)} criticalLabel={T.critical}
+                  selectedKey={selPoint} onSelect={setSelPoint}
+                  onCenter={(k) => { const r = rankRows.find((x) => x.key === k); if (r) { setSelPoint(k); mapRef.current?.flyTo(r.lat, r.lon, 13); } }} />
+                <p className="gv-hint">Cada punto toma el índice de la celda donde cae. Los puntos sin evaluar van al final, sin puesto.</p>
+              </section>
+            )}
             <section className="gv-sec">
               <p className="gv-hint">Haz clic en el mapa (o, con el teclado, enfócalo, muévelo con las flechas y pulsa Intro) para ver el índice de {T.noun} de un punto. Es un <b>índice de 0 a 100</b> (suma ponderada de criterios), <b>no una probabilidad</b>.</p>
               <p className="gv-hint">Publicado el {new Date(data.updated_at).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}{meta.attribution ? ` · Datos: ${meta.attribution}` : ''}</p>
@@ -114,7 +143,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
         </aside>
         <section className="gv-main">
           <div className="gv-stage">
-            <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={[]} markers={markers} draft={null} drawing={false}
+            <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={[]} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} onPointClick={setSelPoint} draft={null} drawing={false}
               initialBounds={meta.bounds} onClick={onClick} onMove={onMove} onDrawn={() => {}} />
             <div className="gv-hud gv-hud-tr">
               <BasemapChips value={basemap} onChange={setBasemap} />
