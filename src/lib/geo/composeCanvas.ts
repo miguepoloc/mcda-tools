@@ -2,10 +2,12 @@
  * aquí solo se pinta. No lee el mapa de Leaflet: renderiza desde el estado del proyecto que le pasa quien llama. */
 import {
   directionLine, footerLines, frameLayout, geomPaths, legendRows, metersPerPixel, niceScale, pickZoom, planComposition,
-  project, fitView, tilesFor, unrankedNote, wrapLines, splitPoints,
+  project, fitView, tilesFor, unrankedNote, wrapLines, splitPoints, rankingTable, fitText,
+  RANKING_ROW_H, RANKING_SUBHEAD_H, RANKING_MORE_H,
   type ComposeAvailability, type ComposeOptions, type ComposePoint, type FooterInput, type LegendClassInput, type MapView, type Rect,
 } from './compose.ts';
 import type { Bounds } from './grid.ts';
+import { LABEL_MAX_W, MAX_LABELS, labelPriority, layoutLabels, labelText } from './pointLabels.ts';
 import type { FC } from './vector.ts';
 
 export type ComposeInputs = {
@@ -126,6 +128,51 @@ function drawLegend(ctx: CanvasRenderingContext2D, r: Rect, s: number, o: Compos
   return y - r.y + 6 * s;
 }
 
+/** Tabla de ranking de puntos (columna derecha, bajo la leyenda). Con `dry` solo mide. Devuelve el alto usado en px. */
+function drawRanking(ctx: CanvasRenderingContext2D, r: Rect, s: number, inp: ComposeInputs, dry: boolean): number {
+  const t = rankingTable(inp.points, inp.texts.direction);
+  let y = r.y;
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `700 ${14 * s}px ${FONT}`;
+  for (const ln of wrapLines(t.heading, r.w, (q) => ctx.measureText(q).width)) {
+    y += 14 * 1.3 * s;
+    if (!dry) { ctx.fillStyle = INK; ctx.fillText(ln, r.x, y); }
+  }
+  y += 6 * s;
+  // columnas: puesto | nombre | índice | clase (muestra de color y nombre)
+  const cRank = r.x, cName = r.x + 30 * s, wName = r.w * 0.36;
+  const cPct = cName + wName + 44 * s; // borde derecho de la columna del índice
+  const cCls = cPct + 10 * s, wCls = r.x + r.w - cCls;
+  const row = (rw: (typeof t.rows)[number]) => {
+    y += RANKING_ROW_H * s;
+    if (dry) return;
+    const base = y - 5 * s;
+    ctx.font = `700 ${12 * s}px ${FONT}`; ctx.fillStyle = INK; ctx.textAlign = 'right';
+    ctx.fillText(rw.rank, cRank + 24 * s, base); ctx.textAlign = 'start';
+    ctx.font = `500 ${12 * s}px ${FONT}`;
+    ctx.fillText(fitText(rw.name, wName, (q) => ctx.measureText(q).width), cName, base);
+    if (rw.value) { ctx.font = `700 ${12 * s}px ${FONT}`; ctx.textAlign = 'right'; ctx.fillText(rw.value, cPct, base); ctx.textAlign = 'start'; }
+    const sw = 10 * s;
+    ctx.fillStyle = rw.color; ctx.fillRect(cCls, base - 9 * s, sw, sw); ctx.strokeStyle = 'rgba(15,23,42,.45)'; ctx.lineWidth = s; ctx.strokeRect(cCls, base - 9 * s, sw, sw);
+    ctx.font = `400 ${12 * s}px ${FONT}`; ctx.fillStyle = MUTED;
+    ctx.fillText(fitText(rw.classLabel, wCls - sw - 5 * s, (q) => ctx.measureText(q).width), cCls + sw + 5 * s, base);
+  };
+  t.rows.slice(0, t.unrankedFrom).forEach(row);
+  if (t.unrankedShown > 0) {
+    y += RANKING_SUBHEAD_H * s;
+    if (!dry) {
+      ctx.fillStyle = LINE; ctx.fillRect(r.x, y - 19 * s, r.w, s);
+      ctx.font = `700 ${12 * s}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText('Sin puesto', r.x, y - 5 * s);
+    }
+    t.rows.slice(t.unrankedFrom).forEach(row);
+  }
+  if (t.more) {
+    y += RANKING_MORE_H * s;
+    if (!dry) { ctx.font = `italic 400 ${12 * s}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(t.more, r.x, y - 5 * s); }
+  }
+  return y - r.y + 6 * s;
+}
+
 function pathPoly(ctx: CanvasRenderingContext2D, rings: number[][][], v: MapView) {
   ctx.beginPath();
   for (const ring of rings) {
@@ -144,7 +191,10 @@ export async function renderComposition(optsIn: ComposeOptions, inp: ComposeInpu
   const footer = footerLines({ ...inp.footer, basemapAttr: o.basemap && inp.basemap ? inp.basemap.attr : null, date: o.date });
   // El alto de la leyenda se mide antes de crear el lienzo; la lámina crece si hace falta (nada se corta).
   const probe = frameLayout(W, inp.bounds, 0);
-  const legendNeeded = o.legend ? drawLegend(m, { ...probe.legend, x: 0, y: 0 }, s, o, inp, true) : 0;
+  const legendH = o.legend ? drawLegend(m, { ...probe.legend, x: 0, y: 0 }, s, o, inp, true) : 0;
+  const rankGap = 14 * s;
+  const rankH = o.rankingTable && inp.points.length ? drawRanking(m, { ...probe.legend, x: 0, y: 0 }, s, inp, true) : 0;
+  const legendNeeded = legendH + (rankH ? (legendH ? rankGap : 0) + rankH : 0);
   m.font = `700 ${30 * s}px ${FONT}`;
   const titleLines = wrapLines(o.title, W - 2 * probe.pad, (q) => m.measureText(q).width).length;
   m.font = `400 ${17 * s}px ${FONT}`;
@@ -265,6 +315,27 @@ export async function renderComposition(optsIn: ComposeOptions, inp: ComposeInpu
     }
   }
 
+  // Nombre junto a cada punto: mismo descarte voraz por puesto que el mapa del Geovisor (máx. 40), con halo blanco.
+  if (o.points && o.pointNames && inp.points.length) {
+    ctx.font = `600 ${11 * s}px ${FONT}`;
+    const cap = LABEL_MAX_W * s;
+    const items = inp.points.map((p, i) => {
+      const [x, y] = project(view, p.lon, p.lat);
+      const txt = fitText(labelText({ name: p.name, pct: null }, 'name'), cap - 10 * s, (q) => ctx.measureText(q).width);
+      return { id: String(i), x, y, w: Math.min(cap, ctx.measureText(txt).width + 10 * s), h: 18 * s, priority: labelPriority(p.rank, false, i), txt };
+    });
+    const { visible } = layoutLabels(items, { width: mp.w, height: mp.h, max: MAX_LABELS, gap: 2 * s, offsetX: 11 * s });
+    const keep = new Set(visible);
+    ctx.textAlign = 'start'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    for (const it of items) {
+      if (!keep.has(it.id)) continue;
+      const tx = it.x + 11 * s + 5 * s;
+      ctx.lineWidth = 4 * s; ctx.strokeStyle = '#fff'; ctx.strokeText(it.txt, tx, it.y);
+      ctx.fillStyle = INK; ctx.fillText(it.txt, tx, it.y);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
   // --- escala gráfica y norte (sobre una tarjeta blanca dentro del mapa)
   if (o.scaleBar) {
     const bar = niceScale(metersPerPixel(view), mp.w * 0.22);
@@ -288,6 +359,7 @@ export async function renderComposition(optsIn: ComposeOptions, inp: ComposeInpu
 
   // --- leyenda y pie
   if (o.legend) drawLegend(ctx, L.legend, s, o, inp, false);
+  if (rankH) drawRanking(ctx, { ...L.legend, y: L.legend.y + legendH + (legendH ? rankGap : 0) }, s, inp, false);
   ctx.fillStyle = LINE; ctx.fillRect(L.footer.x, L.footer.y, L.footer.w, s);
   ctx.font = `400 ${13 * s}px ${FONT}`; ctx.fillStyle = MUTED;
   let fy = L.footer.y + 6 * s;

@@ -602,7 +602,7 @@ export default function GeoVisor(props: Props) {
         labels: zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`),
       } : null,
       // Mismo orden y mismos puestos que la lista: sin puesto (fuera del área, excluido, sin dato) = hueco gris sin número.
-      points: ranked.map((r) => ({ lat: r.lat, lon: r.lon, rank: r.rank, name: r.name, color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF' })),
+      points: ranked.map((r) => ({ lat: r.lat, lon: r.lon, rank: r.rank, name: r.name, color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF', pct: r.pct, label: r.label })),
       legend: { classes: summ.classes, ranges: summ.ranges ?? [] },
       classColors: RHEX,
       // 11 muestras equiespaciadas de la rampa DEL MODELO (la misma del mapa y de la leyenda), no de la paleta fija.
@@ -624,7 +624,7 @@ export default function GeoVisor(props: Props) {
     setReportOpen(true);
     setReportMap({ url: null, busy: true, warnings: [] });
     try {
-      const r = await composeRender({ ...composeDefaults(), width: 1600, zones: false, subtitle: '' });
+      const r = await composeRender({ ...composeDefaults(), width: 1600, zones: false, subtitle: '', rankingTable: false, pointNames: false });
       setReportMap({ url: r.canvas.toDataURL('image/jpeg', 0.9), busy: false, warnings: r.warnings });
     } catch (e) { setReportMap({ url: null, busy: false, warnings: [e instanceof Error ? e.message : String(e)] }); }
   }
