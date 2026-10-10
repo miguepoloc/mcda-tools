@@ -1,7 +1,7 @@
 'use client';
 
 /** Controles flotantes del mapa que comparten el geovisor del dueño y la vista pública. */
-import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, classHexOf, rampCss, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, classHexOf, modelRampCss, rampCss, type PaletteKey } from '@/lib/geo/paint';
 import { CLASS_EXCLUDED, type Direction } from '@/lib/geo/suitability';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { BASEMAPS, type BasemapKey } from './GeoMap';
@@ -58,8 +58,15 @@ export function ResultLegend({ style, model, thresholds, palette = 'semaforo', t
       <b>{heading} <span className="mono">(0–100)</span></b>
       {style === 'continuous' ? (
         <>
-          <div className="ramp" style={{ background: rampCss(palette, m.direction) }} aria-hidden="true" />
-          <div className="ends mono"><span>{T.lowEnd}</span><span>50</span><span>{T.highEnd}</span></div>
+          {/* Misma rampa que pinta el mapa (sale del modelo de clases): marcas en los cortes reales y, en los extremos,
+              el nombre de la clase más baja y de la más alta, así que en riesgo el extremo alto dice «Riesgo alto». */}
+          <div className="ramp-wrap">
+            <div className="ramp" style={{ background: modelRampCss(m, palette) }} aria-hidden="true" />
+            {m.breaks.map((b, i) => <i key={i} className="tick" style={{ left: `${b * 100}%` }} aria-hidden="true" />)}
+          </div>
+          <div className="cuts mono" aria-hidden="true">{m.breaks.map((b, i) => <span key={i} style={{ left: `${b * 100}%` }}>{pc(b)}</span>)}</div>
+          <div className="ends"><span>{m.names[0]} · 0</span><span>100 · {m.names[m.n - 1]}</span></div>
+          <span className="sr-only">Cortes entre clases: {m.breaks.map(pc).join(', ')}.</span>
         </>
       ) : (
         <>

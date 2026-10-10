@@ -1,4 +1,5 @@
 /** Colorea grillas a RGBA (Uint32 little-endian 0xAABBGGRR, listo para `ImageData`). Puro. */
+import { defaultBreaks } from './classes.ts';
 import { suitability, type FnSpec } from './membership.ts';
 import { CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, type Direction } from './suitability.ts';
 
@@ -65,7 +66,7 @@ export const rampCss = (pal: PaletteKey = 'semaforo', dir: Direction = 'suitabil
 };
 
 /** Lo que `paintResult` necesita del modelo de clases (lo cumple `ClassModel`). */
-export type ClassPaint = { n: number; direction: Direction; colors?: (string | undefined)[] };
+export type ClassPaint = { n: number; direction: Direction; colors?: (string | undefined)[]; breaks?: number[] };
 const DEFAULT_PAINT: ClassPaint = { n: 3, direction: 'suitability' };
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
@@ -86,6 +87,43 @@ export function classRgb(m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaf
 }
 export const classHexOf = (m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): Record<number, string> =>
   Object.fromEntries(Object.entries(classRgb(m, pal)).map(([k, v]) => [k, hexOf(v)]));
+/** Rampa continua DEL MODELO DE CLASES (la que pinta la vista «Continuo»). Construcción: cada clase aporta su color
+ * (el de `classRgb`: paleta, personalizado, dirección) en el PUNTO MEDIO de su rango [corte_{i-1}, corte_i]; entre
+ * puntos medios se interpola linealmente en RGB y antes del primero / después del último queda el color de la clase
+ * extrema. Así el color de un índice es siempre una mezcla de las clases vecinas, el de cada punto medio coincide con
+ * el de su clase y las transiciones se concentran alrededor de los cortes reales. Con 3 clases por defecto
+ * (45/70, aptitud) da rojo→ámbar→verde parecido a la rampa fija anterior. Sin `breaks` usa los de por defecto. */
+export function classRamp(m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): Stops {
+  const br = m.breaks && m.breaks.length === m.n - 1 ? m.breaks : defaultBreaks(m.n);
+  const rgb = classRgb(m, pal);
+  const edges = [0, ...br, 1];
+  const stops: Stops = [[0, rgb[1]]];
+  for (let i = 0; i < m.n; i++) {
+    const mid = (edges[i] + edges[i + 1]) / 2;
+    stops.push([Math.max(mid, stops[stops.length - 1][0]), rgb[i + 1]]);
+  }
+  stops.push([1, rgb[m.n]]);
+  return stops;
+}
+function sampleStops(stops: Stops, t: number): Rgb {
+  const x = Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0;
+  if (x <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++) {
+    const [t0, c0] = stops[i - 1], [t1, c1] = stops[i];
+    if (x <= t1) {
+      if (t1 <= t0) return c1;
+      const f = (x - t0) / (t1 - t0);
+      return [Math.round(c0[0] + (c1[0] - c0[0]) * f), Math.round(c0[1] + (c1[1] - c0[1]) * f), Math.round(c0[2] + (c1[2] - c0[2]) * f)];
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+/** Color del índice `t` (0–1) en la rampa del modelo de clases. */
+export const modelRampColor = (t: number, m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): Rgb => sampleStops(classRamp(m, pal), t);
+export const modelRampHex = (t: number, m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): string => hexOf(modelRampColor(t, m, pal));
+/** `linear-gradient` CSS de la rampa del modelo (paradas en los puntos medios, en %). */
+export const modelRampCss = (m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): string =>
+  `linear-gradient(90deg, ${classRamp(m, pal).map(([t, c]) => `rgb(${c[0]},${c[1]},${c[2]}) ${(t * 100).toFixed(1)}%`).join(',')})`;
 export const RAW_RAMP_CSS = `linear-gradient(90deg, ${SEQ.map(([, c]) => `rgb(${c[0]},${c[1]},${c[2]})`).join(',')})`;
 
 const CLEAR = 0;
@@ -95,7 +133,7 @@ const greyOf = (pal: PaletteKey) => { const [r, g, b] = PALETTES[pal].cls[CLASS_
 export function paintResult(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, style: 'continuous' | 'classes', pal: PaletteKey = 'semaforo', model: ClassPaint = DEFAULT_PAINT): Uint32Array {
   const out = new Uint32Array(pct.length);
   const GREY = greyOf(pal);
-  const lut = Array.from({ length: 101 }, (_, i) => { const [r, g, b] = rampColor(i / 100, pal, model.direction); return rgba(r, g, b); });
+  const lut = Array.from({ length: 101 }, (_, i) => { const [r, g, b] = modelRampColor(i / 100, model, pal); return rgba(r, g, b); });
   const cl: Record<number, number> = {};
   for (const [k, [r, g, b]] of Object.entries(classRgb(model, pal))) cl[Number(k)] = rgba(r, g, b);
   for (let i = 0; i < out.length; i++) {

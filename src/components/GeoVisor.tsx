@@ -14,7 +14,7 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } from '@/lib/geo/data';
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
-import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, rampCss, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, modelRampColor, modelRampCss, modelRampHex, paintResult, type PaletteKey } from '@/lib/geo/paint';
 import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import { normalizeBreaks } from '@/lib/geo/classes';
 import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
@@ -295,8 +295,10 @@ export default function GeoVisor(props: Props) {
     : { status: 'nodata' as const, s: null, pct: null, cls: 0, vetoed: false, lat: pt.lat, lon: pt.lon, rows: [] }), labelOf), [points, data, dRules, rm, labelOf]);
   const rankRows = useMemo<RankRow[]>(() => ranked.map((r) => ({
     key: r.id, rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, label: r.label, status: r.status, vetoed: r.vetoed,
-    color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF',
-  })), [ranked, RHEX]);
+    // «Continuo»: el color que la misma rampa del fondo asigna a su índice (así el punto no desentona con el mapa);
+    // «N clases»: el de su clase. El nombre de la clase va siempre en texto (lista, tooltip, ficha).
+    color: r.status !== 'ok' ? '#9CA3AF' : style === 'continuous' && r.pct !== null ? modelRampHex(r.pct / 100, rm, palette) : RHEX[r.cls] ?? '#9CA3AF',
+  })), [ranked, RHEX, style, rm, palette]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
     id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
@@ -337,9 +339,9 @@ export default function GeoVisor(props: Props) {
   const extremeName = rm.names[rm.direction === 'risk' ? rm.n - 1 : 0];
   const zoneRows = useMemo<ZoneRowView[] | null>(() => (zoneStats ? defaultZoneOrder(zoneStats).map((z) => ({
     key: String(z.index), name: z.name, meanPct: z.meanPct, ha: z.ha, classPct: z.classPct, points: points.length ? z.points : null,
-    color: z.meanPct === null ? undefined : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`,
+    color: z.meanPct === null ? undefined : `rgb(${modelRampColor(z.meanPct / 100, rm, palette).join(',')})`,
     ...(popExp ? { pop: popExp.perZone[z.index]?.evaluated ?? 0, popExtremePct: popExp.perZone[z.index]?.extremePct ?? null } : {}),
-  })) : null), [zoneStats, points.length, palette, rm.direction, popExp]);
+  })) : null), [zoneStats, points.length, palette, rm, popExp]);
   const onZoneSel = useCallback((key: string) => {
     setSelZone(key);
     const f = zoneVec?.fc.features[Number(key)];
@@ -414,7 +416,7 @@ export default function GeoVisor(props: Props) {
     };
     // Coroplético: la capa de zonas elegida se rellena con el color del índice medio de cada zona (gris = sin área evaluada).
     if (choro && zoneStats && zoneVec?.id === v.id) {
-      base.fills = zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`));
+      base.fills = zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${modelRampColor(z.meanPct / 100, rm, palette).join(',')})`));
       base.labels = zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`);
     }
     return base;
@@ -527,8 +529,8 @@ export default function GeoVisor(props: Props) {
       // Resultado continuo: la leyenda de clases sola no explica los colores del mapa, se añade la rampa 0–100.
       const gx = W - lw - 2 * f, gw = lw - 20 * f, gy = H - lh - 4 * f;
       const grad = ctx.createLinearGradient(gx, 0, gx + gw, 0);
-      // En riesgo la rampa va al revés (lo alto es lo malo): se muestrean las paradas con `rampColor`.
-      PALETTES[palette].stops.forEach(([t]) => { const [r, g, b] = rampColor(t, palette, rm.direction); grad.addColorStop(t, `rgb(${r},${g},${b})`); });
+      // Misma rampa que el mapa (sale del modelo de clases): se muestrea en 11 pasos.
+      for (let k = 0; k <= 10; k++) { const [r, g, b] = modelRampColor(k / 10, rm, palette); grad.addColorStop(k / 10, `rgb(${r},${g},${b})`); }
       ctx.fillStyle = grad; ctx.fillRect(gx, gy, gw, 10 * f);
       ctx.fillStyle = '#E2E8F0'; ctx.font = `500 ${10 * f}px system-ui, sans-serif`;
       ctx.fillText('0', gx, gy + 22 * f); ctx.fillText('50', gx + gw / 2 - 6 * f, gy + 22 * f); ctx.fillText(`100 (${T.noun})`, gx + gw - 74 * f, gy + 22 * f);
@@ -730,7 +732,7 @@ export default function GeoVisor(props: Props) {
           {tab === 'zonas' && (
             <GeoZonesPanel
               layers={zoneLayers} sel={geo.zonal} ready={!!(data && ev && rules.length > 0)} rows={zoneRows} classNames={rm.names} direction={rm.direction}
-              rampCss={rampCss(palette, rm.direction)} choropleth={choro} onChoropleth={setChoro} nPoints={points.length}
+              rampCss={modelRampCss(rm, palette)} choropleth={choro} onChoropleth={setChoro} nPoints={points.length}
               selectedKey={selZone} onSelect={onZoneSel} onGoLayers={() => setTab('capas')}
               extremeName={extremeName}
               expo={popExp && popPts ? { byClass: popExp.byClass, evaluated: popExp.evaluated, notEvaluated: popExp.notEvaluated, outside: popExp.outside, total: popExp.total, skipped: popPts.skipped } : null}
