@@ -18,6 +18,10 @@ type Props = {
   /** Advertencia sobre la calidad de lo que se va a publicar (p. ej. pesos inconsistentes, CR ≥ 0.10). */
   warn?: string;
   build: () => Promise<{ b64: string; meta: unknown }>;
+  /** Interruptor GLOBAL de puntos y ranking en la vista pública (por defecto apagado). */
+  showPoints: boolean;
+  onShowPoints: (on: boolean) => void;
+  nPoints: number;
 };
 
 export default function GeoPublishPanel(p: Props) {
@@ -56,6 +60,16 @@ export default function GeoPublishPanel(p: Props) {
       <label className="gv-check">
         <input type="checkbox" checked={p.isPublic} onChange={(e) => p.onTogglePublic(e.target.checked)} /> Hacer público con enlace
       </label>
+      <label className="gv-check">
+        <input type="checkbox" checked={p.showPoints} onChange={(e) => p.onShowPoints(e.target.checked)} /> Mostrar puntos y ranking en la vista pública
+      </label>
+      {p.showPoints ? (
+        <p className="gv-hint warn" role="status">
+          Los nombres y ubicaciones de {p.nPoints === 1 ? 'tu punto' : `tus ${p.nPoints} puntos`} serán públicos para cualquiera con el enlace, junto con su índice, clase y puesto. Se publican al pulsar «{status ? 'Actualizar el mapa publicado' : 'Publicar el mapa'}».
+        </p>
+      ) : (
+        <p className="gv-hint">Apagado: la vista pública no recibe tus puntos (ni sus nombres ni ubicaciones).</p>
+      )}
       {p.isPublic && (
         <div className="linkbox">
           <input type="text" readOnly value={url} aria-label="Enlace público" onFocus={(e) => e.target.select()} />

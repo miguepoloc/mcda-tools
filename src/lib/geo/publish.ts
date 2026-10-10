@@ -6,6 +6,14 @@ import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
 import type { SigParts } from './publishSig.ts';
+import type { PublishedPoint } from './points.ts';
+
+/** Puntos que la vista pública debe mostrar: solo con `showPoints` y una lista válida (publicaciones anteriores → null). */
+export function publishedPoints(meta: { showPoints?: boolean; points?: unknown }): PublishedPoint[] | null {
+  if (meta.showPoints !== true || !Array.isArray(meta.points)) return null;
+  const out = (meta.points as Partial<PublishedPoint>[]).filter((p) => p && typeof p.name === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)) as PublishedPoint[];
+  return out.length ? out : null;
+}
 
 /** Códigos del plano de clase publicado. */
 export const CODE_EXCLUDED = 0;
@@ -30,6 +38,10 @@ type PublishedBase = {
   sig?: string;
   /** Firma por partes (pesos, reglas, umbrales, capas, área) para decir QUÉ cambió. Ausente en publicaciones anteriores. */
   sigParts?: SigParts;
+  /** Puntos con su ranking, ya calculados. SOLO viajan si el dueño activó «mostrar puntos y ranking» (`showPoints`):
+   * el meta completo lo recibe cualquiera con el enlace. Campos opcionales y aditivos: no suben la versión del meta. */
+  points?: PublishedPoint[];
+  showPoints?: boolean;
 };
 
 /** v1: siempre aptitud con 3 clases (alta / moderada / no apta); el plano de clase codifica la vetada como 4. */

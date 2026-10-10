@@ -3,7 +3,7 @@
  * alimentan o lo recortan, área); nombres, estilo, visibilidad, orden u opacidad no. Puro. */
 import type { GeoConfig, GeoGrid } from '../types.ts';
 
-export type SigPart = 'pesos' | 'reglas' | 'umbrales' | 'capas' | 'area';
+export type SigPart = 'pesos' | 'reglas' | 'umbrales' | 'capas' | 'area' | 'puntos';
 export type SigParts = Record<SigPart, string>;
 
 export const SIG_PART_LABEL: Record<SigPart, string> = {
@@ -12,8 +12,9 @@ export const SIG_PART_LABEL: Record<SigPart, string> = {
   umbrales: 'las clases del mapa (cortes, nombres, colores o dirección del índice)',
   capas: 'las capas que alimentan o recortan el cálculo',
   area: 'el área de estudio',
+  puntos: 'los puntos y su ranking en la vista pública',
 };
-const ORDER: SigPart[] = ['pesos', 'reglas', 'umbrales', 'capas', 'area'];
+const ORDER: SigPart[] = ['pesos', 'reglas', 'umbrales', 'capas', 'area', 'puntos'];
 
 export type SigInput = {
   criteria: { id: string }[];
@@ -28,6 +29,9 @@ export type SigInput = {
   layers: Record<string, { role: 'criterion' | 'exclusion' | 'area'; min: number; max: number; bytes?: number }>;
   packId?: string;
   grid?: GeoGrid;
+  /** Puntos con ranking: solo cuentan si `show` (el interruptor de la vista pública). Con `show` apagado la firma es
+   * la misma tengan o no puntos: lo publicado no cambia. Ausente = sin puntos. */
+  points?: { show: boolean; list: { name: string; lat: number; lon: number }[] };
 };
 
 /** JSON con las claves ordenadas: el mismo contenido da siempre el mismo texto. */
@@ -46,7 +50,10 @@ export function hash36(str: string): string {
   return (h >>> 0).toString(36);
 }
 
-const byFirst = (a: unknown[], b: unknown[]) => (String(a[0]) < String(b[0]) ? -1 : 1);
+/** Valor de la parte `puntos` cuando no se publican puntos. */
+export const PUNTOS_OFF = hash36(stableStringify('off'));
+
+const byFirst =(a: unknown[], b: unknown[]) => (String(a[0]) < String(b[0]) ? -1 : 1);
 
 export function publishParts(inp: SigInput): SigParts {
   // Reglas que de verdad se calculan: su capa existe.
@@ -71,13 +78,23 @@ export function publishParts(inp: SigInput): SigParts {
     umbrales: hash36(stableStringify(inp.classSig !== undefined ? ['clases', inp.classSig] : [Math.round(inp.thresholds.alta * 1e4), Math.round(inp.thresholds.media * 1e4)])),
     capas: hash36(stableStringify(layers)),
     area: hash36(stableStringify([inp.packId ?? '', inp.grid ?? null])),
+    // Los valores (índice, clase, puesto) dependen de pesos, reglas, umbrales, capas y área, que ya tienen su parte:
+    // aquí solo entra QUÉ puntos se publican y si se publican.
+    puntos: hash36(stableStringify(inp.points?.show
+      ? ['on', inp.points.list.map((p) => [p.name, Math.round(p.lat * 1e6), Math.round(p.lon * 1e6)]).sort((a, b) => (String(a) < String(b) ? -1 : 1))]
+      : 'off')),
   };
 }
 
 /** Partes que difieren entre lo publicado y lo actual (en orden fijo). Vacío = al día. */
 export function changedParts(published: Partial<SigParts> | null | undefined, current: SigParts): SigPart[] {
   if (!published) return [];
-  return ORDER.filter((k) => published[k] !== undefined && published[k] !== current[k]);
+  // Una publicación anterior a los puntos no trae esa parte: equivale a «sin puntos publicados» (así, activar el
+  // interruptor después sí la marca como desactualizada). Con las demás partes, ausente = no se afirma nada.
+  return ORDER.filter((k) => {
+    const was = k === 'puntos' ? published[k] ?? PUNTOS_OFF : published[k];
+    return was !== undefined && was !== current[k];
+  });
 }
 
 /** Texto para el aviso: «los pesos de los criterios y las reglas de idoneidad». */

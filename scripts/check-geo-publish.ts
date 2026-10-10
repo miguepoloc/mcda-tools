@@ -52,5 +52,25 @@ ok('base64 ida y vuelta (100 KB)', fromBase64(toBase64(rnd)).every((v, i) => v =
   ok('v2: 4 y 8 son clases; la vetada conserva su código; 0 y 254 se mantienen', nw.cls[1] === 4 && nw.cls[2] === 8 && nw.cls[3] === CLASS_VETO && nw.mask[4] === MASK_EXCLUDED && nw.mask[5] === MASK_NODATA);
   ok('códigos consecutivos: CLASS_VETO y CODE_NODATA no chocan con 1..8', CLASS_VETO > 8 && (CLASS_VETO as number) !== CODE_NODATA && CODE_EXCLUDED === 0 && CODE_NODATA === 254);
 }
+// --- puntos publicados: campos aditivos, sin subir la versión del meta
+{
+  const { publishedPoints } = await import('../src/lib/geo/publish.ts');
+  const base = { grid: { crs: 'EPSG:32618', width: 4, height: 1, resM: 100, haPerPixel: 1, transform: [100, 0, 0, 0, -100, 0] as [number, number, number, number, number, number] },
+    bounds: { west: 0, south: 0, east: 1, north: 1 }, weights: [], cr: 0, nExperts: 0, weightsOrigin: '', evaluableHa: 100 };
+  const pts = [
+    { name: 'A', lat: 11.2, lon: -74.1, pct: 80, cls: 3, status: 'ok' as const, rank: 1 },
+    { name: 'B', lat: 11.3, lon: -74.2, pct: null, cls: 0, status: 'excluded' as const, rank: null },
+  ];
+  const v2off: PublishedMeta = { ...base, v: 2, direction: 'suitability', vetoHa: 0, exclHa: 0, classes: [{ name: 'x', from: 0, to: 1, ha: 1, pct: 100 }] };
+  ok('meta sin points (publicación anterior): no hay puntos', publishedPoints(v2off) === null);
+  ok('points presentes pero showPoints ausente/falso: la vista no los usa', publishedPoints({ ...v2off, points: pts }) === null && publishedPoints({ ...v2off, points: pts, showPoints: false }) === null);
+  const on = JSON.parse(JSON.stringify({ ...v2off, points: pts, showPoints: true })) as PublishedMeta;
+  const got = publishedPoints(on);
+  ok('showPoints: devuelve la lista (sobrevive a JSON)', got?.length === 2 && got[0].rank === 1 && got[1].pct === null && got[1].status === 'excluded');
+  ok('el meta con puntos no cambia v ni publishedView', on.v === 2 && JSON.stringify(publishedView(on)) === JSON.stringify(publishedView(v2off)));
+  ok('lista basura o vacía = sin puntos', publishedPoints({ showPoints: true, points: [] }) === null && publishedPoints({ showPoints: true, points: 'x' }) === null && publishedPoints({ showPoints: true, points: [{ foo: 1 }] }) === null);
+  const v1p: PublishedMeta = { ...base, v: 1, thresholds: { alta: 0.7, media: 0.45 }, classes: { alta: 1, media: 1, noapta: 1, excl: 0 }, pct: { alta: 1, media: 1, noapta: 1 } };
+  ok('v1 sin points sigue leyéndose', publishedPoints(v1p) === null && publishedView(v1p).classes.length === 3);
+}
 console.log(fails === 0 ? '\nTodo OK (check-geo-publish)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);

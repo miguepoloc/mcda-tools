@@ -491,11 +491,12 @@ export default function GeoVisor(props: Props) {
 
   // ------------------------------------------------------------------ publicar
   const resultSig = useMemo(() => {
-    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? ""]);
+    // Los puntos solo entran con el interruptor encendido: sin él la firma es la de siempre.
+    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : [])]);
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
-  }, [weightResult, geo.rules, setup, layersSig, geo.packId]);
+  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points]);
 
   // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
   const sigParts = useMemo(() => {
@@ -506,8 +507,9 @@ export default function GeoVisor(props: Props) {
       thresholds: { alta: setup.breaks[setup.breaks.length - 1] ?? 0.7, media: setup.breaks[0] ?? 0.45 }, classSig: publishClassSig(setup),
       layers: Object.fromEntries(Object.entries(data.info).map(([k, l]) => [k, { role: l.role, min: l.min, max: l.max, bytes: l.bytes }])),
       packId: geo.packId, grid: data.grid,
+      points: { show: !!geo.publicPoints, list: points },
     });
-  }, [data, criteria, weightResult, geo.rules, geo.packId, setup]);
+  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points]);
 
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
@@ -528,6 +530,8 @@ export default function GeoVisor(props: Props) {
       evaluableHa: stats.evaluableHa,
       attribution: data.attribution, sig: resultSig, sigParts: sigParts ?? undefined,
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
+      // Con el interruptor apagado NO viaja ni la lista: el meta lo recibe cualquiera con el enlace.
+      ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked) } : {}),
     };
     return { b64, meta };
   }
@@ -622,6 +626,8 @@ export default function GeoVisor(props: Props) {
               {props.share && (
                 <GeoPublishPanel sb={supabase} projectId={props.projectId} isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
                   ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
+                  showPoints={!!geo.publicPoints} nPoints={points.length}
+                  onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
                   warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined} />
               )}
               {isAdmin && supabase && !geo.packId && (
