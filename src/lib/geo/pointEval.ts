@@ -7,7 +7,7 @@ import { classOf, CLASS_VETO, indexPixel, MASK_EXCLUDED, MASK_NODATA, usableRule
 
 /** `suit` = idoneidad 0–1 de la regla, `weight` = peso reescalado entre los criterios con dato y `part` = suit × weight (su aporte
  * al índice); los tres son null cuando el criterio no tiene dato (no vota). Aditivos: `contrib` sigue siendo el texto de siempre. */
-export type PointRow = { label: string; value: string; contrib: string; veto: boolean; suit?: number | null; weight?: number | null; part?: number | null };
+export type PointRow = { /** Clave interna de la capa (solo para mapear al nombre del criterio; NUNCA se publica). */ key?: string; label: string; value: string; contrib: string; veto: boolean; suit?: number | null; weight?: number | null; part?: number | null };
 export type PointStatus = 'ok' | 'excluded' | 'outside' | 'nodata';
 export type PointEval = {
   status: PointStatus;
@@ -45,7 +45,7 @@ export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], cfg: 
     const value = Number.isNaN(x) ? 'sin dato' : `${Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2)} ${info?.unit ?? ''}`.trim();
     const votes = !Number.isNaN(x);
     return {
-      label: info?.label ?? r.key, value, contrib: votes ? `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}` : 'no vota', veto,
+      key: r.key, label: info?.label ?? r.key, value, contrib: votes ? `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}` : 'no vota', veto,
       suit: votes ? s : null, weight: votes ? wn : null, part: votes ? s * wn : null,
     };
   });

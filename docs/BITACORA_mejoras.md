@@ -135,3 +135,13 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Decisiones:** una columna que crece, no dos; fuente de 12 px a 1600 px; la muestra de color es la de la clase aunque el estilo sea continuo.
 - **Verificación:** 18 verificaciones nuevas en `check-geo-report`; typecheck, `npm test` y `test:excel` en verde.
 - **Pendiente (visual):** anchos de columna, elipsis, solapes, salida PDF; dos columnas si se quiere.
+
+### 17. Desglose por criterio en los puntos de la vista pública — merge de `b37098b`
+- **Por qué:** captura del docente: en `/p/<token>` al abrir un punto solo se veían coordenadas; el editor muestra la ficha completa (valor, idoneidad, peso, aporte, veto). La vista pública se diseñó para no exponer capas de entrada y los puntos heredaron esa regla sin cuestionarla.
+- **Qué:** el punto publicado lleva `rows?` opcional (nombre de criterio, valor con unidad, idoneidad, peso, aporte a 3 decimales y veto) tomado del mismo `pointEval`, **solo con el interruptor «Mostrar puntos y ranking» encendido**. La vista pública lo muestra con `PointFicha`. Sin subir `v` del meta; publicaciones anteriores siguen igual (coordenadas); `rows` se sanea al leerlo.
+- **Privacidad:** la etiqueta es el nombre del criterio (el de `meta.weights`), nunca el nombre de archivo ni claves de capa (sin mapeo cae a «Criterio N»). El aviso del interruptor ahora dice que se publica el valor de cada criterio en la ubicación de cada punto y que las capas de entrada no se publican. Quien tenga el enlace puede inferir valores de las capas en esas coordenadas: es lo que se advierte.
+- **Tamaño:** 300 puntos × 6 criterios ≈ 180 KB sin tope; con tope de 100 primeros puestos ≈ 88 KB. La lista pública avisa «El desglose por criterio se publica para los 100 primeros puestos» cuando aplica.
+- **Se queda igual (decisión pendiente del docente):** un clic libre en el mapa público (fuera de los puntos publicados) sigue mostrando solo % y clase; mostrar el desglose exigiría publicar capas.
+- **Firma:** `publishSig` sin cambios (el desglose depende de pesos, reglas, capas y área, que ya firman, y de `puntos`).
+- **Verificación:** `check-geo-points` y `check-geo-publish` ampliadas; typecheck, `npm test` y `test:excel` en verde.
+- **Pendiente (visual):** mirar `/p/<token>` con puntos publicados y la nota de «100 primeros puestos». Los criterios sin dato publican `suit/weight/contrib` en `null` («no vota»).

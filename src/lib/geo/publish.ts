@@ -6,13 +6,18 @@ import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
 import type { SigParts } from './publishSig.ts';
-import type { PublishedPoint } from './points.ts';
+import { sanitizePublishedRows, type PublishedPoint } from './points.ts';
 import type { PublishedZones } from './zonal.ts';
 
 /** Puntos que la vista pública debe mostrar: solo con `showPoints` y una lista válida (publicaciones anteriores → null). */
 export function publishedPoints(meta: { showPoints?: boolean; points?: unknown }): PublishedPoint[] | null {
   if (meta.showPoints !== true || !Array.isArray(meta.points)) return null;
-  const out = (meta.points as Partial<PublishedPoint>[]).filter((p) => p && typeof p.name === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)) as PublishedPoint[];
+  const out = (meta.points as Partial<PublishedPoint>[]).filter((p) => p && typeof p.name === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)).map((p) => {
+    // `rows` es opcional (publicaciones anteriores no lo traen) y se valida: lo mal formado se descarta sin tumbar el punto.
+    const { rows, ...rest } = p as PublishedPoint;
+    const clean = sanitizePublishedRows(rows);
+    return (clean.length ? { ...rest, rows: clean } : rest) as PublishedPoint;
+  });
   return out.length ? out : null;
 }
 

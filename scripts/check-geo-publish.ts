@@ -69,6 +69,14 @@ ok('base64 ida y vuelta (100 KB)', fromBase64(toBase64(rnd)).every((v, i) => v =
   ok('showPoints: devuelve la lista (sobrevive a JSON)', got?.length === 2 && got[0].rank === 1 && got[1].pct === null && got[1].status === 'excluded');
   ok('el meta con puntos no cambia v ni publishedView', on.v === 2 && JSON.stringify(publishedView(on)) === JSON.stringify(publishedView(v2off)));
   ok('lista basura o vacía = sin puntos', publishedPoints({ showPoints: true, points: [] }) === null && publishedPoints({ showPoints: true, points: 'x' }) === null && publishedPoints({ showPoints: true, points: [{ foo: 1 }] }) === null);
+  // desglose por criterio: aditivo y opcional
+  const withRows = [{ ...pts[0], rows: [{ label: 'Pendiente', value: '3.20 %', suit: 0.8, weight: 0.4, contrib: 0.32 }, { label: 'Sin dato', value: 'sin dato', suit: null, weight: null, contrib: null }, { label: 'Río', value: '5 m', suit: 0, weight: 0.2, contrib: 0, veto: true }] }, pts[1]];
+  const wr = publishedPoints(JSON.parse(JSON.stringify({ ...v2off, points: withRows, showPoints: true })));
+  ok('rows sobrevive a JSON y a publishedPoints', wr?.[0].rows?.length === 3 && wr[0].rows[0].label === 'Pendiente' && wr[0].rows[2].veto === true && wr[1].rows === undefined);
+  ok('publicación antigua (sin rows) sigue funcionando', got?.every((p) => p.rows === undefined) === true);
+  const bad = publishedPoints({ showPoints: true, points: [{ ...pts[0], rows: 'basura' }, { ...pts[0], name: 'C', rows: [null, { label: 5 }] }, { ...pts[0], name: 'D', rows: [{ label: 'x', value: 'y', suit: 'n', weight: 1, contrib: 1, archivo: 'capa.tif' }] }] });
+  ok('rows mal formado: el punto sobrevive sin desglose', bad?.length === 3 && bad[0].rows === undefined && bad[1].rows === undefined);
+  ok('rows: números inválidos = no vota y no pasan claves extra', bad?.[2].rows?.length === 1 && bad[2].rows[0].suit === null && !JSON.stringify(bad[2]).includes('capa.tif'));
   const v1p: PublishedMeta = { ...base, v: 1, thresholds: { alta: 0.7, media: 0.45 }, classes: { alta: 1, media: 1, noapta: 1, excl: 0 }, pct: { alta: 1, media: 1, noapta: 1 } };
   ok('v1 sin points sigue leyéndose', publishedPoints(v1p) === null && publishedView(v1p).classes.length === 3);
 }

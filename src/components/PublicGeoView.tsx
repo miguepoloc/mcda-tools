@@ -10,10 +10,11 @@ import { buildOverlayMap } from '@/lib/geo/overlay';
 import { PALETTES, classHexOf, modelRampHex, paintResult } from '@/lib/geo/paint';
 import { decodePlanes, publishedPoints, publishedView, publishedZones, type PublishedMeta } from '@/lib/geo/publish';
 import { DIR_TEXT } from '@/lib/geo/classes';
-import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
+import { MAX_PUBLISHED_BREAKDOWN, publishedRowsToPointRows, rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
 import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoPointsList, { type RankRow } from './GeoPointsList';
+import PointFicha from './GeoPointFicha';
 import GeoZonesTable from './GeoZonesTable';
 import { BasemapChips, PaletteChips, ResultLegend, StyleChips } from './GeoHud';
 import { Icon, ICONS, usePalette } from './GeoBits';
@@ -86,6 +87,12 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
       label: !ok ? STATUS_LABEL[p.status as Exclude<typeof p.status, 'ok'>] : veto ? model.names[view.direction === 'risk' ? model.n - 1 : 0] : (model.names[p.cls - 1] ?? `Clase ${p.cls}`),
     };
   }), [pubPoints, HEX, model, view.direction, style, palette]);
+  // Ficha en línea con el desglose por criterio que el dueño publicó (`rows`); sin él (publicación anterior) no hay detalle.
+  const renderPointDetail = useCallback((r: RankRow) => {
+    const rows = publishedRowsToPointRows(pubPoints?.[Number(r.key)]?.rows);
+    if (!rows.length) return <p className="gv-hint mono">{r.lat.toFixed(5)}, {r.lon.toFixed(5)}</p>;
+    return <PointFicha pct={r.pct} label={r.label} color={r.status === 'ok' ? r.color : undefined} lat={r.lat} lon={r.lon} rows={rows} vetoLabel={r.vetoed ? T.critical : undefined} variant="inline" />;
+  }, [pubPoints, T]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
     id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
@@ -132,10 +139,10 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
               <section className="gv-sec">
                 <GeoPointsList
                   rows={rankRows} heading={rankHeading(view.direction)} criticalLabel={T.critical}
-                  selectedKey={selPoint}
+                  selectedKey={selPoint} renderDetail={pubPoints?.some((p) => p.rows?.length) ? renderPointDetail : undefined}
                   onSelect={(k) => { setSelPoint(k); const r = k ? rankRows.find((x) => x.key === k) : null; if (r) mapRef.current?.panTo(r.lat, r.lon); }}
                   onCenter={(k) => { const r = rankRows.find((x) => x.key === k); if (r) { setSelPoint(k); mapRef.current?.flyTo(r.lat, r.lon, 13); } }} />
-                <p className="gv-hint">Cada punto toma el índice de la celda donde cae. Los puntos sin evaluar van al final, sin puesto.</p>
+                <p className="gv-hint">Cada punto toma el índice de la celda donde cae. Los puntos sin evaluar van al final, sin puesto.{pubPoints?.some((p) => p.status === 'ok' && !p.rows?.length) && pubPoints.some((p) => p.rows?.length) ? ` El desglose por criterio se publica para los ${MAX_PUBLISHED_BREAKDOWN} primeros puestos.` : ''}</p>
               </section>
             )}
             {pubZones && (
