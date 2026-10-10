@@ -182,7 +182,13 @@ export function directionLine(direction: Direction): string {
 }
 
 // ------------------------------------------------------------------ puntos (regla: sin puesto fuera del área)
-export type ComposePoint = { lat: number; lon: number; rank: number | null; color: string; name: string };
+export type ComposePoint = {
+  lat: number; lon: number; rank: number | null; color: string; name: string;
+  /** Índice 0–100 (null = sin evaluar: nunca se imprime «0 %»). Opcional: solo lo necesita la tabla de ranking. */
+  pct?: number | null;
+  /** Nombre de la clase (o del estado si no se evaluó: «Excluido», «Fuera del área evaluada», «Sin dato»). */
+  label?: string;
+};
 /** Separa los puntos evaluados (con puesto) de los que no lo tienen (fuera del área, excluidos o sin dato). */
 export function splitPoints<T extends { rank: number | null }>(points: T[]): { ranked: T[]; unranked: T[] } {
   return { ranked: points.filter((p) => p.rank !== null), unranked: points.filter((p) => p.rank === null) };
@@ -190,6 +196,76 @@ export function splitPoints<T extends { rank: number | null }>(points: T[]): { r
 /** Texto de la fila de leyenda de los puntos sin puesto; null si no hay. */
 export function unrankedNote(n: number): string | null {
   return n > 0 ? `${n} punto${n === 1 ? '' : 's'} sin puesto (fuera del área, excluido${n === 1 ? '' : 's'} o sin dato)` : null;
+}
+
+// ------------------------------------------------------------------ tabla de ranking de puntos
+/** Filas visibles como máximo en la tabla de la lámina; el resto se resume en una línea. */
+export const RANKING_MAX_ROWS = 40;
+/** Alto de una fila de la tabla y de sus subtítulos, en px a 1600 de ancho (se multiplica por `s`). */
+export const RANKING_ROW_H = 20;
+export const RANKING_SUBHEAD_H = 26;
+export const RANKING_MORE_H = 22;
+
+export type RankingRow = { rank: string; name: string; value: string; classLabel: string; color: string; ranked: boolean };
+export type RankingTable = {
+  /** «Ranking de puntos · Mayor riesgo primero» / «· Más apto primero». */
+  heading: string;
+  rows: RankingRow[];
+  /** Índice dentro de `rows` donde empiezan los «Sin puesto» (= rows.length si no hay visibles). */
+  unrankedFrom: number;
+  /** Cuántos «Sin puesto» hay visibles (para dibujar el subtítulo). */
+  unrankedShown: number;
+  /** «y N puntos más (ver el CSV o el informe)» cuando se truncó; null si todo cabe. */
+  more: string | null;
+  total: number;
+};
+
+/** Encabezado de la tabla según la dirección del índice. */
+export const rankingHeading = (direction: Direction) => `Ranking de puntos · ${direction === 'risk' ? 'Mayor riesgo primero' : 'Más apto primero'}`;
+
+/** Filas de la tabla de ranking. El orden y los puestos son los de `points` (el mismo `ranked` de la lista del Geovisor): aquí
+ * solo se reordena de forma estable para dejar los «Sin puesto» al final y se trunca a `max` filas. Un punto sin puesto va
+ * sin índice (nunca «0 %»). */
+export function rankingTable(points: ComposePoint[], direction: Direction, max = RANKING_MAX_ROWS): RankingTable {
+  const withRank = points.filter((p) => p.rank !== null);
+  const without = points.filter((p) => p.rank === null);
+  const all = [...withRank, ...without];
+  const shown = all.slice(0, Math.max(0, max));
+  const rows: RankingRow[] = shown.map((p) => {
+    const ranked = p.rank !== null;
+    return {
+      rank: ranked ? String(p.rank) : '—',
+      name: p.name.trim() || '(sin nombre)',
+      value: ranked && p.pct !== null && p.pct !== undefined ? fmtPct(p.pct, 0) : '',
+      classLabel: p.label ?? '',
+      color: ranked ? p.color : '#9CA3AF',
+      ranked,
+    };
+  });
+  const hidden = all.length - shown.length;
+  const rankedShown = Math.min(withRank.length, shown.length);
+  return {
+    heading: rankingHeading(direction), rows, unrankedFrom: rankedShown, unrankedShown: rows.length - rankedShown,
+    more: hidden > 0 ? `y ${hidden} punto${hidden === 1 ? '' : 's'} más (ver el CSV o el informe)` : null,
+    total: all.length,
+  };
+}
+
+/** Alto en px de salida de la parte de filas de la tabla (sin el encabezado, que depende del ancho): filas, subtítulo
+ * «Sin puesto» y línea «y N más». `s` = escala respecto a 1600 px. */
+export function rankingRowsHeight(t: RankingTable, s: number): number {
+  return (t.rows.length * RANKING_ROW_H + (t.unrankedShown > 0 ? RANKING_SUBHEAD_H : 0) + (t.more ? RANKING_MORE_H : 0)) * s;
+}
+
+/** Recorta `text` con «…» para que mida a lo sumo `maxW` según `measure`. */
+export function fitText(text: string, maxW: number, measure: (s: string) => number): string {
+  if (measure(text) <= maxW) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measure(text.slice(0, mid).trimEnd() + '…') <= maxW) lo = mid; else hi = mid - 1;
+  }
+  return lo > 0 ? text.slice(0, lo).trimEnd() + '…' : '…';
 }
 
 // ------------------------------------------------------------------ opciones y plan
@@ -206,6 +282,10 @@ export type ComposeOptions = {
   zones: boolean;
   referenceIds: string[];
   points: boolean;
+  /** Tabla de ranking de puntos bajo la leyenda (puesto, nombre, índice, clase). */
+  rankingTable: boolean;
+  /** Nombre junto a cada punto del mapa (con descarte de solapes, máx. 40). */
+  pointNames: boolean;
   legend: boolean;
   scaleBar: boolean;
   northArrow: boolean;
@@ -223,6 +303,8 @@ export function planComposition(opts: ComposeOptions, avail: ComposeAvailability
   if (o.result && !avail.result) { o.result = false; warnings.push('No hay resultado calculado: se omite la capa de resultado.'); }
   if (o.zones && !avail.zones) { o.zones = false; warnings.push('El proyecto no tiene zonas elegidas: se omite el coroplético.'); }
   if (o.points && avail.points === 0) { o.points = false; }
+  if (avail.points === 0) { o.rankingTable = false; o.pointNames = false; }
+  if (!o.points) o.pointNames = false;
   const known = new Set(avail.references.map((r) => r.id));
   const missing = o.referenceIds.filter((id) => !known.has(id));
   if (missing.length) warnings.push(`${missing.length} capa(s) de referencia ya no existen y se omiten.`);
@@ -234,7 +316,7 @@ export function planComposition(opts: ComposeOptions, avail: ComposeAvailability
 export function defaultOptions(title: string, avail: ComposeAvailability, basemapKey: string, date: string): ComposeOptions {
   return {
     title, subtitle: '', width: 2400, basemap: true, basemapKey, result: avail.result, style: 'classes',
-    zones: false, referenceIds: avail.references.map((r) => r.id), points: avail.points > 0, legend: true, scaleBar: true, northArrow: true, date,
+    zones: false, referenceIds: avail.references.map((r) => r.id), points: avail.points > 0, rankingTable: avail.points > 0, pointNames: false, legend: true, scaleBar: true, northArrow: true, date,
   };
 }
 

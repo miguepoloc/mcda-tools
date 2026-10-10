@@ -80,7 +80,7 @@ export default function GeoComposeDialog({ initial, avail, basemaps, zoneName, o
     setBusy('');
   };
 
-  const chk = (k: 'result' | 'zones' | 'points' | 'basemap' | 'legend' | 'scaleBar' | 'northArrow', label: string, disabled = false) => (
+  const chk = (k: 'result' | 'zones' | 'points' | 'basemap' | 'legend' | 'rankingTable' | 'pointNames' | 'scaleBar' | 'northArrow', label: string, disabled = false) => (
     <label className="gv-cmp-chk">
       <input type="checkbox" checked={o[k]} disabled={disabled} onChange={(e) => set(k, e.target.checked)} /> {label}
     </label>
@@ -126,6 +126,8 @@ export default function GeoComposeDialog({ initial, avail, basemaps, zoneName, o
           <fieldset>
             <legend>Elementos</legend>
             {chk('legend', 'Leyenda')}
+            {chk('rankingTable', `Tabla de ranking de puntos${avail.points ? ` (${avail.points})` : ''}`, avail.points === 0)}
+            {chk('pointNames', 'Nombre junto a cada punto', avail.points === 0 || !o.points)}
             {chk('scaleBar', 'Escala gráfica')}
             {chk('northArrow', 'Flecha de norte')}
           </fieldset>

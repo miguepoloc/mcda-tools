@@ -128,3 +128,10 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Lógica pura:** `src/lib/geo/share.ts` + `scripts/check-geo-share.ts`.
 - **Verificación:** typecheck, `npm test` y `test:excel` en verde. Merge confirmado solo tras pasar la suite (el anterior se commiteó antes de verificar y dejó un error de tipos; ver entrada 14).
 - **Pendiente (visual y real):** vista de Compartir y Exportar; Leaflet al volver del estado oculto; publicación real contra Supabase (`geo_publish_result`, `is_public`); contraste y responsive del CSS nuevo; escaneo del QR; aspecto del catálogo fuera de `.gv-wrap` (variables de acento redefinidas en `.gs-details`); «Generar enlace nuevo» del token no existe en ese flujo. Al abrir Compartir se cargan las capas, puede tardar («Cargando el mapa…»).
+
+### 16. Lámina: tabla de ranking de puntos — merge de `d0a0365`, `be692e6`
+- **Por qué:** captura del docente: la lámina de «Componer mapa para entregar» numeraba los puntos pero no decía cuál era cuál (sin nombres, índices ni clases); quedaba un espacio vacío bajo la leyenda.
+- **Qué:** tabla bajo la leyenda con puesto, nombre (elipsis), índice % y muestra de color con nombre de clase. Encabezado «Ranking de puntos · Mayor riesgo primero / Más apto primero». «Sin puesto» al final, sin índice. Máx. 40 filas y luego «y N puntos más (ver el CSV o el informe)»; la lámina crece en alto (≈ 800 px con 40 filas a 1600 px de ancho). Orden y puestos salen del `ranked` del Geovisor. Casilla «Nombre junto a cada punto» (apagada) con descarte de solapes por puesto (máx. 40) y halo blanco. El informe ejecutivo no la duplica (ya trae su ranking completo).
+- **Decisiones:** una columna que crece, no dos; fuente de 12 px a 1600 px; la muestra de color es la de la clase aunque el estilo sea continuo.
+- **Verificación:** 18 verificaciones nuevas en `check-geo-report`; typecheck, `npm test` y `test:excel` en verde.
+- **Pendiente (visual):** anchos de columna, elipsis, solapes, salida PDF; dos columnas si se quiere.

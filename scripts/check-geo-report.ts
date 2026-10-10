@@ -2,7 +2,7 @@
 // gráfica, distribución de la lámina, leyenda de N clases, regla de puntos sin puesto, PDF mínimo y armado del informe.
 import {
   composeFileName, defaultOptions, directionLine, fitView, fmtDateEs, fmtNum, fmtPct, footerLines, frameLayout, geomPaths, legendRows,
-  metersPerPixel, niceScale, pickZoom, planComposition, project, splitPoints, tileUrl, tilesFor, unrankedNote, wrapLines, mercX, mercY,
+  metersPerPixel, niceScale, rankingTable, rankingRowsHeight, rankingHeading, fitText, RANKING_ROW_H, RANKING_SUBHEAD_H, RANKING_MORE_H, pickZoom, planComposition, project, splitPoints, tileUrl, tilesFor, unrankedNote, wrapLines, mercX, mercY,
   type ComposeAvailability,
 } from '../src/lib/geo/compose.ts';
 import { jpegToPdf } from '../src/lib/geo/pdfImage.ts';
@@ -238,6 +238,52 @@ for (const [n, dir] of [[3, 'suitability'], [5, 'risk'], [8, 'risk']] as const) 
   const none = buildGeoReport({ summary: { ...mkSummary(3, 'suitability', false), nExperts: 0 }, ahp: null });
   ok(none.sections.find((x) => x.id === 'weights')!.paragraphs.some((p) => /pesan lo mismo/.test(p)), 'informe: sin expertos, pesos iguales');
   ok(/CR no aplica|pesos iguales/.test(buildGeoMethodologyParagraph({ criteria: [{ name: 'A', weight: 0.5 }, { name: 'B', weight: 0.5 }], expertCount: 0, direction: 'suitability', nClasses: 3 }, 'es')), 'metodología de mapas: sin expertos');
+}
+
+// ---------------------------------------------------------------- tabla de ranking de puntos en la lámina
+{
+  const mk = (n: number, nullAt: number[] = []) => Array.from({ length: n }, (_, i) => ({
+    lat: 0, lon: 0, name: `P${i + 1}`, color: '#123456', rank: nullAt.includes(i) ? null : i + 1,
+    pct: nullAt.includes(i) ? null : 90 - i, label: nullAt.includes(i) ? 'Excluido' : 'Alta',
+  }));
+  ok(rankingHeading('risk') === 'Ranking de puntos · Mayor riesgo primero' && rankingHeading('suitability') === 'Ranking de puntos · Más apto primero', 'rankingHeading: según la dirección');
+  const t = rankingTable(mk(5), 'risk');
+  ok(t.rows.length === 5 && t.more === null && t.unrankedShown === 0 && t.rows[2].rank === '3' && t.rows[2].value === '88 %' && t.rows[2].classLabel === 'Alta', 'rankingTable: puesto, nombre, índice y clase');
+  ok(t.heading === rankingHeading('risk'), 'rankingTable: encabezado por dirección');
+  // sin puesto al final, sin índice (nunca 0 %)
+  const mix = [...mk(3, [0])]; // P1 sin puesto, P2 y P3 con puesto
+  const tm = rankingTable(mix, 'suitability');
+  ok(tm.rows.map((r) => r.name).join() === 'P2,P3,P1' && tm.unrankedFrom === 2 && tm.unrankedShown === 1, 'rankingTable: «Sin puesto» al final');
+  ok(tm.rows[2].rank === '—' && tm.rows[2].value === '' && !tm.rows.some((r) => /^0 ?%/.test(r.value)) && tm.rows[2].classLabel === 'Excluido', 'rankingTable: sin puesto no lleva índice ni 0 %');
+  // pct 0 de un punto con puesto sí se imprime como 0 %
+  ok(rankingTable([{ lat: 0, lon: 0, name: 'Z', color: '#000', rank: 1, pct: 0, label: 'Baja' }], 'risk').rows[0].value === '0 %', 'rankingTable: 0 % real de un punto evaluado sí aparece');
+  // truncado a 40 con la línea «y N más»
+  const big = rankingTable(mk(55), 'risk');
+  ok(big.rows.length === 40 && big.more === 'y 15 puntos más (ver el CSV o el informe)' && big.total === 55, 'rankingTable: 40 filas y «y 15 puntos más»');
+  ok(rankingTable(mk(41), 'risk').more === 'y 1 punto más (ver el CSV o el informe)', 'rankingTable: singular «y 1 punto más»');
+  ok(rankingTable(mk(40), 'risk').more === null, 'rankingTable: exactamente 40 cabe sin línea extra');
+  // truncado cuando hay sin puesto: primero los con puesto
+  const bigMix = rankingTable(mk(45, [3, 44]), 'risk'); // 43 con puesto + 2 sin
+  ok(bigMix.rows.length === 40 && bigMix.unrankedShown === 0 && bigMix.more === 'y 5 puntos más (ver el CSV o el informe)', 'rankingTable: con muchos puntos, los sin puesto quedan fuera del corte');
+  // altura extra
+  ok(rankingRowsHeight(t, 1) === 5 * RANKING_ROW_H, 'rankingRowsHeight: solo filas');
+  ok(rankingRowsHeight(tm, 2) === (3 * RANKING_ROW_H + RANKING_SUBHEAD_H) * 2, 'rankingRowsHeight: subtítulo «Sin puesto» y escala');
+  ok(rankingRowsHeight(big, 1) === 40 * RANKING_ROW_H + RANKING_MORE_H, 'rankingRowsHeight: línea «y N más»');
+  // la lámina crece cuando la tabla es más alta que el mapa
+  const b = { west: -74.2, south: 10.8, east: -73.9, north: 11.3 };
+  const base = frameLayout(1600, b, 0), grown = frameLayout(1600, b, base.map.h + 400);
+  ok(grown.H > base.H && grown.map.h === base.map.h + 400, 'frameLayout: crece en alto cuando la tabla excede el mapa');
+  // elipsis
+  const meas = (s: string) => s.length * 10;
+  ok(fitText('corto', 100, meas) === 'corto' && fitText('Nombre muy largo del punto', 100, meas) === 'Nombre mu…' && meas(fitText('Nombre muy largo del punto', 100, meas)) <= 100, 'fitText: elipsis dentro del ancho');
+  // opciones
+  const av: ComposeAvailability = { result: true, zones: false, points: 3, references: [] };
+  const d = defaultOptions('T', av, 'osm', '2026-10-10');
+  ok(d.rankingTable && !d.pointNames, 'defaultOptions: tabla activa con puntos; nombres apagados');
+  ok(!defaultOptions('T', { ...av, points: 0 }, 'osm', '2026-10-10').rankingTable, 'defaultOptions: sin puntos no hay tabla');
+  const pl = planComposition({ ...d, pointNames: true, points: true }, { ...av, points: 0 }).opts;
+  ok(!pl.rankingTable && !pl.pointNames, 'planComposition: sin puntos se omiten tabla y nombres');
+  ok(!planComposition({ ...d, points: false, pointNames: true }, av).opts.pointNames, 'planComposition: nombres requieren dibujar los puntos');
 }
 
 if (fails) { console.error(`\n${fails} verificación(es) fallaron`); process.exit(1); }
