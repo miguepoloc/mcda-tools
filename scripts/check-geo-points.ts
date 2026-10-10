@@ -131,6 +131,28 @@ ok(Number.isFinite(part.lat) && Number.isFinite(part.lon), 'devuelve lat/lon');
   ok(sanitizePoints(Array.from({ length: 500 }, (_, i) => ({ id: `i${i}`, name: 'n', lat: 0, lon: 0 }))).length === MAX_POINTS, `saneado: tope de ${MAX_POINTS}`);
   const pub = toPublishedPoints(rankPoints(pts, (p) => evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'suitability' }, p), label));
   ok(pub.length === pts.length && !('id' in pub[0]) && pub.filter((p) => p.pct === null).length === 4, 'publicables: sin ids y con pct null si no se evaluó');
+
+  // Excel: hoja «Puntos» solo con valores; los no evaluados con celdas vacías (nunca 0)
+  const { buildGeoWorkbook } = await import('../src/lib/geoExcel.ts');
+  const { pointState } = await import('../src/lib/geo/points.ts');
+  const XLSX = (await import('xlsx-js-style')).default as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const rowsR = rankPoints(pts, (p) => evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'risk' }, p), label);
+  const summary = {
+    title: 'T', objective: '', date: '2026-10-10', crs: 'EPSG:32618', resM: 100, width: W, height: H, cr: 0, nExperts: 0, weightsOrigin: '',
+    criteria: [], classes: [], layers: [], direction: 'risk' as const,
+    points: rowsR.map((r) => ({ rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, classLabel: r.status === 'ok' ? r.label : '', state: pointState(r, 'risk') })),
+    pointsOrder: rankHeading('risk'),
+  };
+  const wb = buildGeoWorkbook(XLSX, summary);
+  ok(wb.SheetNames.includes('Puntos'), 'Excel: existe la hoja «Puntos»');
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets.Puntos, { header: 1, defval: '' }) as unknown[][];
+  ok(String(aoa[0][0]).includes('Mayor riesgo primero') && aoa[2][0] === 'Puesto' && String(aoa[2][4]).includes('riesgo'), 'Excel: encabezado con la dirección');
+  const data = aoa.slice(3, 3 + pts.length);
+  ok(data[0][0] === 1 && data[0][1] === 'veto' && data[0][6] === 'Condición crítica', 'Excel: primer puesto = el veto en riesgo, con su estado');
+  ok(data.slice(-4).every((r) => r[0] === '' && r[4] === '' && r[5] === ''), 'Excel: no evaluados con puesto, índice y clase vacíos (no 0)');
+  ok(aoa.some((r) => String(r[1]).includes('no son fórmulas vivas')), 'Excel: nota de valores calculados');
+  const noPts = buildGeoWorkbook(XLSX, { ...summary, points: [] });
+  ok(!noPts.SheetNames.includes('Puntos'), 'Excel: sin puntos no hay hoja');
 }
 console.log(fails === 0 ? '\nTodo OK (check-geo-points)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);
