@@ -1646,3 +1646,7 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 .gv-pbtn{appearance:none;width:36px;height:36px;display:inline-grid;place-items:center;background:transparent;border:0;border-radius:8px;color:var(--muted);cursor:pointer}
 .gv-pbtn:hover{background:var(--surface2);color:var(--ink)}
 @media (prefers-reduced-motion:no-preference){.gv-pbtn{transition:background .12s,color .12s}}
+
+/* En el Geovisor el header no se queda pegado: al desplazar el panel lateral tapaba la barra del mapa (estilo,
+   paleta, clases) y el panel quedaba a medias bajo la barra. El resto de la app conserva el header fijo. */
+.wrap:has(.gv-wrap) .topbar{position:static}
