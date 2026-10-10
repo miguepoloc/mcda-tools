@@ -5,7 +5,9 @@ import type { GeoData } from './data.ts';
 import { suitability, vetoed } from './membership.ts';
 import { classOf, CLASS_VETO, indexPixel, MASK_EXCLUDED, MASK_NODATA, usableRules, type CriterionRule, type Direction } from './suitability.ts';
 
-export type PointRow = { label: string; value: string; contrib: string; veto: boolean };
+/** `suit` = idoneidad 0–1 de la regla, `weight` = peso reescalado entre los criterios con dato y `part` = suit × weight (su aporte
+ * al índice); los tres son null cuando el criterio no tiene dato (no vota). Aditivos: `contrib` sigue siendo el texto de siempre. */
+export type PointRow = { label: string; value: string; contrib: string; veto: boolean; suit?: number | null; weight?: number | null; part?: number | null };
 export type PointStatus = 'ok' | 'excluded' | 'outside' | 'nodata';
 export type PointEval = {
   status: PointStatus;
@@ -41,7 +43,11 @@ export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], cfg: 
     const veto = vetoed(x, r.veto);
     const wn = wUsed > 0 ? r.weight / wUsed : 0;
     const value = Number.isNaN(x) ? 'sin dato' : `${Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2)} ${info?.unit ?? ''}`.trim();
-    return { label: info?.label ?? r.key, value, contrib: Number.isNaN(x) ? 'no vota' : `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}`, veto };
+    const votes = !Number.isNaN(x);
+    return {
+      label: info?.label ?? r.key, value, contrib: votes ? `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}` : 'no vota', veto,
+      suit: votes ? s : null, weight: votes ? wn : null, part: votes ? s * wn : null,
+    };
   });
   if (Number.isNaN(px.s)) return { status: 'nodata', ...none, rows };
   const cls = px.vetoed ? CLASS_VETO : classOf(px.s, cfg.breaks);

@@ -13,7 +13,7 @@ import { DIR_TEXT } from '@/lib/geo/classes';
 import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
 import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
-import GeoPointsTable, { type RankRow } from './GeoPointsTable';
+import GeoPointsList, { type RankRow } from './GeoPointsList';
 import { BasemapChips, PaletteChips, ResultLegend, StyleChips } from './GeoHud';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import PublicAhp from './PublicAhp';
@@ -84,7 +84,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
     };
   }), [pubPoints, HEX, model, view.direction]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
-    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
   })), [rankRows, T]);
 
@@ -127,10 +127,10 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
             </section>
             {rankRows.length > 0 && (
               <section className="gv-sec">
-                <header><h4>Puntos</h4><span className="gv-badge ok">{rankRows.length}</span></header>
-                <GeoPointsTable
+                <GeoPointsList
                   rows={rankRows} heading={rankHeading(view.direction)} criticalLabel={T.critical}
-                  selectedKey={selPoint} onSelect={setSelPoint}
+                  selectedKey={selPoint}
+                  onSelect={(k) => { setSelPoint(k); const r = k ? rankRows.find((x) => x.key === k) : null; if (r) mapRef.current?.panTo(r.lat, r.lon); }}
                   onCenter={(k) => { const r = rankRows.find((x) => x.key === k); if (r) { setSelPoint(k); mapRef.current?.flyTo(r.lat, r.lon, 13); } }} />
                 <p className="gv-hint">Cada punto toma el índice de la celda donde cae. Los puntos sin evaluar van al final, sin puesto.</p>
               </section>

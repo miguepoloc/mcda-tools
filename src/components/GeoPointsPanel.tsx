@@ -2,13 +2,14 @@
 
 /** Pestaña «Puntos» del geovisor: agregar puntos con clic (modo explícito), importarlos de un CSV o GeoJSON con vista
  * previa, y ver su ranking por índice. El cálculo vive en `lib/geo/points.ts`; aquí solo la interfaz. */
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { MAX_POINTS, rankHeading, type GeoPoint, type RankedPoint } from '@/lib/geo/points';
 import { mergeImported, parseCsvPoints, pointsFromFc, type ImportResult } from '@/lib/geo/pointsImport';
 import type { Direction } from '@/lib/geo/suitability';
 import ConfirmDialog from './ConfirmDialog';
 import { Icon, ICONS } from './GeoBits';
-import GeoPointsTable, { type RankRow } from './GeoPointsTable';
+import type { LabelMode } from '@/lib/geo/pointLabels';
+import GeoPointsList, { type RankRow } from './GeoPointsList';
 
 type Preview = { fileName: string; result: ImportResult; fc: unknown | null };
 /** `after` = firma de la lista tal como quedó: el «Deshacer» solo se ofrece mientras nada más la haya cambiado. */
@@ -19,6 +20,10 @@ type Props = {
   points: GeoPoint[];
   ranked: RankedPoint[];
   rows: RankRow[];
+  /** Etiquetas con el nombre en el mapa: interruptor, texto («Nombre» / «Nombre + %») y aviso de descartes por falta de lugar. */
+  labels?: { on: boolean; mode: LabelMode; trimmed: boolean; onOn: (on: boolean) => void; onMode: (m: LabelMode) => void };
+  /** Ficha del punto abierto en la lista (misma que la consulta del mapa). */
+  renderDetail?: (row: RankRow) => ReactNode;
   direction: Direction;
   criticalLabel: string;
   /** Hay un mapa calculado (con área y reglas): sin él, los puntos se guardan pero no se evalúan. */
@@ -28,7 +33,7 @@ type Props = {
   /** Aviso del último intento de agregar (p. ej. tope alcanzado). */
   addNote: string;
   selectedKey: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
   onCenter: (id: string) => void;
   onChange: (points: GeoPoint[]) => void;
   onExportCsv: () => void;
@@ -149,8 +154,25 @@ export default function GeoPointsPanel(p: Props) {
         ) : (
           <>
             {!p.ready && <p className="gv-hint warn" role="status">Todavía no hay un mapa calculado (área, capas y reglas): los puntos se guardan y se evaluarán cuando lo haya.</p>}
-            <GeoPointsTable
-              rows={p.rows} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
+            <GeoPointsList
+              rows={p.rows} renderDetail={p.renderDetail}
+              toolbar={p.labels && (
+                <div className="gv-labtog">
+                  <button type="button" role="switch" aria-checked={p.labels.on} className="gv-switch" onClick={() => p.labels?.onOn(!p.labels.on)}>
+                    <span className="trk" aria-hidden="true" /><span>Mostrar nombres en el mapa</span>
+                  </button>
+                  {p.labels.on && (
+                    <label className="gv-lsel">
+                      <span className="gv-hint">Texto </span>
+                      <select value={p.labels.mode} onChange={(e) => p.labels?.onMode(e.target.value as LabelMode)}>
+                        <option value="name">Nombre</option>
+                        <option value="namePct">Nombre + %</option>
+                      </select>
+                    </label>
+                  )}
+                  {p.labels.on && p.labels.trimmed && <p className="gv-hint" role="status">Acerca el mapa para ver más nombres.</p>}
+                </div>
+              )} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
               selectedKey={p.selectedKey} onSelect={p.onSelect} onCenter={p.onCenter}
               onRename={(id, name) => p.onChange(p.points.map((x) => (x.id === id ? { ...x, name } : x)))}
               onDelete={(id) => setToDelete(p.points.find((x) => x.id === id) ?? null)}
@@ -171,6 +193,7 @@ export default function GeoPointsPanel(p: Props) {
             const next = prev.filter((x) => x.id !== toDelete.id);
             p.onChange(next);
             setUndo({ prev, after: sigOf(next), msg: `Se eliminó «${toDelete.name}».` });
+            if (p.selectedKey === toDelete.id) p.onSelect(null);
             setToDelete(null);
           }}
         />
