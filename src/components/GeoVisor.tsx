@@ -40,6 +40,7 @@ import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rank
 import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import PointFicha from './GeoPointFicha';
 import GeoPointsPanel from './GeoPointsPanel';
 import type { RankRow } from './GeoPointsList';
 import { Icon, ICONS, usePalette } from './GeoBits';
@@ -282,6 +283,13 @@ export default function GeoVisor(props: Props) {
     id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
   })), [rankRows, T]);
+  // Ficha de un punto de la lista (expansión en línea): el mismo cálculo y la misma presentación que la consulta del mapa.
+  // Se evalúa solo el punto abierto, con las reglas y el modelo diferidos igual que el ranking.
+  const renderPointDetail = useCallback((r: RankRow) => {
+    if (!data) return null;
+    const e = evaluateLonLat(data, dRules, { breaks: rm.breaks, direction: rm.direction }, { lat: r.lat, lon: r.lon });
+    return <PointFicha pct={r.pct} label={r.label} color={r.status === 'ok' ? r.color : undefined} lat={r.lat} lon={r.lon} rows={e.rows} vetoLabel={r.vetoed ? T.critical : undefined} variant="inline" />;
+  }, [data, dRules, rm, T]);
   const setPoints = useCallback((next: GeoPoint[]) => commit((g) => { const o = { ...g }; if (next.length) o.points = next; else delete o.points; return o; }), [commit]);
   // El modo «Agregar punto» no sobrevive a salir de la pestaña ni a Esc: un clic perdido no debe crear puntos.
   useEffect(() => { if (tab !== 'puntos') setAddMode(false); }, [tab]);
@@ -616,7 +624,7 @@ export default function GeoVisor(props: Props) {
           )}
           {tab === 'puntos' && (
             <GeoPointsPanel
-              points={points} ranked={ranked} rows={rankRows} direction={rm.direction} criticalLabel={T.critical}
+              points={points} ranked={ranked} rows={rankRows} renderDetail={renderPointDetail} direction={rm.direction} criticalLabel={T.critical}
               ready={!!(data && rules.length > 0)} addMode={addMode} onAddMode={setAddMode} addNote={addNote}
               selectedKey={selPoint}
               onSelect={(id) => { setSelPoint(id); const pt = id ? points.find((x) => x.id === id) : null; if (pt) mapRef.current?.panTo(pt.lat, pt.lon); }}
@@ -697,19 +705,7 @@ export default function GeoVisor(props: Props) {
           {point && (
             <div className="gv-point" role="status">
               <button type="button" className="x" aria-label="Cerrar" onClick={() => setSelected(null)}>×</button>
-              <div className="big">{point.pct === null ? '—' : `${point.pct}%`}</div>
-              <span className="cls-pill" style={{ background: `color-mix(in srgb, ${RHEX[point.cls]} 22%, transparent)`, borderColor: RHEX[point.cls] }}>
-                <span className="dot" style={{ background: RHEX[point.cls] }} />{point.label}
-              </span>
-              <div className="coords mono">{point.lat.toFixed(5)}, {point.lon.toFixed(5)}</div>
-              <div className="tbl">
-                {point.rows.map((r) => (
-                  <div className={'r' + (r.veto ? ' veto' : '')} key={r.label}>
-                    <span className="rl"><span className="k">{r.label}</span><span className="pv">{r.value}</span></span>
-                    <span className="pc">{r.contrib}</span>
-                  </div>
-                ))}
-              </div>
+              <PointFicha pct={point.pct} label={point.label} color={RHEX[point.cls]} lat={point.lat} lon={point.lon} rows={point.rows} />
               <div className="disc">{T.disclaimer} Con el mapa enfocado, Intro consulta el punto central.</div>
             </div>
           )}

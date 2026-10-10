@@ -2,7 +2,7 @@
 
 /** Pestaña «Puntos» del geovisor: agregar puntos con clic (modo explícito), importarlos de un CSV o GeoJSON con vista
  * previa, y ver su ranking por índice. El cálculo vive en `lib/geo/points.ts`; aquí solo la interfaz. */
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { MAX_POINTS, rankHeading, type GeoPoint, type RankedPoint } from '@/lib/geo/points';
 import { mergeImported, parseCsvPoints, pointsFromFc, type ImportResult } from '@/lib/geo/pointsImport';
 import type { Direction } from '@/lib/geo/suitability';
@@ -19,6 +19,8 @@ type Props = {
   points: GeoPoint[];
   ranked: RankedPoint[];
   rows: RankRow[];
+  /** Ficha del punto abierto en la lista (misma que la consulta del mapa). */
+  renderDetail?: (row: RankRow) => ReactNode;
   direction: Direction;
   criticalLabel: string;
   /** Hay un mapa calculado (con área y reglas): sin él, los puntos se guardan pero no se evalúan. */
@@ -150,7 +152,7 @@ export default function GeoPointsPanel(p: Props) {
           <>
             {!p.ready && <p className="gv-hint warn" role="status">Todavía no hay un mapa calculado (área, capas y reglas): los puntos se guardan y se evaluarán cuando lo haya.</p>}
             <GeoPointsList
-              rows={p.rows} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
+              rows={p.rows} renderDetail={p.renderDetail} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
               selectedKey={p.selectedKey} onSelect={p.onSelect} onCenter={p.onCenter}
               onRename={(id, name) => p.onChange(p.points.map((x) => (x.id === id ? { ...x, name } : x)))}
               onDelete={(id) => setToDelete(p.points.find((x) => x.id === id) ?? null)}
