@@ -82,3 +82,12 @@ Integrado en `main` local (sin push): contraste, header, E1, G4/G5/G14/R5/rueda,
 
 ## Estado al 10 oct (fin de la segunda ola)
 Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. Siguen (tercera ola): persistir polígonos (G6/G7), estadística zonal y exposición (G9/G10), composición de mapa PDF (R1) e informe del mapa (R2).
+
+### 10. Lista de puntos, ficha en línea y nombres en el mapa — merge `5dfa91c`
+- **Por qué:** capturas del docente: la tabla de 5 columnas no cabía en el panel lateral (~330 px útiles): había que desplazarla de lado para ver índice y clase, el título salía cortado y había un scroll anidado.
+- **Qué:** lista de filas de dos líneas (puesto, nombre + clase con color e insignia de veto, índice con barrita), sin scroll horizontal ni anidado. Los sin evaluar al final, bajo «Sin evaluar · sin puesto», con «Sin índice», nunca 0 %. Cada fila se expande en línea con la ficha del punto (valor, idoneidad × peso = aporte, veto), compartida con la consulta del mapa (`GeoPointFicha`), y con renombrar, centrar y eliminar (confirmado). Teclado: flechas, Inicio/Fin, Intro/Espacio, Esc.
+- **Mapa:** interruptor «Mostrar nombres en el mapa» (apagado por defecto) con «Nombre / Nombre + %»; descarte voraz por puesto (máx. 40, sin solapes, debounce 120 ms) y aviso «Acerca el mapa…»; las etiquetas entran en el PNG si están activas; el mapa se centra al elegir un punto. «Buscar punto» con más de 12. Los marcadores no se recrean al cambiar la selección.
+- **Decisión:** el detalle va dentro de la fila y no en una tarjeta flotante (la tarjeta cubre justo los controles del mapa).
+- **Datos:** sin cambios en el modelo de puntos; `PointRow` gana `suit/weight/part` opcionales. Lógica pura en `src/lib/geo/pointLabels.ts`, `check-geo-point-labels` (26 verificaciones).
+- **Verificación:** typecheck, 965 verificaciones y `test:excel` en verde.
+- **Pendiente (visual):** a 330/280 px en claro y oscuro, etiquetas y PNG, 300 puntos reales, vista pública.
