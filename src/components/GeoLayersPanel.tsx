@@ -64,6 +64,8 @@ type Props = {
   draft: Bounds | null; setDraft: (b: Bounds | null) => void;
   drawing: boolean; setDrawing: (d: boolean) => void;
   quota: Quota | null; onQuotaChange: () => void;
+  /** Hectáreas realmente evaluadas (sin exclusiones ni fuera del área de estudio); null si aún no hay resultado. */
+  evaluableHa?: number | null;
   /** Criterio para el que se está subiendo un mapa (viene del botón «Subir el mapa de este criterio»). */
   uploadFor?: string | null; onCancelUpload?: () => void; onLayerAdded?: (criterionId: string) => void;
   virtual: { id: string; label: string; role: string; swatch: string }[];
@@ -286,14 +288,15 @@ export default function GeoLayersPanel(p: Props) {
       <section className="gv-sec">
         <header><h4>1 · Área de estudio</h4></header>
         {isPack && data && (
-          <p className="gv-hint">Paquete del curso: <b>{data.grid.width}×{data.grid.height}</b> celdas de <b>{data.grid.resM} m</b> ({(data.grid.width * data.grid.height * data.grid.haPerPixel).toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha). El área y sus mapas son de solo lectura, pero <b>puedes añadir tus propios mapas</b> (paso 2): se recortan y alinean solos a esta misma grilla.</p>
+          <p className="gv-hint">Paquete del curso: <b>{data.grid.width}×{data.grid.height}</b> celdas de <b>{data.grid.resM} m</b> (extensión de la grilla: {(data.grid.width * data.grid.height * data.grid.haPerPixel).toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{p.evaluableHa != null ? <>; <b>área evaluada: {p.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</b></> : null}). El área y sus mapas son de solo lectura, pero <b>puedes añadir tus propios mapas</b> (paso 2): se recortan y alinean solos a esta misma grilla.</p>
         )}
         {isPack && !data && <p className="gv-hint">Cargando el paquete del curso… en cuanto termine podrás subir tus propios mapas aquí.</p>}
         {!isPack && grid && !editingArea && (
           <>
             <div className="gv-kv"><span>Grilla</span><b className="mono">{grid.width} × {grid.height} celdas</b></div>
             <div className="gv-kv"><span>Resolución</span><b className="mono">{grid.resM} m</b></div>
-            <div className="gv-kv"><span>Área</span><b className="mono">{(grid.width * grid.height * grid.haPerPixel).toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</b></div>
+            {p.evaluableHa != null && <div className="gv-kv"><span>Área evaluada</span><b className="mono">{p.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</b></div>}
+            <div className="gv-kv"><span>Extensión de la grilla</span><b className="mono">{(grid.width * grid.height * grid.haPerPixel).toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</b></div>
             <div className="gv-kv"><span>Sistema</span><b className="mono">{grid.crs}</b></div>
             <div className="gv-row-acts">
               <button type="button" className="btn sm" onClick={() => p.fit(gridBoundsLonLat(grid))}><Icon d={ICONS.fit} size={13} /> Ver en el mapa</button>
