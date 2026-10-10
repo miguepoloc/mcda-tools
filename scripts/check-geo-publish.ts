@@ -50,7 +50,7 @@ ok('base64 ida y vuelta (100 KB)', fromBase64(toBase64(rnd)).every((v, i) => v =
   ok('v1: el 4 se lee como vetada', old.cls[3] === CLASS_VETO && old.cls[0] === 1 && old.cls[2] === 3 && old.mask[4] === MASK_EXCLUDED && old.mask[5] === MASK_NODATA);
   const nw = await decodePlanes(await encodePlanes(p, Uint8Array.from([1, 4, 8, CLASS_VETO, 0, 0]), mk), 6);
   ok('v2: 4 y 8 son clases; la vetada conserva su código; 0 y 254 se mantienen', nw.cls[1] === 4 && nw.cls[2] === 8 && nw.cls[3] === CLASS_VETO && nw.mask[4] === MASK_EXCLUDED && nw.mask[5] === MASK_NODATA);
-  ok('códigos consecutivos: CLASS_VETO y CODE_NODATA no chocan con 1..8', CLASS_VETO > 8 && CLASS_VETO !== CODE_NODATA && CODE_EXCLUDED === 0 && CODE_NODATA === 254);
+  ok('códigos consecutivos: CLASS_VETO y CODE_NODATA no chocan con 1..8', CLASS_VETO > 8 && (CLASS_VETO as number) !== CODE_NODATA && CODE_EXCLUDED === 0 && CODE_NODATA === 254);
 }
 console.log(fails === 0 ? '\nTodo OK (check-geo-publish)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);

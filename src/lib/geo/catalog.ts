@@ -10,7 +10,7 @@ import { gunzip, gzip } from './store.ts';
 export const CATALOG_BUCKET = 'geo-catalog';
 export const CAT_PREFIX = 'cat:';
 
-export type CatalogDef = { criteria: Criterion[]; geo: { grid: GeoGrid; layers: Record<string, GeoLayerMeta>; rules: GeoConfig['rules']; classes: GeoConfig['classes']; minPatchHa?: number } };
+export type CatalogDef = { criteria: Criterion[]; geo: { grid: GeoGrid; layers: Record<string, GeoLayerMeta>; rules: GeoConfig['rules']; classes: GeoConfig['classes']; direction?: GeoConfig['direction']; classModel?: GeoConfig['classModel']; minPatchHa?: number } };
 export type CatalogRow = { id: string; title: string; description: string; attribution: string; is_active: boolean; definition: CatalogDef; created_at?: string };
 
 export async function listCatalog(sb: SupabaseClient): Promise<CatalogRow[]> {
@@ -33,7 +33,7 @@ export function catalogExample(row: CatalogRow): Example {
   return {
     id: CAT_PREFIX + row.id, source: 'catalog', label: row.title, hasData: true,
     blurb: row.description || 'Paquete del curso con datos ya preparados.',
-    title: row.title, objective: '', criteria, geo: { packId: CAT_PREFIX + row.id, rules, classes: { ...row.definition.geo.classes } },
+    title: row.title, objective: '', criteria, geo: { packId: CAT_PREFIX + row.id, rules, classes: { ...row.definition.geo.classes }, ...(row.definition.geo.direction ? { direction: row.definition.geo.direction } : {}), ...(row.definition.geo.classModel ? { classModel: row.definition.geo.classModel } : {}) },
   };
 }
 
@@ -73,7 +73,7 @@ export async function publishToCatalog(sb: SupabaseClient, inp: PublishInput, on
     metas[k] = { ...(inp.geo.layers as Record<string, GeoLayerMeta>)[k], path, bytes: gz.byteLength, ...(license ? { license } : {}) };
     onProgress?.(++done, keys.length);
   }
-  const definition: CatalogDef = { criteria: inp.criteria, geo: { grid, layers: metas, rules: inp.geo.rules, classes: inp.geo.classes, ...(inp.geo.minPatchHa ? { minPatchHa: inp.geo.minPatchHa } : {}) } };
+  const definition: CatalogDef = { criteria: inp.criteria, geo: { grid, layers: metas, rules: inp.geo.rules, classes: inp.geo.classes, ...(inp.geo.direction ? { direction: inp.geo.direction } : {}), ...(inp.geo.classModel ? { classModel: inp.geo.classModel } : {}), ...(inp.geo.minPatchHa ? { minPatchHa: inp.geo.minPatchHa } : {}) } };
   const { error } = await sb.from('geo_packs').upsert({ id: inp.id, title: inp.title, description: inp.description, attribution: inp.attribution, definition, is_active: true, created_by: inp.userId });
   if (error) throw new Error(error.message);
 }

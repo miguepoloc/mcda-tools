@@ -107,7 +107,8 @@ export function setupFromGeo(geo: GeoClassFields): ClassSetup {
     const breaks = normalizeBreaks(cm.breaks);
     const classes: ClassDef[] = Array.from({ length: breaks.length + 1 }, (_, i) => {
       const c = cm.classes?.[i];
-      return { ...(c?.name?.trim() ? { name: c.name.trim() } : {}), ...(c?.color && HEX.test(c.color) ? { color: c.color } : {}) };
+      // El nombre no se recorta: el editor escribe espacios mientras se teclea («Muy» → «Muy » → «Muy alta»).
+      return { ...(c?.name && c.name.trim() ? { name: c.name } : {}), ...(c?.color && HEX.test(c.color) ? { color: c.color } : {}) };
     });
     return { direction, breaks, classes, cut: cm.cut ?? 'manual' };
   }
@@ -119,7 +120,7 @@ export function resolveModel(setup: ClassSetup): ClassModel {
   const n = setup.breaks.length + 1;
   return {
     direction: setup.direction, n, breaks: setup.breaks.slice(),
-    names: Array.from({ length: n }, (_, i) => setup.classes[i]?.name || defaultClassName(setup.direction, i, n)),
+    names: Array.from({ length: n }, (_, i) => setup.classes[i]?.name?.trim() || defaultClassName(setup.direction, i, n)),
     colors: Array.from({ length: n }, (_, i) => setup.classes[i]?.color || undefined),
     cut: setup.cut,
   };

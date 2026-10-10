@@ -1,9 +1,9 @@
-/** Evaluación de UNA celda (el punto consultado): el mismo cálculo que `evaluateGrid` (delega en `evaluatePixel`)
+/** Evaluación de UNA celda (el punto consultado): el mismo cálculo que `evaluateIndex` + `classify` (delega en `indexPixel`/`classOf`)
  * más el desglose por criterio para mostrarlo. Puro — ver `scripts/check-geo-points.ts`. */
 import { pixelToLonLat } from './crs.ts';
 import type { GeoData } from './data.ts';
 import { suitability, vetoed } from './membership.ts';
-import { evaluatePixel, MASK_EXCLUDED, MASK_NODATA, usableRules, type ClassThresholds, type CriterionRule } from './suitability.ts';
+import { classOf, CLASS_VETO, indexPixel, MASK_EXCLUDED, MASK_NODATA, usableRules, type CriterionRule, type Direction } from './suitability.ts';
 
 export type PointRow = { label: string; value: string; contrib: string; veto: boolean };
 export type PointStatus = 'ok' | 'excluded' | 'outside' | 'nodata';
@@ -21,7 +21,7 @@ export type PointEval = {
   rows: PointRow[];
 };
 
-export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], thr: ClassThresholds, sel: { col: number; row: number }): PointEval {
+export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], cfg: { breaks: number[]; direction?: Direction }, sel: { col: number; row: number }): PointEval {
   const i = sel.row * data.grid.width + sel.col;
   const [lon, lat] = pixelToLonLat(sel.col, sel.row, data.grid.transform, data.grid.crs);
   const m = data.mask[i];
@@ -31,7 +31,7 @@ export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], thr: 
   const rules = usableRules(data.layers, data.mask.length, allRules);
   const raw: Record<string, number> = {};
   for (const r of rules) raw[r.key] = data.layers[r.key][i];
-  const px = evaluatePixel(raw, rules, thr, m);
+  const px = indexPixel(raw, rules, m, cfg.direction ?? 'suitability');
   // Desglose: los criterios sin dato no votan y los pesos se reescalan entre los que sí (igual que `evaluatePixel`).
   const wUsed = rules.reduce((a, r) => (Number.isNaN(raw[r.key]) ? a : a + r.weight), 0);
   const rows = rules.map((r) => {
@@ -44,5 +44,6 @@ export function evaluateOnePoint(data: GeoData, allRules: CriterionRule[], thr: 
     return { label: info?.label ?? r.key, value, contrib: Number.isNaN(x) ? 'no vota' : `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}`, veto };
   });
   if (Number.isNaN(px.s)) return { status: 'nodata', ...none, rows };
-  return { status: 'ok', s: px.s, pct: Math.round(px.s * 100), cls: px.cls, vetoed: px.vetoed, lat, lon, rows };
+  const cls = px.vetoed ? CLASS_VETO : classOf(px.s, cfg.breaks);
+  return { status: 'ok', s: px.s, pct: Math.round(px.s * 100), cls, vetoed: px.vetoed, lat, lon, rows };
 }

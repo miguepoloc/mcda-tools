@@ -2,15 +2,19 @@
 
 /** Pestaña «Modelo» del geovisor: pesos del panel de expertos (o exploración libre), la regla de
  * idoneidad de cada criterio con vista previa, y los umbrales de las clases. */
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { describeFn, fnIssue, sortedFn, suitability, type FnSpec } from '@/lib/geo/membership';
 import type { LayerInfo } from '@/lib/geo/data';
 import type { Criterion, GeoConfig } from '@/lib/types';
 import type { Parcel } from '@/lib/geo/patches';
-import type { AreaStats } from '@/lib/geo/suitability';
+import type { ClassStats } from '@/lib/geo/suitability';
+import { DIR_TEXT, resolveModel, type ClassSetup, type CutMode } from '@/lib/geo/classes';
+import GeoClassesEditor from './GeoClassesEditor';
 import { fmtNum, Num } from './GeoBits';
 
 type Rule = GeoConfig['rules'][string];
+/** Palabra del índice según la dirección del proyecto («idoneidad» / «riesgo») para los textos de las reglas. */
+const NounCtx = createContext<string>('idoneidad');
 type Props = {
   criteria: Criterion[];
   weights: number[];
@@ -19,8 +23,12 @@ type Props = {
   layers: Record<string, LayerInfo>;
   rules: GeoConfig['rules'];
   onRule: (criterionId: string, rule: Rule | undefined) => void;
-  thresholds: GeoConfig['classes'];
-  onThresholds: (c: GeoConfig['classes']) => void;
+  /** Clases del mapa: dirección, cortes, nombres y colores (ver GeoClassesEditor). */
+  setup: ClassSetup;
+  onSetup: (s: ClassSetup) => void;
+  editHex: Record<number, string>;
+  onCut: (mode: Exclude<CutMode, 'manual'>) => void;
+  canCut: boolean;
   exploring: boolean;
   exploreWeights: number[] | null;
   onExplore: (on: boolean, w?: number[] | null) => void;
@@ -35,8 +43,8 @@ type Props = {
   onMinPatch: (ha: number) => void;
   parcels: Parcel[] | null;
   onFlyTo: (col: number, row: number) => void;
-  stats: AreaStats | null;
-  baseline: { label: string; stats: AreaStats } | null;
+  stats: ClassStats | null;
+  baseline: { label: string; stats: ClassStats } | null;
   onSaveBaseline: (label: string) => void;
   onClearBaseline: () => void;
 };
@@ -75,6 +83,7 @@ function previewRange(fn: FnSpec, min: number, max: number): [number, number] {
 }
 
 function Preview({ fn, min, max }: { fn: FnSpec; min: number; max: number }) {
+  const noun = useContext(NounCtx);
   const d = useMemo(() => {
     const [lo, hi] = previewRange(fn, min, max), N = 120;
     const pts: string[] = [];
@@ -86,7 +95,7 @@ function Preview({ fn, min, max }: { fn: FnSpec; min: number; max: number }) {
     return 'M' + pts.join(' L');
   }, [fn, min, max]);
   return (
-    <svg className="gv-prev" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label={`Vista previa de la regla: ${describeFn(fn)}. Eje vertical: idoneidad de 0 a 1.`}>
+    <svg className="gv-prev" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label={`Vista previa de la regla: ${describeFn(fn)}. Eje vertical: ${noun} de 0 a 1.`}>
       <line x1="0" y1="30" x2="100" y2="30" className="ax" /><line x1="0" y1="2" x2="100" y2="2" className="ax dash" />
       <path d={d} vectorEffect="non-scaling-stroke" />
     </svg>
@@ -94,6 +103,8 @@ function Preview({ fn, min, max }: { fn: FnSpec; min: number; max: number }) {
 }
 
 function FnEditor({ fn, onChange, min, max }: { fn: FnSpec; onChange: (f: FnSpec) => void; min: number; max: number }) {
+  const noun = useContext(NounCtx);
+  const Noun = noun[0].toUpperCase() + noun.slice(1);
   if (fn.type === 'steps') {
     const { breaks, scores } = fn;
     const set = (b: number[], s: number[]) => onChange({ type: 'steps', breaks: b, scores: s });
@@ -108,8 +119,8 @@ function FnEditor({ fn, onChange, min, max }: { fn: FnSpec; onChange: (f: FnSpec
                 : i === scores.length - 1 ? <><Num label={`Corte ${i}`} width={64} value={breaks[i - 1]} onChange={(n) => set(breaks.map((v, k) => (k === i - 1 ? n : v)), scores)} /> o más</>
                   : <>de <Num label={`Corte ${i}`} width={64} value={breaks[i - 1]} onChange={(n) => set(breaks.map((v, k) => (k === i - 1 ? n : v)), scores)} /> a <Num label={`Corte ${i + 1}`} width={64} value={breaks[i]} onChange={(n) => set(breaks.map((v, k) => (k === i ? n : v)), scores)} /></>}
             </span>
-            <span className="arr" title="idoneidad de este rango">→</span>
-            <Num label={`Idoneidad del rango ${i + 1}`} width={56} min={0} max={1} step="0.05" value={s} onChange={(n) => set(breaks, scores.map((v, k) => (k === i ? Math.max(0, Math.min(1, n)) : v)))} />
+            <span className="arr" title={`${noun} de este rango`}>→</span>
+            <Num label={`${Noun} del rango ${i + 1}`} width={56} min={0} max={1} step="0.05" value={s} onChange={(n) => set(breaks, scores.map((v, k) => (k === i ? Math.max(0, Math.min(1, n)) : v)))} />
           </div>
         ))}
         <div className="gv-step-acts">
@@ -128,11 +139,11 @@ function FnEditor({ fn, onChange, min, max }: { fn: FnSpec; onChange: (f: FnSpec
         {vals.map((v) => (
           <div className="gv-step" key={v} style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
             <span className="rng">Clase / valor <b className="mono">{v}</b> →</span>
-            <Num label={`Idoneidad del valor ${v}`} width={64} min={0} max={1} step="0.05" value={fn.map[String(v)] ?? 0}
+            <Num label={`${Noun} del valor ${v}`} width={64} min={0} max={1} step="0.05" value={fn.map[String(v)] ?? 0}
               onChange={(n) => onChange({ type: 'classes', map: { ...fn.map, [String(v)]: Math.max(0, Math.min(1, n)) } })} />
           </div>
         ))}
-        <p className="gv-hint">Idoneidad de 0 (mala) a 1 (óptima) de cada clase del mapa. Un valor que no esté en la lista vale 0.</p>
+        <p className="gv-hint">{Noun} de 0 ({noun === 'riesgo' ? 'bajo' : 'mala'}) a 1 ({noun === 'riesgo' ? 'máximo' : 'óptima'}) de cada clase del mapa. Un valor que no esté en la lista vale 0.</p>
       </div>
     );
   }
@@ -143,14 +154,14 @@ function FnEditor({ fn, onChange, min, max }: { fn: FnSpec; onChange: (f: FnSpec
         <div className="gv-nums" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
           <label><span>objetivo</span><Num label="Valor objetivo" value={f.value} onChange={(n) => onChange({ ...f, value: n })} /></label>
           <label><span>± tolerancia</span><Num label="Tolerancia" min={0} value={f.tol} onChange={(n) => onChange({ ...f, tol: Math.max(0, n) })} /></label>
-          <label><span>caída</span><Num label="Distancia hasta idoneidad 0" min={0} value={f.falloff} onChange={(n) => onChange({ ...f, falloff: Math.max(0, n) })} /></label>
+          <label><span>caída</span><Num label={`Distancia hasta ${noun} 0`} min={0} value={f.falloff} onChange={(n) => onChange({ ...f, falloff: Math.max(0, n) })} /></label>
         </div>
-        <p className="gv-hint">Idoneidad 1 si el valor está a ±tolerancia del objetivo; baja linealmente a 0 a «caída» unidades más allá. Sirve para «110 V», «pH 6», «temperatura 25 °C»…</p>
+        <p className="gv-hint">{Noun} 1 si el valor está a ±tolerancia del objetivo; baja linealmente a 0 a «caída» unidades más allá. Sirve para «110 V», «pH 6», «temperatura 25 °C»…</p>
       </div>
     );
   }
   const fields = fn.type === 'trapezoid' ? (['a', 'b', 'c', 'd'] as const) : fn.type === 'up' || fn.type === 'down' ? (['a', 'b'] as const) : [];
-  const hint = fn.type === 'trapezoid' ? 'Idoneidad 0 hasta a; sube a 1 en b; 1 hasta c; baja a 0 en d.' : fn.type === 'up' ? 'Idoneidad 0 hasta a; sube linealmente a 1 en b.' : fn.type === 'down' ? 'Idoneidad 1 hasta a; baja linealmente a 0 en b.' : '';
+  const hint = fn.type === 'trapezoid' ? `${Noun} 0 hasta a; sube a 1 en b; 1 hasta c; baja a 0 en d.` : fn.type === 'up' ? `${Noun} 0 hasta a; sube linealmente a 1 en b.` : fn.type === 'down' ? `${Noun} 1 hasta a; baja linealmente a 0 en b.` : '';
   return (
     <div>
       <div className="gv-nums">
@@ -176,7 +187,13 @@ export default function GeoModelPanel(p: Props) {
   const partial = readyIdx.length > 0 && readyIdx.length < p.criteria.length;
   const effective = (i: number) => (readyIdx.includes(i) && wReady > 0 ? (w[i] ?? 0) / wReady : 0);
   const exploreSum = (p.exploreWeights ?? []).reduce((a, x) => a + x, 0);
+  const risk = p.setup.direction === 'risk';
+  const rm = resolveModel(p.setup);
+  const names = rm.names;
+  const sameN = !p.baseline || p.baseline.stats.classes.length === names.length;
+  const T = DIR_TEXT[p.setup.direction];
   return (
+    <NounCtx.Provider value={T.noun}>
     <div className="gv-sec-stack">
       <section className="gv-sec">
         <header>
@@ -217,8 +234,8 @@ export default function GeoModelPanel(p: Props) {
       </section>
 
       <section className="gv-sec">
-        <header><h4>Reglas de idoneidad</h4></header>
-        <p className="gv-hint">Cómo se traduce el valor de cada capa (una distancia, una temperatura, una profundidad…) a una idoneidad de 0 (mala) a 1 (óptima).</p>
+        <header><h4>Reglas de {T.noun}</h4></header>
+        <p className="gv-hint">Cómo se traduce el valor de cada capa (una distancia, una temperatura, una profundidad…) a {risk ? 'un riesgo de 0 (bajo) a 1 (máximo)' : 'una idoneidad de 0 (mala) a 1 (óptima)'}.</p>
         {p.isPack && <p className="gv-hint">Este proyecto parte de un <b>paquete de datos del curso</b>: sus mapas son de solo lectura y no se modifican. Si agregas un criterio nuevo, <b>sube tu propio mapa</b> con el botón «Subir el mapa de este criterio»: se ajusta a la misma grilla del paquete y queda guardado en tu cuenta.</p>}
         {!p.isPack && layerEntries.length === 0 && p.criteria.length > 0 && <p className="gv-hint">Cada criterio necesita un mapa. Usa <b>«Subir el mapa de este criterio»</b> en cada uno, o carga primero tus archivos en la pestaña «Capas».</p>}
         {p.criteria.some((c) => !p.rules[c.id]) && <p className="gv-hint warn">Los criterios «sin capa» no entran al cálculo del mapa hasta que les asignes un mapa (elige una capa existente o sube la tuya).</p>}
@@ -296,22 +313,13 @@ export default function GeoModelPanel(p: Props) {
         {p.criteria.length === 0 && <p className="gv-hint">Define primero los criterios en la pestaña «Proyecto».</p>}
       </section>
 
-      <section className="gv-sec">
-        <header><h4>Clases del mapa</h4></header>
-        <div className="gv-class-row"><i style={{ background: 'var(--geo-alta)' }} /><span>Alta aptitud desde (%)</span>
-          <Num label="Umbral alta" width={62} min={0} max={100} value={Math.round(p.thresholds.alta * 100)} onChange={(n) => p.onThresholds({ ...p.thresholds, alta: Math.max(0, Math.min(100, n)) / 100 })} /></div>
-        <div className="gv-class-row"><i style={{ background: 'var(--geo-media)' }} /><span>Moderada desde (%)</span>
-          <Num label="Umbral moderada" width={62} min={0} max={100} value={Math.round(p.thresholds.media * 100)} onChange={(n) => p.onThresholds({ ...p.thresholds, media: Math.max(0, Math.min(100, n)) / 100 })} /></div>
-        {p.thresholds.media > p.thresholds.alta && <p className="gv-hint warn" role="alert">«Moderada» debe empezar en un valor menor que «Alta»: con estos umbrales ninguna celda sería moderada.</p>}
-        <div className="gv-class-row"><i style={{ background: 'var(--geo-noapta)' }} /><span>No apta / vetada</span><span /></div>
-        <div className="gv-class-row"><i style={{ background: 'var(--geo-excl)' }} /><span>Exclusión</span><span /></div>
-      </section>
+      <GeoClassesEditor setup={p.setup} onSetup={p.onSetup} hex={p.editHex} onCut={p.onCut} canCut={p.canCut} />
 
       <section className="gv-sec">
-        <header><h4>Parcelas contiguas</h4></header>
-        <p className="gv-hint">Muchos proyectos (una finca solar, un cultivo) necesitan un área mínima de un solo cuerpo. Aquí se buscan los grupos de celdas de <b>alta aptitud</b> que se tocan y suman al menos ese tamaño.</p>
+        <header><h4>{p.setup.direction === 'risk' ? 'Zonas contiguas' : 'Parcelas contiguas'}</h4></header>
+        <p className="gv-hint">Muchos proyectos (una finca solar, un cultivo) necesitan un área mínima de un solo cuerpo. Aquí se buscan los grupos de celdas de la clase más alta («<b>{names[names.length - 1]}</b>») que se tocan y suman al menos ese tamaño.</p>
         <div className="gv-class-row" style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto' }}>
-          <span>Área mínima de la parcela</span>
+          <span>Área mínima de {risk ? 'la zona' : 'la parcela'}</span>
           <Num label="Área mínima en hectáreas" width={80} min={0} value={p.minPatchHa} onChange={(n) => p.onMinPatch(Math.max(0, n))} /><span className="mono muted">ha</span>
         </div>
         {p.minPatchHa > 0 && p.parcels && (
@@ -336,15 +344,19 @@ export default function GeoModelPanel(p: Props) {
           <>
             <div className="gv-cmp">
               <span /><b>A</b><b>Ahora</b><b>Δ ha</b>
-              {([['Alta', 'alta'], ['Moderada', 'media'], ['No apta', 'noapta']] as const).map(([lbl, k]) => {
-                const a = p.baseline!.stats[k].ha, b = p.stats?.[k].ha ?? 0, d = b - a;
+              {sameN ? [...names.keys()].reverse().map((i) => {
+                const a = p.baseline!.stats.classes[i].ha, b = p.stats?.classes[i].ha ?? 0, d = b - a;
+                // «Malo» = que crezca la clase peor de la dirección (aptitud: la más baja; riesgo: la más alta) o que
+                // decrezca cualquiera de las otras; el color sigue a eso, no al signo.
+                const worstClass = risk ? names.length - 1 : 0;
+                const bad = i === worstClass ? d > 0 : d < 0;
                 return (
-                  <div className="row" key={k}>
-                    <span>{lbl}</span><span className="mono">{a.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span><span className="mono">{b.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                    <span className="mono" style={{ color: d === 0 ? undefined : (k === 'noapta' ? d > 0 : d < 0) ? 'var(--geo-noapta)' : 'var(--geo-alta)' }}>{d > 0 ? '+' : ''}{d.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                  <div className="row" key={i}>
+                    <span>{names[i]}</span><span className="mono">{a.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span><span className="mono">{b.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
+                    <span className="mono" style={{ color: d === 0 ? undefined : bad ? 'var(--geo-noapta)' : 'var(--geo-alta)' }}>{d > 0 ? '+' : ''}{d.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
                   </div>
                 );
-              })}
+              }) : <p className="gv-hint warn" role="status" style={{ gridColumn: '1 / -1' }}>El escenario A tenía otro número de clases ({p.baseline.stats.classes.length}) que el mapa actual ({names.length}): guárdalo de nuevo para comparar.</p>}
             </div>
             <div className="gv-row-acts">
               <button type="button" className="btn sm" onClick={() => p.onSaveBaseline('A')}>Reemplazar A por el estado actual</button>
@@ -354,5 +366,6 @@ export default function GeoModelPanel(p: Props) {
         )}
       </section>
     </div>
+    </NounCtx.Provider>
   );
 }
