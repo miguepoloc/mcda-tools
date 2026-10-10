@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import ReportIssueLink from './ReportIssueLink';
 
 /** Iniciales para el avatar: una letra por cada trozo del usuario del correo («ana.munoz@…» → AM, «miguepoloc@…» → M). */
 const initials = (email: string) =>
@@ -75,6 +76,9 @@ export default function UserMenu({ email }: { email: string }) {
           <Link href="/cuenta" role="menuitem" className="umenu-item" aria-current={pathname === '/cuenta' ? 'page' : undefined} onClick={() => setOpen(false)}>
             <Icon d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />Mi cuenta
           </Link>
+          <ReportIssueLink role="menuitem" className="umenu-item" onClick={() => setOpen(false)}>
+            <Icon d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />Reportar un problema
+          </ReportIssueLink>
           <div className="umenu-sep" role="separator" />
           <button type="button" role="menuitem" className="umenu-item danger" onClick={() => void signOut()}>
             <Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />Salir

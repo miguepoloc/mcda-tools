@@ -151,6 +151,12 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); void flush(); }, [flush]);
 
+  // «Reportar un problema» (ReportIssueLink) lee solo el tipo de proyecto, nunca ids ni datos
+  useEffect(() => {
+    document.body.dataset.mcdaMethod = project.kind === 'spatial' ? 'geovisor-ahp-sig' : project.method;
+    return () => { delete document.body.dataset.mcdaMethod; };
+  }, [project.kind, project.method]);
+
   function patch(p: Patch, immediate = false) {
     setProject((prev) => ({ ...prev, ...p }) as ProjectRow);
     pending.current = { ...pending.current, ...p };
