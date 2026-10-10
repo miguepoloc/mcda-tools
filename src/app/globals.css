@@ -1551,3 +1551,11 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 .wrap:has(.gv-wrap) .gv-wrap{left:0;transform:none;width:100%}
 /* La barra es sticky: con 85 % de opacidad se leía el contenido que pasa por debajo. */
 .topbar{background:color-mix(in srgb,var(--bg) 94%,transparent)}
+/* Guía de consistencia (JudgmentEditor): el par sospechoso se marca con borde grueso Y con texto, no solo con color. */
+.pair.flag{border:2px solid var(--warn-text);padding:11px 13px}
+.flagnote{font-size:13px;color:var(--warn-text)}
+.guide{display:grid;gap:10px;margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--warn-text);border-radius:6px;background:var(--surface)}
+.gitem p{margin:0 0 6px;font-size:14px;line-height:1.45}
+.gitem:not(.top){padding-top:8px;border-top:1px dashed var(--line)}
+.gacts{display:flex;flex-wrap:wrap;gap:8px}
+.gnote{margin:0;font-size:12.5px}
