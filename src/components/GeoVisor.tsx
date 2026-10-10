@@ -33,6 +33,8 @@ import { publishParts } from '@/lib/geo/publishSig';
 import type { Example } from '@/lib/geo/examples';
 import GeoPublishPanel from './GeoPublishPanel';
 import GeoCatalogPanel from './GeoCatalogPanel';
+import { exportGroups, type ExportGroup, type ExportKey, type ExportSpec } from '@/lib/geo/share';
+import './geo-share.css';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
   classStats, classify, CLASS_EXCLUDED, CLASS_VETO, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
@@ -831,22 +833,18 @@ export default function GeoVisor(props: Props) {
               {isAdmin && supabase && !geo.packId && (
                 <GeoCatalogPanel sb={supabase} userId={props.ownerId} title={props.title} objective={props.objective} criteria={criteria} geo={geo} cache={cache} ready={ready && !!geo.grid} />
               )}
-              <ExportList disabled={!ready} items={[
-                { k: 'zip', label: 'Paquete completo (.zip)', desc: 'Todo lo de abajo + cada capa de entrada como GeoTIFF + receta JSON. Lo que entregas al docente o abres en QGIS.', run: zip, primary: true },
-                { k: 'tif', label: `GeoTIFF de ${T.noun} (0–100) + estilo .qml`, desc: `Ráster georreferenciado en ${data?.grid.crs ?? 'UTM'}. Ábrelo en QGIS/ArcGIS y carga el .qml para los colores.`, run: geotiffPct },
-                { k: 'cls', label: 'GeoTIFF de clases + estilo .qml', desc: `${rm.names.map((nm, i) => `${i + 1} ${nm.toLowerCase()}`).join(' · ')} · ${rm.n + 1} ${T.critical.toLowerCase()} · 0 exclusión. Ideal para calcular áreas o vectorizar en QGIS.`, run: geotiffCls },
-                { k: 'compose', label: 'Componer mapa para entregar (PNG o PDF)', desc: 'Lámina con título, resultado, leyenda de las N clases, escala, norte y fuente. Se arma con el estado del proyecto, no con la vista actual; 1600, 2400 o 3600 px.', run: async () => setComposeOpen(true), opens: true },
-                { k: 'report', label: 'Informe ejecutivo (PDF)', desc: 'Objetivo, pesos con CR y consenso, reglas, mapa compuesto, área por clase, zonas, población, ranking de puntos y metodología (es/en). Se imprime desde el navegador.', run: async () => { void openReport(); }, opens: true },
-                { k: 'png', label: 'PNG de la vista actual (con mapa base y leyenda)', desc: 'El mapa tal como lo ves ahora, con título y leyenda. Para una lámina de entrega usa «Componer mapa».', run: pngMap },
-                { k: 'pngr', label: 'PNG solo del resultado (transparente)', desc: 'Únicamente los píxeles, sin mapa base: para superponer en tu propio diseño.', run: pngOnly },
-                { k: 'kmz', label: 'KMZ para Google Earth', desc: 'El resultado como imagen georreferenciada sobre el globo.', run: kmzOne },
-                ...(parcelRes?.parcels.length ? [
-                  { k: 'ptif', label: `GeoTIFF de parcelas (≥ ${minPatchHa} ha)`, desc: `Cada ${rm.direction === 'risk' ? 'zona contigua de «' + rm.names[rm.n - 1] + '»' : 'parcela contigua de alta aptitud'} con su número (0 = ninguna). Ábrelo en QGIS y vectorízalo.`, run: parcelsTif },
-                  { k: 'pcsv', label: 'CSV de parcelas', desc: `Número, hectáreas, ${T.noun} media y mínima y centroide (lon, lat) de cada ${rm.direction === 'risk' ? 'zona' : 'parcela'}.`, run: parcelsFile },
-                ] : []),
-                { k: 'csv', label: 'CSV de píxeles (lon, lat, %, clase)', desc: 'Importable como puntos en QGIS o Excel (máx. ~200 000 filas).', run: csv },
-                { k: 'xls', label: 'Excel de resumen', desc: 'Pesos, reglas, superficie por clase y datos de las capas.', run: xlsx },
-              ]} />
+              <ExportGroups disabled={!ready}
+                groups={exportGroups({ noun: T.noun, crs: data?.grid.crs ?? '', classNames: rm.names, critical: T.critical,
+                  parcels: parcelRes?.parcels.length ? { n: parcelRes.parcels.length, minHa: minPatchHa, label: rm.direction === 'risk' ? 'zona contigua de «' + rm.names[rm.n - 1] + '»' : 'parcela contigua de alta aptitud' } : null,
+                  hasPoints: ranked.length > 0, hasZones: !!zoneStats })}
+                run={{
+                  compose: async () => setComposeOpen(true),
+                  report: async () => { void openReport(); },
+                  xls: xlsx, tif: geotiffPct, kmz: kmzOne, cls: geotiffCls, csv, ptif: parcelsTif, pcsv: parcelsFile,
+                  rank: async () => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv'),
+                  zcsv: async () => { if (zoneStats) saveBytes(`${base}_zonas.csv`, zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction, popExp?.perZone, extremeName), 'text/csv'); },
+                  png: pngMap, pngr: pngOnly, zip,
+                }} />
             </div>
           )}
         </div>
@@ -945,28 +943,41 @@ export default function GeoVisor(props: Props) {
   );
 }
 
-/** `opens`: la acción abre un diálogo (no descarga): el botón dice «Abrir» y no se anuncia «listo, revisa tu carpeta». */
-type ExportItem = { k: string; label: string; desc: string; run: () => Promise<void>; primary?: boolean; opens?: boolean };
-/** Lista de descargas. El resultado de cada una se muestra en línea (antes los errores salían en un `alert()` y los
- * éxitos no decían nada): así una descarga que falla nunca pasa desapercibida. */
-function ExportList({ items, disabled }: { items: ExportItem[]; disabled: boolean }) {
+/** Grupos de descargas de la pestaña «Exportar». El resultado de cada una se muestra en línea (antes los errores salían en un
+ * `alert()` y los éxitos no decían nada): así una descarga que falla nunca pasa desapercibida. «Más formatos» va plegado. */
+function ExportGroups({ groups, run, disabled }: { groups: ExportGroup[]; run: Partial<Record<ExportKey, () => Promise<void>>>; disabled: boolean }) {
   const [running, setRunning] = useState('');
-  const [res, setRes] = useState<{ k: string; ok: boolean; msg: string } | null>(null);
+  const [res, setRes] = useState<{ ok: boolean; msg: string } | null>(null);
+  const row = (it: ExportSpec) => {
+    const fn = run[it.k];
+    return (
+      <div className={'gv-export' + (it.primary ? ' primary' : '')} key={it.k}>
+        <div><b>{it.label}</b><p>{it.desc}</p></div>
+        <button type="button" className={'btn sm' + (it.primary ? ' primary' : '')} disabled={disabled || !!running || !fn} aria-busy={running === it.k}
+          onClick={async () => {
+            if (!fn) return;
+            setRunning(it.k); setRes(null);
+            try { await fn(); if (!it.opens) setRes({ ok: true, msg: `«${it.label}»: listo, revisa tu carpeta de descargas.` }); }
+            catch (e) { setRes({ ok: false, msg: `«${it.label}» no se pudo generar: ${e instanceof Error ? e.message : String(e)}` }); }
+            setRunning('');
+          }}>
+          <Icon d={ICONS.download} size={13} /> {running === it.k ? 'Generando…' : it.opens ? 'Abrir' : 'Descargar'}
+        </button>
+      </div>
+    );
+  };
   return (
     <>
-      {items.map((it) => (
-        <div className={'gv-export' + (it.primary ? ' primary' : '')} key={it.k}>
-          <div><b>{it.label}</b><p>{it.desc}</p></div>
-          <button type="button" className={'btn sm' + (it.primary ? ' primary' : '')} disabled={disabled || !!running} aria-busy={running === it.k}
-            onClick={async () => {
-              setRunning(it.k); setRes(null);
-              try { await it.run(); if (!it.opens) setRes({ k: it.k, ok: true, msg: `«${it.label}»: listo, revisa tu carpeta de descargas.` }); }
-              catch (e) { setRes({ k: it.k, ok: false, msg: `«${it.label}» no se pudo generar: ${e instanceof Error ? e.message : String(e)}` }); }
-              setRunning('');
-            }}>
-            <Icon d={ICONS.download} size={13} /> {running === it.k ? 'Generando…' : it.opens ? 'Abrir' : 'Descargar'}
-          </button>
-        </div>
+      {groups.map((g) => g.folded ? (
+        <details className="gx-group" key={g.id}>
+          <summary>{g.title} <span className="gx-count">{g.items.length}</span></summary>
+          <div className="gx-items">{g.items.map(row)}</div>
+        </details>
+      ) : (
+        <section className="gx-group" key={g.id} aria-labelledby={`gx-${g.id}`}>
+          <h4 id={`gx-${g.id}`} className="gx-title">{g.title}</h4>
+          <div className="gx-items">{g.items.map(row)}</div>
+        </section>
       ))}
       <p className={'gv-hint' + (res && !res.ok ? ' warn' : '')} role={res && !res.ok ? 'alert' : 'status'} aria-live="polite">{res?.msg ?? ''}</p>
     </>
