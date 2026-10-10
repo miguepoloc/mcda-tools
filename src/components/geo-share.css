@@ -48,3 +48,9 @@ details.gx-group>summary:focus-visible{outline:2px solid var(--accent,#4D7C0F);o
 .gs-msg{font-size:13px;color:var(--muted);margin:0}
 .gs-warn-inline{font-size:13px;color:var(--ink,inherit);margin:0}
 @media (max-width:640px){.gs-link{grid-template-columns:1fr}.gs-qr{justify-items:start}}
+
+/* Geovisor montado pero fuera de pantalla (pestaña Compartir): mantiene su tamaño para que Leaflet no mida 0 px. */
+.gv-wrap.gs-away{position:absolute;left:-10000px;top:0;transform:none;visibility:hidden;pointer-events:none;height:0;overflow:hidden}
+.gs-host{max-width:760px}
+.gs-host:empty::before{content:"Cargando el mapa para poder publicarlo…";display:block;color:var(--muted);font-size:14px;padding:12px 0}
+.gs-details{--accent:var(--geo-accent,#84CC16);--accent-soft:var(--geo-accent-soft,rgba(132,204,22,.14))}

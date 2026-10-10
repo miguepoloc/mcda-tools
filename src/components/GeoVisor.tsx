@@ -31,7 +31,8 @@ import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
 import { publishParts } from '@/lib/geo/publishSig';
 import type { Example } from '@/lib/geo/examples';
-import GeoPublishPanel from './GeoPublishPanel';
+import GeoSharePanel from './GeoSharePanel';
+import { createPortal } from 'react-dom';
 import GeoCatalogPanel from './GeoCatalogPanel';
 import { exportGroups, type ExportGroup, type ExportKey, type ExportSpec } from '@/lib/geo/share';
 import './geo-share.css';
@@ -70,7 +71,14 @@ type Props = {
   onChangeGeo: (g: GeoConfig, immediate?: boolean) => void;
   examples: Example[];
   onApplyExample: (id: string) => void;
-  share: { isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void } | null;
+  /** Publicación: la tarjeta de «Compartir» se pinta con un portal en `slot` (contenedor de la pestaña Compartir del
+   * proyecto) porque necesita el mapa calculado, que vive aquí.
+   * El geovisor se oculta (no se desmonta) mientras la pestaña es Compartir. */
+  share: {
+    isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void;
+    slot: HTMLElement | null; away: boolean; fileBase: string;
+    onGoExperts: () => void; onPrioExcel: () => void;
+  } | null;
 };
 
 type Tab = 'capas' | 'modelo' | 'puntos' | 'zonas' | 'exportar';
@@ -135,7 +143,9 @@ export default function GeoVisor(props: Props) {
   const [tour, setTour] = useState(false);
   const [minPatchHa, setMinPatchHa] = useState(geo.minPatchHa ?? 0);
   const [baseline, setBaseline] = useState<{ label: string; pct: Uint8Array; stats: ClassStats } | null>(null);
-  useEffect(() => { if (!tourSeen()) { const t = setTimeout(() => setTour(true), 900); return () => clearTimeout(t); } }, []);
+  // El recorrido automático solo cuando el geovisor está a la vista (montado oculto en «Compartir» no debe abrirse).
+  const away = !!props.share?.away;
+  useEffect(() => { if (!away && !tourSeen()) { const t = setTimeout(() => setTour(true), 900); return () => clearTimeout(t); } }, [away]);
 
   const mapRef = useRef<GeoMapHandle>(null);
   const coordRef = useRef<HTMLSpanElement>(null);
@@ -821,15 +831,7 @@ export default function GeoVisor(props: Props) {
           {tab === 'exportar' && (
             <div className="gv-sec-stack">
               {!ready && <p className="gv-hint">Para exportar hace falta un mapa calculado: define el área, sube capas y asígnalas a criterios con su regla.</p>}
-              {props.share && (
-                <GeoPublishPanel sb={supabase} projectId={props.projectId} isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
-                  ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
-                  showPoints={!!geo.publicPoints} nPoints={points.length}
-                  showZones={!!geo.publicZones} zonesReady={!!zoneVec} hasPop={!!popVec}
-                  onShowZones={(on) => commit((g) => { const o = { ...g }; if (on) o.publicZones = true; else delete o.publicZones; return o; })}
-                  onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
-                  warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined} />
-              )}
+              {props.share && <p className="gv-hint">Para publicar el mapa con un enlace (y QR) usa la pestaña «Compartir» del proyecto.</p>}
               {isAdmin && supabase && !geo.packId && (
                 <GeoCatalogPanel sb={supabase} userId={props.ownerId} title={props.title} objective={props.objective} criteria={criteria} geo={geo} cache={cache} ready={ready && !!geo.grid} />
               )}
@@ -939,6 +941,17 @@ export default function GeoVisor(props: Props) {
           </div>
         )}
       </section>
+      {props.share?.slot && createPortal(
+        <GeoSharePanel sb={supabase} projectId={props.projectId} title={props.title} fileBase={props.share.fileBase}
+          isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
+          ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
+          showPoints={!!geo.publicPoints} nPoints={points.length} showZones={!!geo.publicZones} zonesReady={!!zoneVec} hasPop={!!popVec}
+          onShowZones={(on) => commit((g) => { const o = { ...g }; if (on) o.publicZones = true; else delete o.publicZones; return o; })}
+          onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
+          warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined}
+          onGoExperts={props.share.onGoExperts} onPrioExcel={props.share.onPrioExcel} />,
+        props.share.slot,
+      )}
     </div>
   );
 }
