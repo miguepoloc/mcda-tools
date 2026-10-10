@@ -1635,6 +1635,8 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 .gv-switch[aria-checked=true] .trk{background:var(--accent);border-color:var(--accent)}
 .gv-switch[aria-checked=true] .trk::after{left:18px;background:var(--bg)}
 .gv-switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.gv-lsel{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.gv-plabel-icon{pointer-events:none}
 .gv-labtog select{min-height:36px;font-size:12.5px;padding:4px 8px}
 @media (prefers-reduced-motion:no-preference){.gv-switch .trk,.gv-switch .trk::after{transition:background .12s,left .12s}}
 /* Etiquetas permanentes de los puntos en el mapa (nodo de texto; el HTML nunca se interpreta) */

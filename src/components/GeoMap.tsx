@@ -8,6 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import type * as Lf from 'leaflet';
 import type { Bounds } from '@/lib/geo/grid';
 import type { FC } from '@/lib/geo/vector';
+import { estimateLabelWidth, labelPriority, labelText, layoutLabels, LABEL_H, type LabelMode } from '@/lib/geo/pointLabels';
 
 export type BasemapKey = 'sat' | 'osm' | 'topo' | 'ocean' | 'dark';
 
@@ -23,7 +24,7 @@ export type RasterOverlay = { id: string; url: string; bounds: Bounds; opacity: 
 export type VectorOverlay = { id: string; fc: FC; color: string; visible: boolean };
 export type MapMarker = { id: string; lat: number; lon: number; label?: string; selected?: boolean };
 /** Punto del ranking: `color` = el de su clase (gris si no se evaluó), `tip` = «nombre · índice», `rank` = puesto (null = sin puesto). */
-export type PointMark = { id: string; lat: number; lon: number; tip: string; color: string; rank: number | null };
+export type PointMark = { id: string; lat: number; lon: number; tip: string; color: string; rank: number | null; name: string; pct: number | null };
 
 /** Estilo de un punto del ranking: el seleccionado es más grande y con aro blanco (no solo cambia el color); el que no
  * se evaluó va con relleno traslúcido y borde discontinuo. */
@@ -55,6 +56,10 @@ type Props = {
   /** Modo «Agregar punto»: cursor de cruz; el clic lo interpreta quien lo recibe. */
   addMode?: boolean;
   onPointClick?: (id: string) => void;
+  /** Etiquetas permanentes con el nombre de cada punto (null/ausente = apagadas). Solo caben las que no se solapan. */
+  labels?: { mode: LabelMode } | null;
+  /** Avisa si hubo etiquetas descartadas por falta de lugar («Acerca el mapa para ver más nombres»). */
+  onLabelsTrimmed?: (trimmed: boolean) => void;
   draft: Bounds | null;
   drawing: boolean;
   initialBounds: Bounds | null;
@@ -80,6 +85,12 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
   /** Marcadores del ranking: `sig` = lo que determina su estilo, `tip` = el texto del tooltip ya puesto. */
   const pmarks = useRef(new Map<string, { o: Lf.CircleMarker; sig: string; tip: string; mark: PointMark }>());
   const lastSel = useRef<string | null>(null);
+  /** Etiquetas permanentes puestas ahora (el `el` es un nodo de texto propio: nunca HTML). */
+  const lmarks = useRef(new Map<string, { o: Lf.Marker; el: HTMLElement; text: string; sel: boolean; lat: number; lon: number }>());
+  /** Lo que se ve rotulado (para dibujarlo en el PNG) y si hubo descartes. */
+  const shownLabels = useRef<{ text: string; lat: number; lon: number }[]>([]);
+  const trimmed = useRef(false);
+  const relabel = useRef<() => void>(() => {});
   const draftRect = useRef<Lf.Rectangle | null>(null);
   const cb = useRef(props);
   cb.current = props;
@@ -102,6 +113,8 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     m.createPane('gv-raster').style.zIndex = '410';
     m.createPane('gv-vector').style.zIndex = '420';
     m.createPane('gv-marks').style.zIndex = '430';
+    const lp = m.createPane('gv-labels');
+    lp.style.zIndex = '440'; lp.style.pointerEvents = 'none';
     const ib = cb.current.initialBounds;
     if (ib) m.fitBounds(toLBounds(L, ib), { padding: [30, 30] });
     else m.setView([8, -74], 5);
@@ -142,11 +155,15 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     };
     box.addEventListener('wheel', onWheel, { passive: false });
     m.on('mousemove', (e) => cb.current.onMove(e.latlng.lat, e.latlng.lng));
+    // Las etiquetas se reparten de nuevo al terminar de mover, acercar o redimensionar (con debounce).
+    let labelTimer: ReturnType<typeof setTimeout> | undefined;
+    const onView = () => { clearTimeout(labelTimer); labelTimer = setTimeout(() => relabel.current(), 120); };
+    m.on('moveend zoomend resize', onView);
     map.current = m;
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(host.current);
     const el = m.getContainer();
-    return () => { ro.disconnect(); el.removeEventListener('keydown', onKey); el.removeEventListener('wheel', onWheel); clearTimeout(hintTimer); hint.remove(); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); pmarks.current.clear(); lastSel.current = null; draftRect.current = null; };
+    return () => { clearTimeout(labelTimer); ro.disconnect(); el.removeEventListener('keydown', onKey); el.removeEventListener('wheel', onWheel); clearTimeout(hintTimer); hint.remove(); m.remove(); map.current = null; base.current = null; imgs.current.clear(); vecs.current.clear(); marks.current.clear(); pmarks.current.clear(); lmarks.current.clear(); shownLabels.current = []; trimmed.current = false; lastSel.current = null; draftRect.current = null; };
   }, [L]);
 
   // mapa base
@@ -261,6 +278,58 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     if (id) { const e = pmarks.current.get(id); if (e) { e.o.setStyle(pointStyle(e.mark, true)); e.o.bringToFront(); } }
   }, [L, props.selectedPointId]);
 
+  // etiquetas con el nombre: solo las que caben (descarte voraz por puesto, ver `lib/geo/pointLabels.ts`). Se actualizan en
+  // sitio; el texto va como nodo de texto porque los nombres los escribe o importa el usuario.
+  const labelMode = props.labels?.mode ?? null;
+  useEffect(() => {
+    const m = map.current;
+    if (!L || !m) return;
+    const run = () => {
+      const lab = cb.current.labels;
+      const list = lab ? cb.current.pointMarks ?? [] : [];
+      let visible: string[] = [];
+      let hidden = 0;
+      const byId = new Map(list.map((k) => [k.id, k]));
+      if (lab && list.length) {
+        const size = m.getSize();
+        const selId = cb.current.selectedPointId ?? null;
+        const items = list.map((k, i) => {
+          const p = m.latLngToContainerPoint([k.lat, k.lon]);
+          return { id: k.id, x: p.x, y: p.y, w: estimateLabelWidth(labelText(k, lab.mode)), h: LABEL_H, priority: labelPriority(k.rank, k.id === selId, i) };
+        });
+        ({ visible, hidden } = layoutLabels(items, { width: size.x, height: size.y }));
+      }
+      const keep = new Set(visible);
+      for (const [id, e] of lmarks.current) if (!keep.has(id)) { e.o.remove(); lmarks.current.delete(id); }
+      const selId = cb.current.selectedPointId ?? null;
+      const shown: { text: string; lat: number; lon: number }[] = [];
+      for (const id of visible) {
+        const k = byId.get(id);
+        if (!k || !lab) continue;
+        const text = labelText(k, lab.mode);
+        const sel = id === selId;
+        shown.push({ text, lat: k.lat, lon: k.lon });
+        const e = lmarks.current.get(id);
+        if (!e) {
+          const el = document.createElement('div');
+          el.className = 'gv-plabel' + (sel ? ' sel' : '');
+          el.textContent = text;
+          const o = L.marker([k.lat, k.lon], { icon: L.divIcon({ className: 'gv-plabel-icon', html: el, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'gv-labels' }).addTo(m);
+          lmarks.current.set(id, { o, el, text, sel, lat: k.lat, lon: k.lon });
+          continue;
+        }
+        if (e.text !== text) { e.el.textContent = text; e.text = text; }
+        if (e.sel !== sel) { e.el.classList.toggle('sel', sel); e.sel = sel; }
+        if (e.lat !== k.lat || e.lon !== k.lon) { e.o.setLatLng([k.lat, k.lon]); e.lat = k.lat; e.lon = k.lon; }
+      }
+      shownLabels.current = shown;
+      const t = hidden > 0;
+      if (trimmed.current !== t) { trimmed.current = t; cb.current.onLabelsTrimmed?.(t); }
+    };
+    relabel.current = run;
+    run();
+  }, [L, props.pointMarks, labelMode, props.selectedPointId]);
+
   // modo «Agregar punto»: cursor de cruz sobre el mapa
   useEffect(() => {
     const m = map.current;
@@ -354,6 +423,19 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
           ctx.fillStyle = '#FFFFFF'; ctx.fillText(String(k.rank), p.x, p.y + 0.5);
           ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
         }
+      }
+      // Etiquetas con nombre (si el interruptor está activo): las mismas que se ven en el mapa, con su caja.
+      if (cb.current.labels && shownLabels.current.length) {
+        ctx.font = '600 11px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+        for (const l of shownLabels.current) {
+          const p = m.latLngToContainerPoint([l.lat, l.lon]);
+          const w = Math.min(170, ctx.measureText(l.text).width + 12);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = 'rgba(11,15,23,.8)'; ctx.fillRect(p.x + 9, p.y - 10, w, 20);
+          ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.strokeRect(p.x + 9.5, p.y - 9.5, w - 1, 19);
+          ctx.fillStyle = '#FFFFFF'; ctx.fillText(l.text, p.x + 15, p.y + 0.5, w - 12);
+        }
+        ctx.textBaseline = 'alphabetic';
       }
       ctx.globalAlpha = 1;
       cv.toDataURL('image/png'); // lanza SecurityError si alguna tesela contaminó el lienzo

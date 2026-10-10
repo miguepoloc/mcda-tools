@@ -84,7 +84,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
     };
   }), [pubPoints, HEX, model, view.direction]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
-    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
   })), [rankRows, T]);
 

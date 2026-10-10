@@ -40,6 +40,7 @@ import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rank
 import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import type { LabelMode } from '@/lib/geo/pointLabels';
 import PointFicha from './GeoPointFicha';
 import GeoPointsPanel from './GeoPointsPanel';
 import type { RankRow } from './GeoPointsList';
@@ -98,6 +99,10 @@ export default function GeoVisor(props: Props) {
   // Puntos con ranking: modo «Agregar punto» (explícito), punto resaltado (tabla <-> mapa) y aviso del último intento.
   const [addMode, setAddMode] = useState(false);
   const [selPoint, setSelPoint] = useState<string | null>(null);
+  // Etiquetas con el nombre de cada punto en el mapa (apagadas por defecto; la vista pública tiene su propio criterio).
+  const [showNames, setShowNames] = useState(false);
+  const [nameMode, setNameMode] = useState<LabelMode>('name');
+  const [namesTrimmed, setNamesTrimmed] = useState(false);
   const [addNote, setAddNote] = useState('');
   // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
   // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
@@ -280,7 +285,7 @@ export default function GeoVisor(props: Props) {
     color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF',
   })), [ranked, RHEX]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
-    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
   })), [rankRows, T]);
   // Ficha de un punto de la lista (expansión en línea): el mismo cálculo y la misma presentación que la consulta del mapa.
@@ -626,6 +631,7 @@ export default function GeoVisor(props: Props) {
             <GeoPointsPanel
               points={points} ranked={ranked} rows={rankRows} renderDetail={renderPointDetail} direction={rm.direction} criticalLabel={T.critical}
               ready={!!(data && rules.length > 0)} addMode={addMode} onAddMode={setAddMode} addNote={addNote}
+              labels={{ on: showNames, mode: nameMode, trimmed: namesTrimmed, onOn: setShowNames, onMode: setNameMode }}
               selectedKey={selPoint}
               onSelect={(id) => { setSelPoint(id); const pt = id ? points.find((x) => x.id === id) : null; if (pt) mapRef.current?.panTo(pt.lat, pt.lon); }}
               onCenter={(id) => { const pt = points.find((x) => x.id === id); if (pt) { setSelPoint(id); mapRef.current?.flyTo(pt.lat, pt.lon, 13); } }}
@@ -666,7 +672,7 @@ export default function GeoVisor(props: Props) {
 
       <section className="gv-main">
         <div className="gv-stage">
-          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
+          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} labels={showNames ? { mode: nameMode } : null} onLabelsTrimmed={setNamesTrimmed} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
             initialBounds={gridBounds} onClick={onMapClick} onMove={onMove} onMarkerClick={onMarkerClick}
             onDrawn={(b) => { setDraft(b); setDrawing(false); }} />
 

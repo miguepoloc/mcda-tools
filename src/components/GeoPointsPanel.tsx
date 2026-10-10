@@ -8,6 +8,7 @@ import { mergeImported, parseCsvPoints, pointsFromFc, type ImportResult } from '
 import type { Direction } from '@/lib/geo/suitability';
 import ConfirmDialog from './ConfirmDialog';
 import { Icon, ICONS } from './GeoBits';
+import type { LabelMode } from '@/lib/geo/pointLabels';
 import GeoPointsList, { type RankRow } from './GeoPointsList';
 
 type Preview = { fileName: string; result: ImportResult; fc: unknown | null };
@@ -19,6 +20,8 @@ type Props = {
   points: GeoPoint[];
   ranked: RankedPoint[];
   rows: RankRow[];
+  /** Etiquetas con el nombre en el mapa: interruptor, texto («Nombre» / «Nombre + %») y aviso de descartes por falta de lugar. */
+  labels?: { on: boolean; mode: LabelMode; trimmed: boolean; onOn: (on: boolean) => void; onMode: (m: LabelMode) => void };
   /** Ficha del punto abierto en la lista (misma que la consulta del mapa). */
   renderDetail?: (row: RankRow) => ReactNode;
   direction: Direction;
@@ -152,7 +155,24 @@ export default function GeoPointsPanel(p: Props) {
           <>
             {!p.ready && <p className="gv-hint warn" role="status">Todavía no hay un mapa calculado (área, capas y reglas): los puntos se guardan y se evaluarán cuando lo haya.</p>}
             <GeoPointsList
-              rows={p.rows} renderDetail={p.renderDetail} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
+              rows={p.rows} renderDetail={p.renderDetail}
+              toolbar={p.labels && (
+                <div className="gv-labtog">
+                  <button type="button" role="switch" aria-checked={p.labels.on} className="gv-switch" onClick={() => p.labels?.onOn(!p.labels.on)}>
+                    <span className="trk" aria-hidden="true" /><span>Mostrar nombres en el mapa</span>
+                  </button>
+                  {p.labels.on && (
+                    <label className="gv-lsel">
+                      <span className="gv-hint">Texto </span>
+                      <select value={p.labels.mode} onChange={(e) => p.labels?.onMode(e.target.value as LabelMode)}>
+                        <option value="name">Nombre</option>
+                        <option value="namePct">Nombre + %</option>
+                      </select>
+                    </label>
+                  )}
+                  {p.labels.on && p.labels.trimmed && <p className="gv-hint" role="status">Acerca el mapa para ver más nombres.</p>}
+                </div>
+              )} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
               selectedKey={p.selectedKey} onSelect={p.onSelect} onCenter={p.onCenter}
               onRename={(id, name) => p.onChange(p.points.map((x) => (x.id === id ? { ...x, name } : x)))}
               onDelete={(id) => setToDelete(p.points.find((x) => x.id === id) ?? null)}
