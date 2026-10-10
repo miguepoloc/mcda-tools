@@ -28,6 +28,8 @@ import type { PrioState } from '@/lib/prio';
 import { buildAhpBreakdownData } from '@/lib/ahpBreakdown';
 import { describeMethodParams, electreCompareInfo } from '@/lib/rankCompare';
 import AggregateRanking from './AggregateRanking';
+import MethodologyParagraph from './MethodologyParagraph';
+import type { MethodologyInput } from '@/lib/methodologyText';
 import type { AggMethod } from '@/lib/aggregateRanking';
 import AhpBreakdown from './calc/AhpBreakdown';
 import AhpVsEqualWeights from './calc/AhpVsEqualWeights';
@@ -398,6 +400,19 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       weightsNote: weighting === 'ahp' ? 'AHP, de los juicios de los expertos' : WEIGHTING_SHORT[weighting],
     };
   }, [compareViews, alternatives, vEff, electreCompare, elecSyn, weighting]);
+
+  // Entrada del párrafo de metodología (es/en): todo sale del estado actual, nada de texto fijo.
+  const methodologyInput = useMemo<MethodologyInput>(() => ({
+    method, weighting, weightMethod: wm,
+    criteria: criteria.map((c) => ({ name: c.name })), weights: critWeights,
+    alternativeCount: alternatives.length,
+    expertCount: objective ? 0 : used.length,
+    criteriaCr: reportAhp?.criteriaSheet.cr,
+    altMaxCr: method === 'ahp' && reportAhp && reportAhp.altSheets.length ? Math.max(...reportAhp.altSheets.map((s) => s.cr)) : undefined,
+    vikorV: method === 'vikor' ? vEff : undefined,
+    cStar: method === 'electre' ? cEff : undefined,
+    dStar: method === 'electre' ? dEff : undefined,
+  }), [method, weighting, wm, criteria, critWeights, alternatives.length, objective, used.length, reportAhp, vEff, cEff, dEff]);
 
   // Con pesos objetivos el bloqueo depende SOLO de la matriz de decisión. Con pesos AHP en un método de matriz, sin juicios sobre los
   // criterios los pesos quedarían iguales en silencio: se bloquea y se manda a Expertos.
@@ -945,6 +960,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
         )}
       </div>
       )}
+
+      <MethodologyParagraph input={methodologyInput} />
 
       {/* Desglose de cálculo paso a paso (como en las diapositivas 1 a 4 del curso), de lo que el estudiante viene a justificar a lo que lo
           sustenta: el método → de dónde salieron los pesos → de dónde salieron los criterios → qué tan estable es. Cada bloque es una tarjeta
