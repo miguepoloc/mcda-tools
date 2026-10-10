@@ -689,10 +689,17 @@ export default function GeoVisor(props: Props) {
           <span className={criteria.length && rulesReady === criteria.length ? 'ok' : ''}><Icon d={criteria.length && rulesReady === criteria.length ? ICONS.check : ICONS.minus} size={12} /> Reglas {rulesReady}/{criteria.length}</span>
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
-        <div className="gv-tabs" role="tablist">
-          {(['capas', 'modelo', 'puntos', 'zonas', 'exportar'] as Tab[]).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', zonas: 'Zonas', exportar: 'Exportar' }[t]}</button>
-          ))}
+        <div className="gv-tabs" role="tablist" aria-label="Secciones del geovisor">
+          {(['capas', 'modelo', 'puntos', 'zonas', 'exportar'] as Tab[]).map((t) => {
+            const meta = { capas: ['Capas', ICONS.layers], modelo: ['Modelo', ICONS.sliders], puntos: ['Puntos', ICONS.pin], zonas: ['Zonas', ICONS.zones], exportar: ['Exportar', ICONS.download] }[t];
+            const n = t === 'puntos' ? points.length : 0;
+            return (
+              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} title={meta[0]}>
+                <Icon d={meta[1]} size={18} />
+                <span className="lbl">{meta[0]}{n > 0 && <span className="n" aria-label={` (${n})`}>{n}</span>}</span>
+              </button>
+            );
+          })}
         </div>
         <div className="gv-side-body">
           {lost > 0 && (

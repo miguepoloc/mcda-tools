@@ -1654,3 +1654,19 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 /* En el Geovisor el header no se queda pegado: al desplazar el panel lateral tapaba la barra del mapa (estilo,
    paleta, clases) y el panel quedaba a medias bajo la barra. El resto de la app conserva el header fijo. */
 .wrap:has(.gv-wrap) .topbar{position:static}
+
+/* ==== Pestañas del Geovisor con aspecto de pestañas (oct 2026) ====
+   Eran texto suelto en un fondo gris: no se leían como botones y con 5 ya no cabían en una fila.
+   Ahora: ícono + nombre, borde visible, hover y la activa resaltada con acento y barra inferior. */
+.gv-tabs{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;padding:0;background:transparent;border-radius:0}
+.gv-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;padding:8px 2px 6px;
+  background:var(--surface);color:var(--muted);border:1px solid var(--line);border-bottom-width:3px;border-radius:10px;font:600 12px var(--f-body);
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease}
+.gv-tabs button:hover{color:var(--ink);border-color:var(--gv-accent-strong);background:var(--surface2)}
+.gv-tabs button[aria-selected=true]{background:var(--accent-soft);color:var(--ink);border-color:var(--gv-accent-strong);box-shadow:none}
+.gv-tabs button svg{flex:none}
+.gv-tabs .lbl{display:inline-flex;align-items:center;gap:4px;min-width:0}
+.gv-tabs .n{font:600 10.5px var(--f-mono);padding:1px 5px;border-radius:99px;background:var(--gv-accent-strong);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .gv-tabs .n{color:#0B0F17}}
+:root[data-theme="dark"] .gv-tabs .n{color:#0B0F17}
+@media (prefers-reduced-motion:reduce){.gv-tabs button{transition:none}}
