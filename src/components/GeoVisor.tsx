@@ -143,7 +143,9 @@ export default function GeoVisor(props: Props) {
     geoRef.current = next;
     props.onChangeGeo(next, true);
   }, [props]);
-  const onSetup = useCallback((s: ClassSetup) => { setSetup(s); commit((g) => applySetup(g, s)); }, [commit]);
+  // Editar las clases cambia el mapa solo en la vista «por clases»: si el usuario estaba en «Continuo» (rampa sin
+  // cortes) no vería ningún efecto. Se pasa a la vista por clases al editar, para que el cambio se vea.
+  const onSetup = useCallback((s: ClassSetup) => { setSetup(s); setStyle('classes'); commit((g) => applySetup(g, s)); }, [commit]);
 
   // ------------------------------------------------------------------ carga de datos
   const gridSig = geo.grid ? JSON.stringify(geo.grid) : '';
