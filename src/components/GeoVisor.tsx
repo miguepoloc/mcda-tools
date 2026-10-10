@@ -547,8 +547,14 @@ export default function GeoVisor(props: Props) {
 
           {(extraLegend || (ready && resultOn)) && (
             <div className="gv-legends">
-              {extraLegend && <LayerLegend spec={extraLegend} palette={palette} />}
+              {/* El resultado siempre a la vista; la de la capa activa de arriba, plegable debajo. */}
               {ready && resultOn && <ResultLegend style={style} thresholds={thresholds} palette={palette} />}
+              {extraLegend && (ready && resultOn ? (
+                <details className="gv-legend-more">
+                  <summary>Leyenda de otra capa activa</summary>
+                  <LayerLegend spec={extraLegend} palette={palette} />
+                </details>
+              ) : <LayerLegend spec={extraLegend} palette={palette} />)}
             </div>
           )}
 
