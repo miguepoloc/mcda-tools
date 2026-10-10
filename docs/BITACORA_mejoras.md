@@ -50,3 +50,13 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 - **R5/H6:** firma por partes (`src/lib/geo/publishSig.ts`, `meta.sigParts`): solo pesos, reglas, umbrales, capas que alimentan el cálculo, exclusión y área; el aviso dice qué cambió. Publicaciones antiguas usan el aviso genérico. Prueba: `check-geo-publish-sig.ts` (17 casos).
 - **Rueda:** zoom solo con Ctrl/⌘ y aviso «Ctrl + rueda para acercar»; táctil y teclado intactos.
 - **Pendiente:** revisión visual (móvil ≤ 700 px, lector de pantalla) y el reemplazo de capa con Supabase real. CSS muerto `.gv-layer .del.ask` sin limpiar.
+
+### 7. Orden agregado, umbral crítico y párrafo de metodología (M1, M4, R3) — merge `92739b3`
+- **M1:** la comparativa propone un orden agregado cuando los métodos discrepan: Borda por defecto, Copeland como alternativa visible, con la regla explicada junto al resultado. ELECTRE queda fuera (no da ranking); los empates se declaran, no se desempatan; informa ganador de Condorcet y ciclos. `src/lib/aggregateRanking.ts`, prueba `check-aggregate-ranking.ts`. VIKOR en conjunto de compromiso entra con su orden por Q, con una nota (decisión del agente: revisable).
+- **M4:** tabla de umbral crítico por peso (Triantaphyllou y Sánchez, 1997) bajo el simulador what-if: cambio mínimo que altera el primer puesto, o «robusto» en [0, 1]. Reutiliza `analyzeSensitivity`; no reimplementa fórmulas. En AHP sin prioridades locales no se muestra.
+- **R3:** párrafo de metodología es/en generado del estado del proyecto; versión y DOI desde `version.ts`; solo citas ya verificadas en el repo; CR ≥ 0.10 se escribe «NO cumple».
+- **Excel:** sin cambios. Borda podría ir como fórmula viva (SUMPRODUCT); el umbral crítico exigiría una rejilla de celdas. Pendiente decidir.
+- **Pendiente:** revisión visual de las tres tarjetas y del fallback de copiado.
+
+## Estado al 10 oct (fin de la primera ola)
+Integrado en `main` local (sin push): contraste, header, E1, G4/G5/G14/R5/rueda, P1/P2/U1, M1/M4/R3. Typecheck, `npm test` y `test:excel` en verde. Sigue: dirección del índice + clases variables (G1/G2), luego puntos con ranking.
