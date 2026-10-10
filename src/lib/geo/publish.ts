@@ -1,7 +1,7 @@
 /** Codificación del mapa publicado (vista pública `/p/<token>`): dos planos Uint8 (idoneidad 0–100 y
  * clase) concatenados, gzip y base64, guardados en `geo_results.grid_b64` (ver migración 12). Puro
  * salvo por `CompressionStream`/`btoa`, presentes en navegadores y en Node ≥ 18. */
-import { CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, MASK_VALID } from './suitability.ts';
+import { CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, MASK_VALID, type Direction } from './suitability.ts';
 import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
@@ -11,17 +11,17 @@ import type { SigParts } from './publishSig.ts';
 export const CODE_EXCLUDED = 0;
 export const CODE_NODATA = 254;
 
-export type PublishedMeta = {
-  v: 1;
+/** Una clase evaluada tal como se publica (v2): nombre, color propio opcional (sin él la vista pública usa la
+ * paleta del lector), rango del índice 0–1 `[from, to)` (la última, cerrada), hectáreas y % del área evaluada. */
+export type PublishedClass = { name: string; color?: string; from: number; to: number; ha: number; pct: number };
+
+type PublishedBase = {
   grid: GeoGrid;
   bounds: Bounds;
   weights: { name: string; weight: number }[];
   cr: number;
   nExperts: number;
   weightsOrigin: string;
-  thresholds: { alta: number; media: number };
-  classes: { alta: number; media: number; noapta: number; excl: number };     // hectáreas
-  pct: { alta: number; media: number; noapta: number };                       // % del área evaluada
   evaluableHa: number;
   attribution?: string;
   /** AHP de los criterios (matriz, λmax, CR, consenso, incertidumbre, expertos sin nombre). Ausente en publicaciones anteriores. */
@@ -31,6 +31,42 @@ export type PublishedMeta = {
   /** Firma por partes (pesos, reglas, umbrales, capas, área) para decir QUÉ cambió. Ausente en publicaciones anteriores. */
   sigParts?: SigParts;
 };
+
+/** v1: siempre aptitud con 3 clases (alta / moderada / no apta); el plano de clase codifica la vetada como 4. */
+export type PublishedMetaV1 = PublishedBase & {
+  v: 1;
+  thresholds: { alta: number; media: number };
+  classes: { alta: number; media: number; noapta: number; excl: number };     // hectáreas
+  pct: { alta: number; media: number; noapta: number };                       // % del área evaluada
+};
+
+/** v2: dirección del índice y N clases (2–8). El plano de clase usa 1..N (ascendente por índice), `CLASS_VETO` (253)
+ * para vetada, 0 = exclusión y 254 = sin dato. */
+export type PublishedMetaV2 = PublishedBase & {
+  v: 2;
+  direction: Direction;
+  classes: PublishedClass[];
+  /** Hectáreas vetadas (ya sumadas a la clase extrema de la dirección) y exclusión. */
+  vetoHa: number;
+  exclHa: number;
+};
+
+export type PublishedMeta = PublishedMetaV1 | PublishedMetaV2;
+
+/** Lo que la vista pública necesita, igual para v1 y v2 (v1 = aptitud de 3 clases con los nombres de siempre). */
+export type PublishedView = { direction: Direction; classes: PublishedClass[]; exclHa: number; vetoHa: number; legacyVeto: boolean };
+export function publishedView(meta: PublishedMeta): PublishedView {
+  if (meta.v === 2) return { direction: meta.direction, classes: meta.classes, exclHa: meta.exclHa, vetoHa: meta.vetoHa, legacyVeto: false };
+  const { media, alta } = meta.thresholds;
+  return {
+    direction: 'suitability', legacyVeto: true, exclHa: meta.classes.excl, vetoHa: 0,
+    classes: [
+      { name: 'No apta', from: 0, to: media, ha: meta.classes.noapta, pct: meta.pct.noapta },
+      { name: 'Moderada', from: media, to: alta, ha: meta.classes.media, pct: meta.pct.media },
+      { name: 'Alta aptitud', from: alta, to: 1, ha: meta.classes.alta, pct: meta.pct.alta },
+    ],
+  };
+}
 
 async function pipe(bytes: Uint8Array, s: CompressionStream | DecompressionStream): Promise<Uint8Array> {
   const src = new Blob([bytes as BlobPart]).stream().pipeThrough(s as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
