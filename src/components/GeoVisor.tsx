@@ -586,14 +586,15 @@ export default function GeoVisor(props: Props) {
       references: refVecs.map((v) => ({ id: v.id, name: geo.layers?.[v.id]?.label ?? v.name, fc: v.fc, color: geo.layers?.[v.id]?.ref?.color ?? v.color, weight: geo.layers?.[v.id]?.ref?.weight ?? 2 })),
       zones: zoneVec && zoneStats ? {
         name: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, fc: zoneVec.fc,
-        fills: zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`)),
+        fills: zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${modelRampColor(z.meanPct / 100, rm, palette).join(',')})`)),
         labels: zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`),
       } : null,
       // Mismo orden y mismos puestos que la lista: sin puesto (fuera del área, excluido, sin dato) = hueco gris sin número.
       points: ranked.map((r) => ({ lat: r.lat, lon: r.lon, rank: r.rank, name: r.name, color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF' })),
       legend: { classes: summ.classes, ranges: summ.ranges ?? [] },
       classColors: RHEX,
-      rampStops: PALETTES[palette].stops.map(([t]) => `rgb(${rampColor(t, palette, rm.direction).join(',')})`),
+      // 11 muestras equiespaciadas de la rampa DEL MODELO (la misma del mapa y de la leyenda), no de la paleta fija.
+      rampStops: Array.from({ length: 11 }, (_, k) => `rgb(${modelRampColor(k / 10, rm, palette).join(',')})`),
       texts: { legendTitle: T.legendTitle, lowEnd: T.lowEnd, highEnd: T.highEnd, direction: rm.direction, zoneRampTitle: `${T.indexName} medio por zona` },
       footer: {
         sources: summ.layers.map((l) => (l.source ? `${l.label} (${l.source})` : l.label)),
