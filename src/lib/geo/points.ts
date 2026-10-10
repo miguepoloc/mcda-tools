@@ -11,7 +11,7 @@
 import { lonLatToPixel } from './crs.ts';
 import type { GeoData } from './data.ts';
 import { DIR_TEXT } from './classes.ts';
-import { evaluateOnePoint, type PointEval, type PointStatus } from './pointEval.ts';
+import { evaluateOnePoint, type PointEval, type PointRow, type PointStatus } from './pointEval.ts';
 import type { CriterionRule, Direction } from './suitability.ts';
 
 export const MAX_POINTS = 300;
@@ -29,6 +29,8 @@ export type RankedPoint = GeoPoint & {
   rank: number | null;
   /** Texto de la clase (o del estado cuando no se pudo evaluar). */
   label: string;
+  /** Desglose por criterio del MISMO `PointEval` (solo en puntos evaluados); lo usa la publicación. */
+  rows?: PointRow[];
 };
 
 export const STATUS_LABEL: Record<Exclude<PointStatus, 'ok'>, string> = {
@@ -59,6 +61,7 @@ export function rankPoints(points: GeoPoint[], evalOne: (p: GeoPoint) => PointEv
     return {
       ...p, status, pct: ok ? e.pct : null, cls: ok ? e.cls : 0, vetoed: ok && e.vetoed,
       rank: null, label: status === 'ok' ? labelOf(e.cls) : STATUS_LABEL[status],
+      ...(ok && e.rows.length ? { rows: e.rows } : {}),
     };
   });
   const evaluated = rows.filter((r) => r.status === 'ok');
@@ -100,11 +103,62 @@ export function rankingCsv(rows: RankedPoint[], direction: Direction): string {
   return lines.join('\n') + '\n';
 }
 
-/** Punto tal como viaja en la publicación (`meta.points`). Sin ids: la vista pública no los necesita. */
-export type PublishedPoint = { name: string; lat: number; lon: number; pct: number | null; cls: number; status: PointStatus; rank: number | null };
+/** Línea del desglose publicado: SOLO el nombre del criterio (el mismo de `meta.weights`), su valor ya con unidad y los
+ * números del aporte. Nunca la clave de la capa ni su archivo. `suit`/`weight`/`contrib` son null si el criterio no tenía
+ * dato en ese punto (no vota). `veto` solo aparece cuando es true. */
+export type PublishedRow = { label: string; value: string; suit: number | null; weight: number | null; contrib: number | null; veto?: boolean };
 
-export const toPublishedPoints = (rows: RankedPoint[]): PublishedPoint[] =>
-  rows.map((r) => ({ name: r.name, lat: round6(r.lat), lon: round6(r.lon), pct: r.pct, cls: r.cls, status: r.status, rank: r.rank }));
+/** Punto tal como viaja en la publicación (`meta.points`). Sin ids: la vista pública no los necesita. `rows` es aditivo y
+ * opcional: publicaciones anteriores no lo traen y los puntos sin evaluar tampoco. */
+export type PublishedPoint = { name: string; lat: number; lon: number; pct: number | null; cls: number; status: PointStatus; rank: number | null; rows?: PublishedRow[] };
+
+/** Tope de puntos con desglose en la publicación (por tamaño del meta: ver informe). Los mejor ubicados primero. */
+export const MAX_PUBLISHED_BREAKDOWN = 100;
+
+const round3 = (v: number) => Math.round(v * 1e3) / 1e3;
+
+/** `nameOfKey` traduce la clave interna de la capa al nombre del CRITERIO; sin traducción la línea se rotula «Criterio N»
+ * (nunca el nombre de la capa o del archivo). Con `breakdown: false` no viaja ningún desglose. */
+export function toPublishedPoints(rows: RankedPoint[], opts: { breakdown?: boolean; nameOfKey?: (key: string) => string | undefined } = {}): PublishedPoint[] {
+  const withRows = opts.breakdown === false ? 0 : MAX_PUBLISHED_BREAKDOWN;
+  let n = 0;
+  return rows.map((r) => {
+    const base: PublishedPoint = { name: r.name, lat: round6(r.lat), lon: round6(r.lon), pct: r.pct, cls: r.cls, status: r.status, rank: r.rank };
+    if (r.status !== 'ok' || !r.rows?.length || n >= withRows) return base;
+    n++;
+    base.rows = r.rows.map((x, i): PublishedRow => ({
+      label: (x.key !== undefined ? opts.nameOfKey?.(x.key) : undefined) ?? `Criterio ${i + 1}`,
+      value: x.value,
+      suit: x.suit == null ? null : round3(x.suit),
+      weight: x.weight == null ? null : round3(x.weight),
+      contrib: x.part == null ? null : round3(x.part),
+      ...(x.veto ? { veto: true } : {}),
+    }));
+    return base;
+  });
+}
+
+/** Normaliza un desglose publicado (viene de `meta`, o sea de fuera): descarta lo mal formado y no deja pasar claves extra. */
+export function sanitizePublishedRows(rows: unknown): PublishedRow[] {
+  if (!Array.isArray(rows)) return [];
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const out: PublishedRow[] = [];
+  for (const x of rows as Partial<PublishedRow>[]) {
+    if (!x || typeof x.label !== 'string' || typeof x.value !== 'string') continue;
+    const suit = num(x.suit), weight = num(x.weight), contrib = num(x.contrib);
+    const votes = suit !== null && weight !== null && contrib !== null;
+    out.push({ label: x.label, value: x.value, suit: votes ? suit : null, weight: votes ? weight : null, contrib: votes ? contrib : null, ...(x.veto === true ? { veto: true } : {}) });
+  }
+  return out;
+}
+
+/** Desglose publicado → `PointRow[]` para `PointFicha`. */
+export function publishedRowsToPointRows(rows: unknown): PointRow[] {
+  return sanitizePublishedRows(rows).map((x) => ({
+    label: x.label, value: x.value, veto: x.veto === true, suit: x.suit, weight: x.weight, part: x.contrib,
+    contrib: x.suit !== null && x.weight !== null ? `${x.suit.toFixed(2)} × ${x.weight.toFixed(2)}${x.veto ? ' · VETO' : ''}` : 'no vota',
+  }));
+}
 
 /** Normaliza lo guardado en `geo.points` (jsonb: puede venir con basura o pasar del tope). */
 export function sanitizePoints(raw: unknown): GeoPoint[] {

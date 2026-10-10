@@ -68,7 +68,7 @@ ok(Number.isFinite(part.lat) && Number.isFinite(part.lon), 'devuelve lat/lon');
 
 // ---------------------------------------------------------------- ranking de puntos (lib/geo/points.ts)
 {
-  const { evaluateLonLat, rankPoints, rankHeading, rankingCsv, nextPointName, sanitizePoints, toPublishedPoints, STATUS_LABEL, MAX_POINTS } = await import('../src/lib/geo/points.ts');
+  const { evaluateLonLat, rankPoints, rankHeading, rankingCsv, nextPointName, sanitizePoints, toPublishedPoints, sanitizePublishedRows, publishedRowsToPointRows, MAX_PUBLISHED_BREAKDOWN, STATUS_LABEL, MAX_POINTS } = await import('../src/lib/geo/points.ts');
   const { pixelToLonLat } = await import('../src/lib/geo/crs.ts');
   const A = new Float32Array(N).fill(50), B = new Float32Array(N).fill(0);
   const cell = (c: number, r: number) => r * W + c;
@@ -131,6 +131,46 @@ ok(Number.isFinite(part.lat) && Number.isFinite(part.lon), 'devuelve lat/lon');
   ok(sanitizePoints(Array.from({ length: 500 }, (_, i) => ({ id: `i${i}`, name: 'n', lat: 0, lon: 0 }))).length === MAX_POINTS, `saneado: tope de ${MAX_POINTS}`);
   const pub = toPublishedPoints(rankPoints(pts, (p) => evaluateLonLat(d2, r2, { breaks: [0.45, 0.7], direction: 'suitability' }, p), label));
   ok(pub.length === pts.length && !('id' in pub[0]) && pub.filter((p) => p.pct === null).length === 4, 'publicables: sin ids y con pct null si no se evaluó');
+
+  // desglose publicado: mismas cifras que pointEval, sin claves de capa ni etiquetas de capa, redondeadas a 3 decimales
+  {
+    const cfgP = { breaks: [0.45, 0.7], direction: 'suitability' as const };
+    const rk = rankPoints(pts, (p) => evaluateLonLat(d2, r2, cfgP, p), label);
+    const withB = toPublishedPoints(rk, { nameOfKey: (k) => ({ a: 'Criterio Alfa', b: 'Criterio Beta' } as Record<string, string>)[k] });
+    const noB = toPublishedPoints(rk, { breakdown: false });
+    const altoPub = withB.find((p) => p.name === 'alto')!;
+    const altoEval = evaluateLonLat(d2, r2, cfgP, pts[2]);
+    ok(!!altoPub.rows && altoPub.rows.length === 2 && altoPub.rows[0].label === 'Criterio Alfa' && altoPub.rows[1].label === 'Criterio Beta', 'rows: una línea por criterio, rotulada con el nombre del criterio');
+    ok(altoPub.rows!.every((r, i) => Math.abs((r.suit as number) - (altoEval.rows[i].suit as number)) < 1e-3 && Math.abs((r.contrib as number) - (altoEval.rows[i].part as number)) < 1e-3 && r.value === altoEval.rows[i].value), 'rows: idoneidad, aporte y valor salen del mismo pointEval');
+    ok(altoPub.rows!.every((r) => [r.suit, r.weight, r.contrib].every((n) => n === null || Math.round((n as number) * 1000) / 1000 === n)), 'rows: números a 3 decimales');
+    const txt = JSON.stringify(withB);
+    ok(!/"key"|layerKey|"a"|"b"/.test(JSON.stringify(altoPub.rows)) && !txt.includes('"A"') && !txt.includes('"B"') && !txt.includes('.tif'), 'rows: sin claves de capa ni etiquetas de capa');
+    const unmapped = toPublishedPoints(rk).find((p) => p.name === 'alto')!;
+    ok(unmapped.rows![0].label === 'Criterio 1', 'rows: sin nombre de criterio se rotula «Criterio N», nunca la capa');
+    ok(withB.filter((p) => p.status !== 'ok').every((p) => !('rows' in p)), 'rows: los puntos sin evaluar no llevan desglose');
+    ok(noB.every((p) => !('rows' in p)), 'rows: con breakdown=false no viaja ninguno');
+    const vt = withB.find((p) => p.name === 'veto')!;
+    ok(vt.rows!.some((r) => r.veto === true) && !altoPub.rows!.some((r) => 'veto' in r), 'rows: veto solo cuando es verdadero');
+    // sin dato en un criterio: no vota
+    const nd = toPublishedPoints([{ ...rk[0], rows: [{ key: 'a', label: 'A', value: 'sin dato', contrib: 'no vota', veto: false, suit: null, weight: null, part: null }] }], { nameOfKey: () => 'X' })[0];
+    ok(nd.rows![0].suit === null && publishedRowsToPointRows(nd.rows)[0].contrib === 'no vota', 'rows: criterio sin dato = no vota');
+    // ida y vuelta a PointRow
+    const back = publishedRowsToPointRows(JSON.parse(JSON.stringify(altoPub.rows)));
+    ok(back.length === 2 && back[0].contrib === `${(altoPub.rows![0].suit as number).toFixed(2)} × ${(altoPub.rows![0].weight as number).toFixed(2)}` && back[0].part === altoPub.rows![0].contrib, 'rows: ida y vuelta a PointRow');
+    // tolerancia a basura
+    ok(sanitizePublishedRows('x').length === 0 && sanitizePublishedRows(null).length === 0 && sanitizePublishedRows([null, 3, { label: 1 }, { label: 'a' }]).length === 0, 'rows mal formado: se descarta');
+    const dirty = sanitizePublishedRows([{ label: 'a', value: '1 m', suit: 'x', weight: 0.5, contrib: 0.2, extra: 'secreto.tif', key: 'k' }]);
+    ok(dirty.length === 1 && dirty[0].suit === null && dirty[0].weight === null && !('extra' in dirty[0]) && !('key' in dirty[0]), 'rows: números inválidos = no vota y claves extra no pasan');
+    // tamaño: 300 puntos × 6 criterios
+    const many = Array.from({ length: 300 }, (_, i) => ({
+      ...rk[0], name: `Punto ${i + 1}`, rank: i + 1,
+      rows: Array.from({ length: 6 }, (_, j) => ({ key: `k${j}`, label: `x`, value: `${(1234.5678 + i).toFixed(2)} m`, contrib: '', veto: false, suit: 0.1234567 * (j + 1), weight: 1 / 6, part: 0.0123456 })),
+    }));
+    const big = toPublishedPoints(many, { nameOfKey: (k) => `Distancia al criterio ${k}` });
+    const kb = JSON.stringify(big).length / 1024;
+    ok(big.filter((p) => p.rows).length === MAX_PUBLISHED_BREAKDOWN, `tope de ${MAX_PUBLISHED_BREAKDOWN} puntos con desglose`);
+    ok(kb < 100, `300 puntos × 6 criterios pesa ${kb.toFixed(0)} KB (< 100 KB)`);
+  }
 
   // Excel: hoja «Puntos» solo con valores; los no evaluados con celdas vacías (nunca 0)
   const { buildGeoWorkbook } = await import('../src/lib/geoExcel.ts');

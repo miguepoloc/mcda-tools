@@ -709,7 +709,7 @@ export default function GeoVisor(props: Props) {
       attribution: data.attribution, sig: resultSig, sigParts: sigParts ?? undefined,
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
       // Con el interruptor apagado NO viaja ni la lista: el meta lo recibe cualquiera con el enlace.
-      ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked) } : {}),
+      ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked, { nameOfKey: (k) => criteria.find((c) => geo.rules[c.id]?.layerKey === k)?.name }) } : {}),
       // Solo agregados por zona (nunca los polígonos de entrada ni la población por manzana).
       ...(zonesSpec && zoneStats && zoneVec ? { showZones: true, zones: toPublishedZones(zoneStats, { layer: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, withPoints: !!geo.publicPoints && points.length > 0, pop: popExp?.perZone, extremeName }) } : {}),
     };

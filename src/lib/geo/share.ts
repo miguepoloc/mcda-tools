@@ -89,8 +89,8 @@ export function viewerRows(o: { showPoints: boolean; showZones: boolean; nPoints
     { key: 'map', label: 'El mapa, las clases y los pesos', locked: true, checked: true,
       desc: 'Siempre: el resultado, los pesos con su consistencia y, al hacer clic, el % de un punto. Nunca tus capas de entrada ni los nombres de tus expertos.' },
     { key: 'points', label: 'Puntos y ranking', checked: o.showPoints,
-      desc: 'Tus puntos con su índice, clase y puesto.',
-      ...(o.showPoints ? { warn: `Los nombres y ubicaciones de ${o.nPoints === 1 ? 'tu punto' : `tus ${o.nPoints} puntos`} serán públicos para cualquiera con el enlace, junto con su índice, clase y puesto. ${when}` } : {}) },
+      desc: 'Tus puntos con su índice, clase y puesto, y al abrir uno, el valor de cada criterio en su ubicación.',
+      ...(o.showPoints ? { warn: `Los nombres y ubicaciones de ${o.nPoints === 1 ? 'tu punto' : `tus ${o.nPoints} puntos`} serán públicos para cualquiera con el enlace, junto con su índice, clase y puesto y, al abrir un punto, el valor de cada criterio en su ubicación (con su idoneidad, peso y aporte). No se publican tus capas de entrada. ${when}` } : {}) },
     { key: 'zones', label: 'Resumen por zonas', checked: o.showZones,
       desc: 'Por zona: nombre, índice medio, superficie y % por clase; sin polígonos.',
       ...(o.showZones ? { warn: o.zonesReady
