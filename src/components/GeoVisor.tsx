@@ -24,7 +24,8 @@ import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/members
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
 import { downloadRef, nameFields } from '@/lib/geo/refLayer';
 import { buildZoneGrid, cellOf, defaultZoneOrder, zonalStats, zonesCsv } from '@/lib/geo/zonal';
-import { fcBounds } from '@/lib/geo/vector';
+import { exposure, populationPoints } from '@/lib/geo/population';
+import { fcBounds, numericFields } from '@/lib/geo/vector';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
@@ -304,7 +305,7 @@ export default function GeoVisor(props: Props) {
   useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
 
   // ------------------------------------------------------------------ resumen por zonas
-  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref).map((v) => ({ key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: v.fc.features.length, fields: nameFields(v.fc) })), [vecs, geo.layers]);
+  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref).map((v) => ({ key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: v.fc.features.length, fields: nameFields(v.fc), numFields: numericFields(v.fc) })), [vecs, geo.layers]);
   const zoneVec = useMemo(() => (geo.zonal ? vecs.find((v) => v.ref && v.id === geo.zonal!.layer) ?? null : null), [vecs, geo.zonal]);
   const zoneGrid = useMemo(() => (zoneVec && data ? buildZoneGrid(zoneVec.fc, data.grid, geo.zonal?.nameField) : null), [zoneVec, data, geo.zonal?.nameField]);
   const zoneStats = useMemo(() => {
@@ -312,10 +313,18 @@ export default function GeoVisor(props: Props) {
     const pointCells = points.map((p) => cellOf(data.grid, p.lon, p.lat));
     return zonalStats({ zones: zoneGrid, pct: ev.pct, cls: ev.cls, mask: data.mask, haPerPixel: data.grid.haPerPixel, nClasses: rm.n, direction: rm.direction, pointCells });
   }, [zoneGrid, data, ev, rm.n, rm.direction, points]);
+  // Población (opcional): cada polígono con valor se asigna entero a la celda de su centroide.
+  const popVec = useMemo(() => (geo.zonal?.popLayer && geo.zonal.popField ? vecs.find((v) => v.ref && v.id === geo.zonal!.popLayer) ?? null : null), [vecs, geo.zonal]);
+  const popPts = useMemo(() => (popVec && geo.zonal?.popField ? populationPoints(popVec.fc, geo.zonal.popField) : null), [popVec, geo.zonal?.popField]);
+  const popExp = useMemo(() => (popPts && data && ev
+    ? exposure({ pts: popPts.pts, grid: data.grid, pct: ev.pct, cls: ev.cls, mask: data.mask, nClasses: rm.n, direction: rm.direction, zones: zoneGrid })
+    : null), [popPts, data, ev, rm.n, rm.direction, zoneGrid]);
+  const extremeName = rm.names[rm.direction === 'risk' ? rm.n - 1 : 0];
   const zoneRows = useMemo<ZoneRowView[] | null>(() => (zoneStats ? defaultZoneOrder(zoneStats).map((z) => ({
     key: String(z.index), name: z.name, meanPct: z.meanPct, ha: z.ha, classPct: z.classPct, points: points.length ? z.points : null,
     color: z.meanPct === null ? undefined : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`,
-  })) : null), [zoneStats, points.length, palette, rm.direction]);
+    ...(popExp ? { pop: popExp.perZone[z.index]?.evaluated ?? 0, popExtremePct: popExp.perZone[z.index]?.extremePct ?? null } : {}),
+  })) : null), [zoneStats, points.length, palette, rm.direction, popExp]);
   const onZoneSel = useCallback((key: string) => {
     setSelZone(key);
     const f = zoneVec?.fc.features[Number(key)];
@@ -688,8 +697,10 @@ export default function GeoVisor(props: Props) {
               layers={zoneLayers} sel={geo.zonal} ready={!!(data && ev && rules.length > 0)} rows={zoneRows} classNames={rm.names} direction={rm.direction}
               rampCss={rampCss(palette, rm.direction)} choropleth={choro} onChoropleth={setChoro} nPoints={points.length}
               selectedKey={selZone} onSelect={onZoneSel} onGoLayers={() => setTab('capas')}
+              extremeName={extremeName}
+              expo={popExp && popPts ? { byClass: popExp.byClass, evaluated: popExp.evaluated, notEvaluated: popExp.notEvaluated, outside: popExp.outside, total: popExp.total, skipped: popPts.skipped } : null}
               onSel={(z) => commit((g) => { const o = { ...g }; if (z) o.zonal = z; else delete o.zonal; return o; })}
-              onCsv={() => { if (zoneStats) saveBytes(`${base}_zonas.csv`, zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction), 'text/csv'); }} />
+              onCsv={() => { if (zoneStats) saveBytes(`${base}_zonas.csv`, zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction, popExp?.perZone, extremeName), 'text/csv'); }} />
           )}
           {tab === 'exportar' && (
             <div className="gv-sec-stack">

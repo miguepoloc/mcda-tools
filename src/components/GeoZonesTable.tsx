@@ -11,11 +11,15 @@ export type ZoneRowView = {
   meanPct: number | null; ha: number;
   classPct: (number | null)[];
   points: number | null;
+  /** Personas con celda evaluada en la zona (null = no se pidió población). */
+  pop?: number | null;
+  /** % de esa población en la clase más extrema de la dirección (null = sin población evaluada). */
+  popExtremePct?: number | null;
   /** Color del índice medio (rampa del mapa), solo como apoyo: el número va siempre en texto. */
   color?: string;
 };
 
-type SortKey = 'name' | 'meanPct' | 'ha' | 'points' | `c${number}`;
+type SortKey = 'name' | 'meanPct' | 'ha' | 'points' | 'pop' | 'popPct' | `c${number}`;
 type Dir = 'asc' | 'desc';
 
 type Props = {
@@ -26,19 +30,23 @@ type Props = {
   /** Texto del orden por defecto: «Mayor riesgo primero» / «Más apto primero». */
   heading: string;
   showPoints: boolean;
+  /** Columnas de población; `extremeName` = nombre de la clase más extrema (riesgo: la más alta; aptitud: la menos apta). */
+  showPop?: boolean; extremeName?: string;
   selectedKey?: string | null;
   onSelect?: (key: string) => void;
 };
 
 const fmt1 = (v: number) => v.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-export default function GeoZonesTable({ rows, classNames, indexLabel, heading, showPoints, selectedKey, onSelect }: Props) {
+export default function GeoZonesTable({ rows, classNames, indexLabel, heading, showPoints, showPop, extremeName, selectedKey, onSelect }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({ key: 'meanPct', dir: 'desc' });
   const val = (r: ZoneRowView, k: SortKey): number | string | null => {
     if (k === 'name') return r.name;
     if (k === 'meanPct') return r.meanPct;
     if (k === 'ha') return r.meanPct === null ? null : r.ha;
     if (k === 'points') return r.points;
+    if (k === 'pop') return r.pop ? r.pop : null;
+    if (k === 'popPct') return r.popExtremePct ?? null;
     return r.classPct[Number(k.slice(1))] ?? null;
   };
   const sorted = useMemo(() => rows.slice().sort((a, b) => compareNullsLast(val(a, sort.key), val(b, sort.key), sort.dir, a.name, b.name)), [rows, sort]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,6 +73,8 @@ export default function GeoZonesTable({ rows, classNames, indexLabel, heading, s
             {th('ha', 'ha evaluadas')}
             {classNames.map((n, i) => th(`c${i}` as SortKey, `% ${n}`))}
             {showPoints && th('points', 'Puntos')}
+            {showPop && th('pop', 'Personas evaluadas')}
+            {showPop && th('popPct', `% personas en «${extremeName ?? ''}»`)}
           </tr>
         </thead>
         <tbody>
@@ -84,6 +94,9 @@ export default function GeoZonesTable({ rows, classNames, indexLabel, heading, s
                   </>
                 )}
                 {showPoints && <td className="num">{r.points ?? '—'}</td>}
+                {showPop && (r.pop
+                  ? <><td className="num">{Math.round(r.pop).toLocaleString('es-CO')}</td><td className="num">{r.popExtremePct === null || r.popExtremePct === undefined ? '—' : `${fmt1(r.popExtremePct)} %`}</td></>
+                  : <td className="na-cell" colSpan={2}>Sin población evaluada</td>)}
               </tr>
             );
           })}

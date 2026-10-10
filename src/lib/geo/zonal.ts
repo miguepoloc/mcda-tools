@@ -125,14 +125,23 @@ export const zoneOrderHeading = (d: Direction) => (d === 'risk' ? 'Mayor riesgo 
 const csvCell = (s: string) => (/[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 const num = (v: number | null, d: number) => (v === null ? '' : v.toFixed(d));
 
-/** CSV (coma, punto decimal): una fila por zona, en el orden dado; celdas vacías (nunca 0) cuando no hay área evaluada. */
-export function zonesCsv(rows: ZoneStat[], classNames: string[], direction: Direction): string {
-  const head = ['zona', DIR_TEXT[direction].csvIdx + '_medio', 'ha_evaluadas', 'ha_excluidas', ...classNames.map((n) => csvCell(`pct_${n}`)), 'puntos', 'estado'];
+/** Exposición de la población de una zona (ver `population.ts`), solo para el CSV. */
+export type ZonePopCsv = { evaluated: number; byClass: number[]; notEvaluated: number; extremePct: number | null };
+
+/** CSV (coma, punto decimal): una fila por zona, en el orden dado; celdas vacías (nunca 0) cuando no hay área evaluada.
+ * Con `pop` añade personas por clase, población evaluada y el % en la clase más extrema (vacío si no hay población evaluada). */
+export function zonesCsv(rows: ZoneStat[], classNames: string[], direction: Direction, pop?: ZonePopCsv[] | null, extremeName = ''): string {
+  const popHead = pop ? [...classNames.map((n) => csvCell(`personas_${n}`)), 'poblacion_evaluada', 'poblacion_sin_evaluar', csvCell(`pct_poblacion_${extremeName || 'clase_extrema'}`)] : [];
+  const head = ['zona', DIR_TEXT[direction].csvIdx + '_medio', 'ha_evaluadas', 'ha_excluidas', ...classNames.map((n) => csvCell(`pct_${n}`)), 'puntos', ...popHead, 'estado'];
   const lines = [head.join(',')];
   for (const r of rows) {
+    const q = pop?.[r.index];
+    const popCells = pop
+      ? q ? [...q.byClass.map((v) => Math.round(v)), Math.round(q.evaluated), Math.round(q.notEvaluated), num(q.extremePct, 1)] : [...classNames.map(() => ''), '', '', '']
+      : [];
     lines.push([
       csvCell(r.name), num(r.meanPct, 1), r.cells ? r.ha.toFixed(2) : '', r.exclHa.toFixed(2),
-      ...r.classPct.map((p) => num(p, 1)), r.points, r.cells ? 'Evaluada' : NO_AREA,
+      ...r.classPct.map((p) => num(p, 1)), r.points, ...popCells, r.cells ? 'Evaluada' : NO_AREA,
     ].join(','));
   }
   return lines.join('\n') + '\n';
