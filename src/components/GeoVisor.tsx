@@ -89,7 +89,7 @@ const TOUR: TourStep[] = [
   { sel: '.gv-side-body', tab: 'modelo', title: 'Pesos y reglas', text: 'Aquí ves los pesos del panel y, por cada criterio, eliges la capa y la regla que la traduce a idoneidad (0 a 1), con vista previa. El mapa cambia en vivo.' },
   { sel: '.gv-leaflet', title: 'El mapa', text: 'Muévete y acerca como en cualquier mapa. Haz clic en un punto para ver su % de idoneidad, su clase y cuánto aporta cada criterio.' },
   { sel: '.gv-hud-tr', title: 'Mapa base y estilo', text: 'Cambia el mapa base (satélite, calles, relieve, océano) y muestra el resultado continuo o por clases.' },
-  { sel: '.gv-side-body', tab: 'exportar', title: 'Exportar y publicar', text: 'GeoTIFF (con estilo para QGIS), PNG, KMZ, CSV, Excel y un .zip con todo. Aquí también activas la vista pública con enlace.' },
+  { sel: '.gv-side-body', tab: 'exportar', title: 'Exportar', text: 'Solo descargas, en grupos: para tu informe (lámina PNG/PDF, informe ejecutivo, Excel), para QGIS o Google Earth (GeoTIFF + .qml, KMZ), más formatos y un .zip con todo. Para publicar con enlace y QR usa la pestaña «Compartir» del proyecto.' },
 ];
 type Deps = unknown[];
 /** Variables CSS de clase según la paleta: así los recuadros de color de los paneles (`--geo-alta`…) siguen a la del mapa. */
@@ -832,9 +832,6 @@ export default function GeoVisor(props: Props) {
             <div className="gv-sec-stack">
               {!ready && <p className="gv-hint">Para exportar hace falta un mapa calculado: define el área, sube capas y asígnalas a criterios con su regla.</p>}
               {props.share && <p className="gv-hint">Para publicar el mapa con un enlace (y QR) usa la pestaña «Compartir» del proyecto.</p>}
-              {isAdmin && supabase && !geo.packId && (
-                <GeoCatalogPanel sb={supabase} userId={props.ownerId} title={props.title} objective={props.objective} criteria={criteria} geo={geo} cache={cache} ready={ready && !!geo.grid} />
-              )}
               <ExportGroups disabled={!ready}
                 groups={exportGroups({ noun: T.noun, crs: data?.grid.crs ?? '', classNames: rm.names, critical: T.critical,
                   parcels: parcelRes?.parcels.length ? { n: parcelRes.parcels.length, minHa: minPatchHa, label: rm.direction === 'risk' ? 'zona contigua de «' + rm.names[rm.n - 1] + '»' : 'parcela contigua de alta aptitud' } : null,
@@ -949,7 +946,10 @@ export default function GeoVisor(props: Props) {
           onShowZones={(on) => commit((g) => { const o = { ...g }; if (on) o.publicZones = true; else delete o.publicZones; return o; })}
           onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
           warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined}
-          onGoExperts={props.share.onGoExperts} onPrioExcel={props.share.onPrioExcel} />,
+          onGoExperts={props.share.onGoExperts} onPrioExcel={props.share.onPrioExcel}
+          catalog={isAdmin && supabase && !geo.packId
+            ? <GeoCatalogPanel sb={supabase} userId={props.ownerId} title={props.title} objective={props.objective} criteria={criteria} geo={geo} cache={cache} ready={ready && !!geo.grid} />
+            : null} />,
         props.share.slot,
       )}
     </div>

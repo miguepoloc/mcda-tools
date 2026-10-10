@@ -174,7 +174,7 @@ export default function GeoAdmin({ client }: { client?: SupabaseClient } = {}) {
 
       <details open style={{ marginTop: 10 }}>
         <summary>Catálogo del curso ({packs.length})</summary>
-        <p className="muted" style={{ fontSize: 13 }}>Los paquetes se crean desde un proyecto de mapa tuyo: Geovisor → Exportar → «Catálogo del curso». Aquí los activas, ocultas o borras.</p>
+        <p className="muted" style={{ fontSize: 13 }}>Los paquetes se crean desde un proyecto de mapa tuyo: pestaña Compartir → «Catálogo del curso». Aquí los activas, ocultas o borras.</p>
         <div className="tbl" style={{ marginTop: 10 }} role="region" aria-label="Paquetes del catálogo (desplázala para ver más columnas)" tabIndex={0}>
           <table>
             <caption className="sr-only">Paquetes del catálogo del curso</caption>
