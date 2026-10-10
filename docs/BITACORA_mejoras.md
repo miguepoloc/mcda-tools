@@ -36,3 +36,17 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 
 ### 4. Plan técnico de puntos, G1 y zonal — `a71011c`
 - Ver `docs/PLAN_puntos_ranking.md`. Hallazgos que cambian el plan: los vectores subidos no se persisten (solo se rasterizan), el Excel del geovisor es solo valores, y los marcadores de punto son SVG (no salen en el PNG).
+
+### 5. Versión/DOI, «Reportar un problema» y pegar matriz (P1, P2, U1) — merge `2148f93`
+- **P1/H16:** la sección de citación decía «versión 0.1.0» fija; ahora sigue a `APP_RELEASE_TAG`. No hay otros literales desactualizados. Nota: el CHANGELOG fecha 1.0.0 el 2026-10-02 (tag); el GitHub Release se publicó el 2026-10-07. No se cambió.
+- **P2:** «Reportar un problema» en el pie y en el menú de usuario, con versión, ruta saneada (`/e/:token`, `/p/:token`) y método; nunca ids, tokens ni correo. Plantillas de issue en `.github/ISSUE_TEMPLATE`. Prueba: `check-report-issue.ts`.
+- **U1:** pegar bloques de Excel/Sheets en la matriz de decisión, con vista previa, avisos por celda, límite a la matriz y «Deshacer el pegado». Parser puro `src/lib/paste-matrix.ts`; prueba `check-paste-matrix.ts`.
+- **Pendiente:** revisión visual y paste real desde Excel; confirmar que la etiqueta `bug` existe en GitHub.
+
+### 6. Geovisor: leyendas, área, capas, publicación y rueda (G4, G5, G14, R5) — merge `ad0d948`
+- **G4/H10:** la leyenda del resultado siempre visible; las de otras capas en un `<details>` debajo. Se borró la regla muerta `.gv-legend{display:none}`.
+- **G5/H5:** una cifra «Área evaluada» y la «Extensión de la grilla» rotulada aparte.
+- **G14/H9:** aviso de archivo duplicado (reemplazar conservando reglas, o subir como nueva; por defecto nueva) y `ConfirmDialog` nombrando la capa en lugar del «¿Seguro?» de 3 s.
+- **R5/H6:** firma por partes (`src/lib/geo/publishSig.ts`, `meta.sigParts`): solo pesos, reglas, umbrales, capas que alimentan el cálculo, exclusión y área; el aviso dice qué cambió. Publicaciones antiguas usan el aviso genérico. Prueba: `check-geo-publish-sig.ts` (17 casos).
+- **Rueda:** zoom solo con Ctrl/⌘ y aviso «Ctrl + rueda para acercar»; táctil y teclado intactos.
+- **Pendiente:** revisión visual (móvil ≤ 700 px, lector de pantalla) y el reemplazo de capa con Supabase real. CSS muerto `.gv-layer .del.ask` sin limpiar.
