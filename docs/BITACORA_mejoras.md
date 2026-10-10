@@ -61,3 +61,11 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 
 ## Estado al 10 oct (fin de la primera ola)
 Integrado en `main` local (sin push): contraste, header, E1, G4/G5/G14/R5/rueda, P1/P2/U1, M1/M4/R3. Typecheck, `npm test` y `test:excel` en verde. Sigue: dirección del índice + clases variables (G1/G2), luego puntos con ranking.
+
+### 8. Dirección del índice y clases variables 2–8 (G1, G2) — merge `0ffb6d6`
+- **Qué:** `geo.direction?` (ausente = aptitud) y `geo.classModel` (2–8 clases, cortes contiguos 0–1, nombre y color por clase, `cut: manual|quantile|jenks` congelado hasta «Recalcular»). Proyecto nuevo: 3 clases 45/70 y la pregunta «un valor alto significa más apto / más riesgo» en NewProject (el tipo pasa a «Mapa SIG»). Evaluación de un punto extraída a `src/lib/geo/pointEval.ts`.
+- **Códigos:** 0 excluido, 1..N clases, 253 vetada (en GeoTIFF/QML sale como N+1), 254 sin dato. `CLASS_VETO` pasó de 4 a 253 porque con ≥ 4 clases el 4 chocaba con una clase real; las publicaciones v1 se leen con `legacyVeto`.
+- **Veto en riesgo:** índice 100, etiquetado «Condición crítica»; en aptitud sigue 0 y «Vetada». La exclusión nunca es 0 %.
+- **Compatibilidad:** proyecto antiguo = 3 clases sin migrar; `geo.classes {alta, media}` queda como espejo con 3 clases (lo lee el catálogo); un proyecto sin tocar conserva su firma de publicación; publicación v2 y vista pública lee v1 como aptitud de 3 clases.
+- **Verificación:** `check-geo-points`, `check-geo-cuts`, `check-geo-classes`, `check-geo-direction` y `check-geo-publish` (v1/v2); typecheck, 884 verificaciones y `test:excel` en verde.
+- **Pendiente (visual):** editor de clases, leyendas con N filas, rampa invertida, `<input type="color">`, pregunta en NewProject, vista pública v1/v2, PNG con N clases, persistencia real en Supabase; textos de «idoneidad» que quedan en el tutorial/tour en modo riesgo; pruebas de parcelas con N≠3.
