@@ -23,8 +23,13 @@ export const gunzip = (b: Uint8Array) => pipe(b, new DecompressionStream('gzip')
 
 export const layerPath = (ownerId: string, projectId: string, key: string) => `${ownerId}/${projectId}/${key}.f32.gz`;
 
-export async function uploadLayer(sb: SupabaseClient, path: string, data: Float32Array): Promise<number> {
-  const gz = await gzip(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+/** Polígonos de referencia: el FeatureCollection original, `<key>.geojson.gz` (mismo bucket y cuota que las capas). */
+export const REF_EXT = '.geojson.gz';
+export const refPath = (ownerId: string, projectId: string, key: string) => `${ownerId}/${projectId}/${key}${REF_EXT}`;
+export const isRefPath = (path: string) => path.endsWith(REF_EXT);
+
+/** Sube bytes ya comprimidos: cuota (`geo_check_upload`) y luego Storage. Devuelve el tamaño subido. */
+export async function uploadGz(sb: SupabaseClient, path: string, gz: Uint8Array): Promise<number> {
   const chk = await sb.rpc('geo_check_upload', { p_path: path, p_bytes: gz.byteLength });
   if (chk.error) throw new Error(chk.error.message);
   const { error } = await sb.storage.from(BUCKET).upload(path, new Blob([gz as BlobPart], { type: 'application/gzip' }), { upsert: true, contentType: 'application/gzip' });
@@ -32,10 +37,19 @@ export async function uploadLayer(sb: SupabaseClient, path: string, data: Float3
   return gz.byteLength;
 }
 
-export async function downloadLayer(sb: SupabaseClient, path: string): Promise<Float32Array> {
+/** Baja y descomprime un archivo del bucket. */
+export async function downloadGz(sb: SupabaseClient, path: string): Promise<Uint8Array> {
   const { data, error } = await sb.storage.from(BUCKET).download(path);
   if (error || !data) throw new Error(error?.message ?? 'No se pudo descargar la capa');
-  const raw = await gunzip(new Uint8Array(await data.arrayBuffer()));
+  return gunzip(new Uint8Array(await data.arrayBuffer()));
+}
+
+export async function uploadLayer(sb: SupabaseClient, path: string, data: Float32Array): Promise<number> {
+  return uploadGz(sb, path, await gzip(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)));
+}
+
+export async function downloadLayer(sb: SupabaseClient, path: string): Promise<Float32Array> {
+  const raw = await downloadGz(sb, path);
   return new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
 }
 
@@ -90,7 +104,7 @@ export async function cloneLayers<T extends { path: string; bytes: number }>(
   try {
     for (const [key, meta] of Object.entries(layers)) {
       if (!meta.path) { out[key] = meta; continue; }
-      const dest = layerPath(ownerId, toProject, key);
+      const dest = isRefPath(meta.path) ? refPath(ownerId, toProject, key) : layerPath(ownerId, toProject, key);
       const chk = await sb.rpc('geo_check_upload', { p_path: dest, p_bytes: meta.bytes });
       if (chk.error) throw new Error(chk.error.message);
       const { error } = await sb.storage.from(BUCKET).copy(meta.path, dest);

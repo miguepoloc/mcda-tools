@@ -22,6 +22,10 @@ type Props = {
   showPoints: boolean;
   onShowPoints: (on: boolean) => void;
   nPoints: number;
+  /** Interruptor GLOBAL del resumen por zonas (solo agregados). Apagado por defecto. */
+  showZones: boolean; onShowZones: (on: boolean) => void;
+  /** Hay una capa de zonas elegida en la pestaña «Zonas» (sin ella el interruptor no publica nada). */
+  zonesReady: boolean; hasPop: boolean;
 };
 
 export default function GeoPublishPanel(p: Props) {
@@ -69,6 +73,19 @@ export default function GeoPublishPanel(p: Props) {
         </p>
       ) : (
         <p className="gv-hint">Apagado: la vista pública no recibe tus puntos (ni sus nombres ni ubicaciones).</p>
+      )}
+      <label className="gv-check">
+        <input type="checkbox" checked={p.showZones} onChange={(e) => p.onShowZones(e.target.checked)} /> Mostrar resumen por zonas en la vista pública
+      </label>
+      {p.showZones ? (
+        <p className="gv-hint warn" role="status">
+          {p.zonesReady
+            ? <>Se publicará, por zona, su nombre, el índice medio, la superficie y el % por clase{p.hasPop ? ', y la cantidad de personas evaluadas y su % en la clase más extrema' : ''}. <b>No</b> se publican los polígonos ni la población por manzana. Serán públicos para cualquiera con el enlace; revisa que los nombres de las zonas y las cifras puedan divulgarse.</>
+            : <>Elige una capa de zonas en la pestaña «Zonas»: sin ella no se publica nada.</>}
+          {' '}Se publica al pulsar «{status ? 'Actualizar el mapa publicado' : 'Publicar el mapa'}».
+        </p>
+      ) : (
+        <p className="gv-hint">Apagado: la vista pública no recibe el resumen por zonas.</p>
       )}
       {p.isPublic && (
         <div className="linkbox">

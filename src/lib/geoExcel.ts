@@ -23,6 +23,11 @@ export type GeoSummary = {
   points?: { rank: number | null; name: string; lat: number; lon: number; pct: number | null; classLabel: string; state: string }[];
   /** Texto del orden: «Más apto primero» / «Mayor riesgo primero». */
   pointsOrder?: string;
+  /** Resumen por zonas ya ordenado. Ausente = sin hoja «Zonas». `meanPct`/`classPct` null = sin área evaluada (celda vacía, nunca 0). */
+  zones?: {
+    layer: string; order: string; classNames: string[]; extremeName?: string;
+    rows: { name: string; meanPct: number | null; ha: number; exclHa: number; classPct: (number | null)[]; points: number; pop?: { byClass: number[]; evaluated: number; notEvaluated: number; extremePct: number | null } }[];
+  };
 };
 
 export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
@@ -61,6 +66,28 @@ export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
       [],
       ['Nota', 'Valores calculados al exportar (no son fórmulas vivas). Cada punto toma el índice de la celda del mapa donde cae; empates comparten puesto (1, 2, 2, 4). Excluido, fuera del área o sin dato = sin puesto ni índice.'],
     ], [9, 30, 12, 12, 24, 22, 24]);
+  }
+  if (s.zones?.rows.length) {
+    const z = s.zones;
+    const hasPop = z.rows.some((r) => r.pop);
+    add('Zonas', [
+      [`Resumen por zonas · ${z.layer}${z.order ? ` · ${z.order}` : ''}`], [],
+      ['Zona', risk ? 'Riesgo medio (0–100)' : 'Idoneidad media (0–100)', 'ha evaluadas', 'ha en exclusión', ...z.classNames.map((n) => `% ${n}`), 'Puntos',
+        ...(hasPop ? [...z.classNames.map((n) => `Personas ${n}`), 'Personas evaluadas', 'Personas sin evaluar', `% personas en «${z.extremeName ?? ''}»`] : []), 'Estado'],
+      // Una zona sin área evaluada lleva celdas vacías (nunca 0 %): se rotula «Sin área evaluada».
+      ...z.rows.map((r) => {
+        const has = r.meanPct !== null;
+        return [
+          r.name, has ? Number((r.meanPct as number).toFixed(2)) : '', has ? Number(r.ha.toFixed(2)) : '', Number(r.exclHa.toFixed(2)),
+          ...r.classPct.map((p) => (p === null ? '' : Number(p.toFixed(2)))), r.points,
+          ...(hasPop ? (r.pop ? [...r.pop.byClass.map((v) => Math.round(v)), Math.round(r.pop.evaluated), Math.round(r.pop.notEvaluated), r.pop.extremePct === null ? '' : Number(r.pop.extremePct.toFixed(2))] : [...z.classNames.map(() => ''), '', '', '']) : []),
+          has ? 'Evaluada' : 'Sin área evaluada',
+        ];
+      }),
+      [],
+      ['Nota', 'Valores calculados al exportar (no son fórmulas vivas). Cada celda pertenece a la zona que contiene su centro; solo cuentan las celdas evaluadas (exclusión y fuera del área no cuentan como 0 %). El índice medio es el promedio simple de esas celdas.'],
+      ...(hasPop ? [['Población', 'La población de cada polígono se asigna entera a la celda de su centroide (el total se conserva; un polígono que cruza varias celdas cuenta en una sola).']] : []),
+    ], [28, 18, 14, 14, ...z.classNames.map(() => 14), 9, ...(hasPop ? [...z.classNames.map(() => 14), 16, 18, 22] : []), 20]);
   }
   return wb;
 }

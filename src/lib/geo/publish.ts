@@ -7,12 +7,22 @@ import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
 import type { SigParts } from './publishSig.ts';
 import type { PublishedPoint } from './points.ts';
+import type { PublishedZones } from './zonal.ts';
 
 /** Puntos que la vista pública debe mostrar: solo con `showPoints` y una lista válida (publicaciones anteriores → null). */
 export function publishedPoints(meta: { showPoints?: boolean; points?: unknown }): PublishedPoint[] | null {
   if (meta.showPoints !== true || !Array.isArray(meta.points)) return null;
   const out = (meta.points as Partial<PublishedPoint>[]).filter((p) => p && typeof p.name === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon)) as PublishedPoint[];
   return out.length ? out : null;
+}
+
+/** Resumen por zonas que la vista pública debe mostrar: solo con `showZones` y filas válidas (publicaciones anteriores → null). */
+export function publishedZones(meta: { showZones?: boolean; zones?: unknown }): PublishedZones | null {
+  if (meta.showZones !== true || !meta.zones || typeof meta.zones !== 'object') return null;
+  const z = meta.zones as Partial<PublishedZones>;
+  if (!Array.isArray(z.rows) || !z.rows.length) return null;
+  const rows = z.rows.filter((r) => r && typeof r.name === 'string' && Array.isArray(r.classPct));
+  return rows.length ? { layer: typeof z.layer === 'string' ? z.layer : '', rows, ...(typeof z.extremeName === 'string' ? { extremeName: z.extremeName } : {}) } : null;
 }
 
 /** Códigos del plano de clase publicado. */
@@ -42,6 +52,9 @@ type PublishedBase = {
    * el meta completo lo recibe cualquiera con el enlace. Campos opcionales y aditivos: no suben la versión del meta. */
   points?: PublishedPoint[];
   showPoints?: boolean;
+  /** Resumen por zonas (agregados). SOLO viaja con el interruptor `showZones` (por defecto apagado). Aditivo: no sube `v`. */
+  zones?: PublishedZones;
+  showZones?: boolean;
 };
 
 /** v1: siempre aptitud con 3 clases (alta / moderada / no apta); el plano de clase codifica la vetada como 4. */

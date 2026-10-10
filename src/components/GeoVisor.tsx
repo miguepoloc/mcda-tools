@@ -14,7 +14,7 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } from '@/lib/geo/data';
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
-import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, rampCss, type PaletteKey } from '@/lib/geo/paint';
 import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import { normalizeBreaks } from '@/lib/geo/classes';
 import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
@@ -22,6 +22,10 @@ import { findParcels } from '@/lib/geo/patches';
 import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
+import { downloadRef, nameFields } from '@/lib/geo/refLayer';
+import { buildZoneGrid, cellOf, defaultZoneOrder, toPublishedZones, zonalStats, zoneOrderHeading, zonesCsv } from '@/lib/geo/zonal';
+import { exposure, populationPoints } from '@/lib/geo/population';
+import { fcBounds, numericFields } from '@/lib/geo/vector';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
@@ -37,12 +41,14 @@ import { kmz, parcelsCsv, pixelsCsv, qmlClasses, qmlPct, resultRaster, safeName,
 import { downloadGeoExcelBytes, type GeoSummary } from '@/lib/geoExcel';
 import type { Criterion, ExpertRow, GeoConfig, GeoLayerMeta } from '@/lib/types';
 import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rankHeading, rankingCsv, rankPoints, round6, sanitizePoints, toPublishedPoints, type GeoPoint } from '@/lib/geo/points';
-import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
+import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
 import type { LabelMode } from '@/lib/geo/pointLabels';
 import PointFicha from './GeoPointFicha';
 import GeoPointsPanel from './GeoPointsPanel';
+import GeoZonesPanel from './GeoZonesPanel';
+import type { ZoneRowView } from './GeoZonesTable';
 import type { RankRow } from './GeoPointsList';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
@@ -58,7 +64,7 @@ type Props = {
   share: { isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void } | null;
 };
 
-type Tab = 'capas' | 'modelo' | 'puntos' | 'exportar';
+type Tab = 'capas' | 'modelo' | 'puntos' | 'zonas' | 'exportar';
 
 const TOUR: TourStep[] = [
   { sel: '.gv-steps-bar', tab: 'capas', title: 'Cuatro pasos', text: 'Área → Capas → Reglas → Pesos. Cada marca se pone verde cuando ese paso está listo. Los pesos vienen de tus expertos (pestaña «Expertos» del proyecto).' },
@@ -103,6 +109,9 @@ export default function GeoVisor(props: Props) {
   const [showNames, setShowNames] = useState(false);
   const [nameMode, setNameMode] = useState<LabelMode>('name');
   const [namesTrimmed, setNamesTrimmed] = useState(false);
+  // Resumen por zonas: mapa coroplético (color por índice medio) y zona resaltada en la tabla.
+  const [choro, setChoro] = useState(false);
+  const [selZone, setSelZone] = useState<string | null>(null);
   const [addNote, setAddNote] = useState('');
   // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
   // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
@@ -149,7 +158,8 @@ export default function GeoVisor(props: Props) {
 
   // ------------------------------------------------------------------ carga de datos
   const gridSig = geo.grid ? JSON.stringify(geo.grid) : '';
-  const layersSig = geo.packId + '|' + JSON.stringify(Object.entries(geo.layers ?? {}).map(([k, l]) => [k, l.path, l.role, l.bytes, l.min, l.max]));
+  // Las capas de referencia (polígonos) no alimentan el cálculo: no entran a la firma ni disparan la recarga de rásters.
+  const layersSig = geo.packId + '|' + JSON.stringify(Object.entries(geo.layers ?? {}).filter(([, l]) => l.role !== 'reference').map(([k, l]) => [k, l.path, l.role, l.bytes, l.min, l.max]));
   useEffect(() => {
     let alive = true;
     setError('');
@@ -158,7 +168,7 @@ export default function GeoVisor(props: Props) {
     // intermedio la vaciaría a mitad de un lote. Borrar una capa o cambiar el área limpia la caché de
     // forma explícita en GeoLayersPanel.
     const load = async (metas: Record<string, GeoLayerMeta>, fetchOne: (m: GeoLayerMeta) => Promise<Float32Array>, cells: number, errs: string[]) => {
-      const need = Object.keys(metas).filter((k) => !cache.current[k] && metas[k].path);
+      const need = Object.keys(metas).filter((k) => !cache.current[k] && metas[k].path && metas[k].role !== 'reference');
       if (need.length) setLoading(true);
       let done = 0;
       for (const k of need) {
@@ -174,6 +184,7 @@ export default function GeoVisor(props: Props) {
       const layers: Record<string, Float32Array> = {}; const info: Record<string, LayerInfo> = {};
       let missing = 0;
       for (const [k, m] of Object.entries(metas)) {
+        if (m.role === 'reference') continue; // polígonos de referencia: viven en `vecs`, no en la grilla
         if (!cache.current[k]) { missing++; continue; }
         layers[k] = cache.current[k];
         info[k] = { label: m.label, unit: m.unit, role: m.role, min: m.min, max: m.max, origin: m.origin, source: m.source, bytes: m.bytes, license: m.license };
@@ -308,6 +319,34 @@ export default function GeoVisor(props: Props) {
   }, [addMode]);
   useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
 
+  // ------------------------------------------------------------------ resumen por zonas
+  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref).map((v) => ({ key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: v.fc.features.length, fields: nameFields(v.fc), numFields: numericFields(v.fc) })), [vecs, geo.layers]);
+  const zoneVec = useMemo(() => (geo.zonal ? vecs.find((v) => v.ref && v.id === geo.zonal!.layer) ?? null : null), [vecs, geo.zonal]);
+  const zoneGrid = useMemo(() => (zoneVec && data ? buildZoneGrid(zoneVec.fc, data.grid, geo.zonal?.nameField) : null), [zoneVec, data, geo.zonal?.nameField]);
+  const zoneStats = useMemo(() => {
+    if (!zoneGrid || !data || !ev) return null;
+    const pointCells = points.map((p) => cellOf(data.grid, p.lon, p.lat));
+    return zonalStats({ zones: zoneGrid, pct: ev.pct, cls: ev.cls, mask: data.mask, haPerPixel: data.grid.haPerPixel, nClasses: rm.n, direction: rm.direction, pointCells });
+  }, [zoneGrid, data, ev, rm.n, rm.direction, points]);
+  // Población (opcional): cada polígono con valor se asigna entero a la celda de su centroide.
+  const popVec = useMemo(() => (geo.zonal?.popLayer && geo.zonal.popField ? vecs.find((v) => v.ref && v.id === geo.zonal!.popLayer) ?? null : null), [vecs, geo.zonal]);
+  const popPts = useMemo(() => (popVec && geo.zonal?.popField ? populationPoints(popVec.fc, geo.zonal.popField) : null), [popVec, geo.zonal?.popField]);
+  const popExp = useMemo(() => (popPts && data && ev
+    ? exposure({ pts: popPts.pts, grid: data.grid, pct: ev.pct, cls: ev.cls, mask: data.mask, nClasses: rm.n, direction: rm.direction, zones: zoneGrid })
+    : null), [popPts, data, ev, rm.n, rm.direction, zoneGrid]);
+  const extremeName = rm.names[rm.direction === 'risk' ? rm.n - 1 : 0];
+  const zoneRows = useMemo<ZoneRowView[] | null>(() => (zoneStats ? defaultZoneOrder(zoneStats).map((z) => ({
+    key: String(z.index), name: z.name, meanPct: z.meanPct, ha: z.ha, classPct: z.classPct, points: points.length ? z.points : null,
+    color: z.meanPct === null ? undefined : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`,
+    ...(popExp ? { pop: popExp.perZone[z.index]?.evaluated ?? 0, popExtremePct: popExp.perZone[z.index]?.extremePct ?? null } : {}),
+  })) : null), [zoneStats, points.length, palette, rm.direction, popExp]);
+  const onZoneSel = useCallback((key: string) => {
+    setSelZone(key);
+    const f = zoneVec?.fc.features[Number(key)];
+    const b = f ? fcBounds({ type: 'FeatureCollection', features: [f] }) : null;
+    if (b) mapRef.current?.fit(b);
+  }, [zoneVec]);
+
   // ------------------------------------------------------------------ imágenes sobre el mapa
   const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
   const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
@@ -349,7 +388,37 @@ export default function GeoVisor(props: Props) {
     }));
   }, [imgs, om, vis]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const vectors = useMemo(() => vecs.map((v) => ({ id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false })), [vecs, vis]);
+  // Polígonos de referencia: se bajan de Storage al abrir el proyecto (el FC ya no vive solo en memoria).
+  const refLoading = useRef(new Set<string>());
+  const refSig = Object.entries(geo.layers ?? {}).filter(([, l]) => l.role === 'reference' && l.path).map(([k, l]) => `${k}:${l.path}`).join('|');
+  useEffect(() => {
+    if (!supabase) return;
+    const sb = supabase;
+    for (const [k, l] of Object.entries(geoRef.current.layers ?? {})) {
+      if (l.role !== 'reference' || !l.path || refLoading.current.has(k) || vecs.some((v) => v.id === k)) continue;
+      refLoading.current.add(k);
+      downloadRef(sb, l.path)
+        .then((fc) => setVecs((cur) => (cur.some((v) => v.id === k) || !geoRef.current.layers?.[k] ? cur : [...cur, { id: k, name: l.label, fc, color: l.ref?.color ?? '#22D3EE', ref: true }])))
+        .catch((e) => setLayerErrs((cur) => [...cur, `«${l.label}»: ${e instanceof Error ? e.message : String(e)}`]))
+        .finally(() => refLoading.current.delete(k));
+    }
+  }, [refSig, supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const vectors = useMemo<VectorOverlay[]>(() => vecs.map((v) => {
+    const meta = v.ref ? geo.layers?.[v.id]?.ref : undefined;
+    if (!v.ref) return { id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false };
+    const nf = meta?.labels ? meta.nameField : undefined;
+    const base: VectorOverlay = {
+      id: v.id, fc: v.fc, color: meta?.color ?? v.color, visible: vis[`v:${v.id}`]?.on ?? true, weight: meta?.weight ?? 2, fillOpacity: 0,
+      ...(nf ? { labels: v.fc.features.map((f) => { const t = f.properties?.[nf]; return t === undefined || t === null || t === '' ? null : String(t); }) } : {}),
+    };
+    // Coroplético: la capa de zonas elegida se rellena con el color del índice medio de cada zona (gris = sin área evaluada).
+    if (choro && zoneStats && zoneVec?.id === v.id) {
+      base.fills = zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`));
+      base.labels = zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`);
+    }
+    return base;
+  }), [vecs, vis, geo.layers, choro, zoneStats, zoneVec, palette, rm.direction]);
 
   // ------------------------------------------------------------------ punto consultado
   const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, { breaks: rm.breaks, direction: rm.direction }, selected), rm) : null), [selected, data, ev, rules, rm]);
@@ -411,7 +480,16 @@ export default function GeoVisor(props: Props) {
     layers: data ? Object.entries(data.info).map(([k, l]) => ({ key: k, label: l.label, role: l.role, origin: l.origin ?? 'Paquete del catálogo', source: l.source ?? '', unit: l.unit, min: l.min, max: l.max })) : [],
     points: ranked.map((r) => ({ rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, classLabel: r.status === 'ok' ? r.label : '', state: pointState(r, rm.direction) })),
     pointsOrder: rankHeading(rm.direction),
-  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage, ranked]);
+    ...(zoneStats && zoneVec ? {
+      zones: {
+        layer: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, order: zoneOrderHeading(rm.direction), classNames: rm.names, extremeName,
+        rows: defaultZoneOrder(zoneStats).map((z) => ({
+          name: z.name, meanPct: z.meanPct, ha: z.ha, exclHa: z.exclHa, classPct: z.classPct, points: z.points,
+          ...(popExp?.perZone[z.index] ? { pop: popExp.perZone[z.index] } : {}),
+        })),
+      },
+    } : {}),
+  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage, ranked, zoneStats, zoneVec, popExp, extremeName, geo.layers]);
 
   async function framePng(withBase: boolean): Promise<HTMLCanvasElement> {
     if (!data || !ev || !om || !stats) throw new Error('No hay mapa que exportar.');
@@ -498,23 +576,29 @@ export default function GeoVisor(props: Props) {
     if (parcelRes?.parcels.length) { files['parcelas.tif'] = await toGeoTiff(Uint16Array.from(parcelRes.labels), g, 0); files['parcelas.csv'] = parcelsCsv(parcelRes.parcels, g); }
     files['pixeles.csv'] = pixelsCsv(ev!.pct, ev!.cls, data!.mask, g, 200_000, rm);
     if (ranked.length) files['puntos_ranking.csv'] = rankingCsv(ranked, rm.direction);
+    if (zoneStats) files['zonas.csv'] = zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction, popExp?.perZone, extremeName);
     files['resumen.xlsx'] = await downloadGeoExcelBytes(summary());
     const s = summary();
     files['receta.json'] = JSON.stringify({ ...s, grid: g, rules: geo.rules, layerMeta: Object.fromEntries(Object.entries(geo.layers ?? {}).map(([k, m]) => [k, { ...m, path: undefined }])), pack: geo.packId ?? null }, null, 2);
     // Códigos del GeoTIFF de clases: 1..N en orden ascendente del índice, N+1 = vetada, 0 = exclusión.
     const codes = rm.names.map((nm, i) => `${i + 1} = ${nm}`).concat([`${rm.n + 1} = ${T.critical.toLowerCase()}`, '0 = exclusión']).join(', ');
-    files['LEEME.txt'] = `${T.mapTitle} «${props.title}»\n\n- ${T.fileIdx}.tif: ${T.indexName.toLowerCase()} 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios; ${rm.direction === 'risk' ? 'un valor alto es más riesgo' : 'un valor alto es más apto'}) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: ${codes} (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n${ranked.length ? `- puntos_ranking.csv: ranking de tus ${ranked.length} punto(s) (${rankHeading(rm.direction).toLowerCase()}); los no evaluados van al final, sin puesto ni índice. También en la hoja «Puntos» de resumen.xlsx.\n` : ''}\nEl ${T.indexName.toLowerCase()} NO es una probabilidad.\n`;
+    files['LEEME.txt'] = `${T.mapTitle} «${props.title}»\n\n- ${T.fileIdx}.tif: ${T.indexName.toLowerCase()} 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios; ${rm.direction === 'risk' ? 'un valor alto es más riesgo' : 'un valor alto es más apto'}) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: ${codes} (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n${ranked.length ? `- puntos_ranking.csv: ranking de tus ${ranked.length} punto(s) (${rankHeading(rm.direction).toLowerCase()}); los no evaluados van al final, sin puesto ni índice. También en la hoja «Puntos» de resumen.xlsx.\n` : ''}${zoneStats ? `- zonas.csv: resumen por zona (${zoneOrderHeading(rm.direction).toLowerCase()}): ${T.indexName.toLowerCase()} medio, % del área evaluada por clase${popExp ? ' y personas por clase' : ''}; una zona sin celdas evaluadas va sin índice («Sin área evaluada»). También en la hoja «Zonas» de resumen.xlsx.\n` : ''}\nEl ${T.indexName.toLowerCase()} NO es una probabilidad.\n`;
     saveBytes(`${base}_paquete.zip`, zipFiles(files), 'application/zip');
   };
 
   // ------------------------------------------------------------------ publicar
+  // Resumen por zonas público: con el interruptor apagado (o sin zonas elegidas) esto es null y no cambia ninguna firma.
+  // Si hay zonas, su contenido lo fijan la capa, el atributo de nombre, la población y si se publican los puntos.
+  const zonesSpec = useMemo(() => (geo.publicZones && zoneVec && zoneGrid
+    ? [zoneVec.id, geo.layers?.[zoneVec.id]?.bytes ?? 0, geo.zonal?.nameField ?? '', popVec ? [popVec.id, geo.zonal?.popField ?? ''] : '', !!geo.publicPoints && points.length > 0]
+    : null), [geo.publicZones, zoneVec, zoneGrid, popVec, geo.zonal, geo.layers, geo.publicPoints, points.length]);
   const resultSig = useMemo(() => {
     // Los puntos solo entran con el interruptor encendido: sin él la firma es la de siempre.
-    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : [])]);
+    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : []), ...(zonesSpec ? [['zonas', zonesSpec]] : [])]);
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
-  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points]);
+  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points, zonesSpec]);
 
   // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
   const sigParts = useMemo(() => {
@@ -526,8 +610,9 @@ export default function GeoVisor(props: Props) {
       layers: Object.fromEntries(Object.entries(data.info).map(([k, l]) => [k, { role: l.role, min: l.min, max: l.max, bytes: l.bytes }])),
       packId: geo.packId, grid: data.grid,
       points: { show: !!geo.publicPoints, list: points },
+      zones: { show: !!zonesSpec, spec: zonesSpec },
     });
-  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points]);
+  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points, zonesSpec]);
 
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
@@ -550,6 +635,8 @@ export default function GeoVisor(props: Props) {
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
       // Con el interruptor apagado NO viaja ni la lista: el meta lo recibe cualquiera con el enlace.
       ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked) } : {}),
+      // Solo agregados por zona (nunca los polígonos de entrada ni la población por manzana).
+      ...(zonesSpec && zoneStats && zoneVec ? { showZones: true, zones: toPublishedZones(zoneStats, { layer: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, withPoints: !!geo.publicPoints && points.length > 0, pop: popExp?.perZone, extremeName }) } : {}),
     };
     return { b64, meta };
   }
@@ -601,8 +688,8 @@ export default function GeoVisor(props: Props) {
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
         <div className="gv-tabs" role="tablist">
-          {(['capas', 'modelo', 'puntos', 'exportar'] as Tab[]).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', exportar: 'Exportar' }[t]}</button>
+          {(['capas', 'modelo', 'puntos', 'zonas', 'exportar'] as Tab[]).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', zonas: 'Zonas', exportar: 'Exportar' }[t]}</button>
           ))}
         </div>
         <div className="gv-side-body">
@@ -640,6 +727,16 @@ export default function GeoVisor(props: Props) {
               onChange={setPoints}
               onExportCsv={() => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv')} />
           )}
+          {tab === 'zonas' && (
+            <GeoZonesPanel
+              layers={zoneLayers} sel={geo.zonal} ready={!!(data && ev && rules.length > 0)} rows={zoneRows} classNames={rm.names} direction={rm.direction}
+              rampCss={rampCss(palette, rm.direction)} choropleth={choro} onChoropleth={setChoro} nPoints={points.length}
+              selectedKey={selZone} onSelect={onZoneSel} onGoLayers={() => setTab('capas')}
+              extremeName={extremeName}
+              expo={popExp && popPts ? { byClass: popExp.byClass, evaluated: popExp.evaluated, notEvaluated: popExp.notEvaluated, outside: popExp.outside, total: popExp.total, skipped: popPts.skipped } : null}
+              onSel={(z) => commit((g) => { const o = { ...g }; if (z) o.zonal = z; else delete o.zonal; return o; })}
+              onCsv={() => { if (zoneStats) saveBytes(`${base}_zonas.csv`, zonesCsv(defaultZoneOrder(zoneStats), rm.names, rm.direction, popExp?.perZone, extremeName), 'text/csv'); }} />
+          )}
           {tab === 'exportar' && (
             <div className="gv-sec-stack">
               {!ready && <p className="gv-hint">Para exportar hace falta un mapa calculado: define el área, sube capas y asígnalas a criterios con su regla.</p>}
@@ -647,6 +744,8 @@ export default function GeoVisor(props: Props) {
                 <GeoPublishPanel sb={supabase} projectId={props.projectId} isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
                   ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
                   showPoints={!!geo.publicPoints} nPoints={points.length}
+                  showZones={!!geo.publicZones} zonesReady={!!zoneVec} hasPop={!!popVec}
+                  onShowZones={(on) => commit((g) => { const o = { ...g }; if (on) o.publicZones = true; else delete o.publicZones; return o; })}
                   onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
                   warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined} />
               )}
