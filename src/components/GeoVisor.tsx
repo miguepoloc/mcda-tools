@@ -53,6 +53,11 @@ import type { RankRow } from './GeoPointsList';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
 import { canvasBytes, saveBytes, toCanvas, toUrl } from '@/lib/geo/canvas';
+import { composeFileName, defaultOptions, type ComposeAvailability, type ComposeOptions } from '@/lib/geo/compose';
+import { renderComposition, type ComposeInputs } from '@/lib/geo/composeCanvas';
+import { jpegToPdf } from '@/lib/geo/pdfImage';
+import { APP_DOI, APP_FULL_NAME, APP_VERSION } from '@/lib/version';
+import GeoComposeDialog from './GeoComposeDialog';
 
 type Props = {
   projectId: string; ownerId: string; title: string; objective: string;
@@ -553,6 +558,49 @@ export default function GeoVisor(props: Props) {
     }
   };
   const pngOnly = async () => saveBytes(`${base}_resultado.png`, await canvasBytes(await framePng(false)), 'image/png');
+
+  // ------------------------------------------------------------------ composición de mapa (R1) e informe ejecutivo (R2)
+  // Todo se arma desde el estado del proyecto (datos, resultado calculado, clases, capas, puntos), nunca de lo que está
+  // visible en pantalla: el estilo (clases / continuo), las capas y el mapa base los fija el diálogo.
+  const [composeOpen, setComposeOpen] = useState(false);
+  const refVecs = vecs.filter((v) => v.ref);
+  const composeAvail: ComposeAvailability = {
+    result: !!(data && ev && om && stats), zones: !!(zoneVec && zoneStats), points: points.length,
+    references: refVecs.map((v) => ({ id: v.id, name: geo.layers?.[v.id]?.label ?? v.name })),
+  };
+  const composeDefaults = () => defaultOptions(props.title, composeAvail, basemap === 'dark' ? 'osm' : basemap, new Date().toISOString().slice(0, 10));
+  const composeRender = async (o: ComposeOptions) => {
+    if (!data || !ev || !om || !stats) throw new Error('No hay mapa que componer: calcula el resultado primero.');
+    const summ = summary();
+    const bm = BASEMAPS[(o.basemapKey in BASEMAPS ? o.basemapKey : 'osm') as BasemapKey];
+    const inputs: ComposeInputs = {
+      bounds: om.bounds,
+      result: o.result ? toCanvas(om, paintResult(ev.pct, ev.cls, data.mask, o.style, palette, rm)) : null,
+      basemap: { url: bm.url, attr: bm.attr, maxZoom: bm.maxZoom, subdomains: bm.subdomains },
+      references: refVecs.map((v) => ({ id: v.id, name: geo.layers?.[v.id]?.label ?? v.name, fc: v.fc, color: geo.layers?.[v.id]?.ref?.color ?? v.color, weight: geo.layers?.[v.id]?.ref?.weight ?? 2 })),
+      zones: zoneVec && zoneStats ? {
+        name: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, fc: zoneVec.fc,
+        fills: zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${rampColor(z.meanPct / 100, palette, rm.direction).join(',')})`)),
+        labels: zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`),
+      } : null,
+      // Mismo orden y mismos puestos que la lista: sin puesto (fuera del área, excluido, sin dato) = hueco gris sin número.
+      points: ranked.map((r) => ({ lat: r.lat, lon: r.lon, rank: r.rank, name: r.name, color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF' })),
+      legend: { classes: summ.classes, ranges: summ.ranges ?? [] },
+      classColors: RHEX,
+      rampStops: PALETTES[palette].stops.map(([t]) => `rgb(${rampColor(t, palette, rm.direction).join(',')})`),
+      texts: { legendTitle: T.legendTitle, lowEnd: T.lowEnd, highEnd: T.highEnd, direction: rm.direction, zoneRampTitle: `${T.indexName} medio por zona` },
+      footer: {
+        sources: summ.layers.map((l) => (l.source ? `${l.label} (${l.source})` : l.label)),
+        dataAttribution: data.attribution, appName: APP_FULL_NAME, version: APP_VERSION, doi: APP_DOI,
+      },
+    };
+    return renderComposition(o, inputs);
+  };
+  const composeSave = async (cv: HTMLCanvasElement, kind: 'png' | 'pdf', o: ComposeOptions) => {
+    if (kind === 'png') { saveBytes(composeFileName(base, o.width, 'png'), await canvasBytes(cv), 'image/png'); return; }
+    const jpg = await new Promise<Uint8Array>((res, rej) => cv.toBlob(async (b) => (b ? res(new Uint8Array(await b.arrayBuffer())) : rej(new Error('No se pudo generar la imagen del PDF'))), 'image/jpeg', 0.92));
+    saveBytes(composeFileName(base, o.width, 'pdf'), jpegToPdf(jpg, cv.width, cv.height, { title: o.title }), 'application/pdf');
+  };
   const kmzOne = async () => {
     const g = buildOverlayMap(data!.grid, 'geographic');
     saveBytes(`${base}.kmz`, kmz(props.title, g.bounds, await canvasBytes(toCanvas(g, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette, rm)))), 'application/vnd.google-earth.kmz');
@@ -680,6 +728,11 @@ export default function GeoVisor(props: Props) {
   return (
     <div className="gv-shell" style={paletteVars(RHEX, rm.n, rm.direction === "risk")}>
       <GeoTour steps={TOUR} open={tour} onClose={() => setTour(false)} onTab={setTab} />
+      {composeOpen && (
+        <GeoComposeDialog initial={composeDefaults()} avail={composeAvail} zoneName={zoneVec ? geo.layers?.[zoneVec.id]?.label ?? zoneVec.name : undefined}
+          basemaps={Object.entries(BASEMAPS).map(([key, b]) => ({ key, label: b.label }))}
+          onClose={() => setComposeOpen(false)} render={composeRender} save={composeSave} />
+      )}
       <aside className="gv-side">
         <div className="gv-steps-bar" aria-label="Progreso">
           <span className={hasArea ? 'ok' : ''}><Icon d={hasArea ? ICONS.check : ICONS.minus} size={12} /> Área</span>
@@ -756,7 +809,8 @@ export default function GeoVisor(props: Props) {
                 { k: 'zip', label: 'Paquete completo (.zip)', desc: 'Todo lo de abajo + cada capa de entrada como GeoTIFF + receta JSON. Lo que entregas al docente o abres en QGIS.', run: zip, primary: true },
                 { k: 'tif', label: `GeoTIFF de ${T.noun} (0–100) + estilo .qml`, desc: `Ráster georreferenciado en ${data?.grid.crs ?? 'UTM'}. Ábrelo en QGIS/ArcGIS y carga el .qml para los colores.`, run: geotiffPct },
                 { k: 'cls', label: 'GeoTIFF de clases + estilo .qml', desc: `${rm.names.map((nm, i) => `${i + 1} ${nm.toLowerCase()}`).join(' · ')} · ${rm.n + 1} ${T.critical.toLowerCase()} · 0 exclusión. Ideal para calcular áreas o vectorizar en QGIS.`, run: geotiffCls },
-                { k: 'png', label: 'PNG del mapa (con mapa base y leyenda)', desc: 'La vista actual tal como la ves, con título y leyenda, lista para tu informe.', run: pngMap },
+                { k: 'compose', label: 'Componer mapa para entregar (PNG o PDF)', desc: 'Lámina con título, resultado, leyenda de las N clases, escala, norte y fuente. Se arma con el estado del proyecto, no con la vista actual; 1600, 2400 o 3600 px.', run: async () => setComposeOpen(true), opens: true },
+                { k: 'png', label: 'PNG de la vista actual (con mapa base y leyenda)', desc: 'El mapa tal como lo ves ahora, con título y leyenda. Para una lámina de entrega usa «Componer mapa».', run: pngMap },
                 { k: 'pngr', label: 'PNG solo del resultado (transparente)', desc: 'Únicamente los píxeles, sin mapa base: para superponer en tu propio diseño.', run: pngOnly },
                 { k: 'kmz', label: 'KMZ para Google Earth', desc: 'El resultado como imagen georreferenciada sobre el globo.', run: kmzOne },
                 ...(parcelRes?.parcels.length ? [
@@ -864,7 +918,8 @@ export default function GeoVisor(props: Props) {
   );
 }
 
-type ExportItem = { k: string; label: string; desc: string; run: () => Promise<void>; primary?: boolean };
+/** `opens`: la acción abre un diálogo (no descarga): el botón dice «Abrir» y no se anuncia «listo, revisa tu carpeta». */
+type ExportItem = { k: string; label: string; desc: string; run: () => Promise<void>; primary?: boolean; opens?: boolean };
 /** Lista de descargas. El resultado de cada una se muestra en línea (antes los errores salían en un `alert()` y los
  * éxitos no decían nada): así una descarga que falla nunca pasa desapercibida. */
 function ExportList({ items, disabled }: { items: ExportItem[]; disabled: boolean }) {
@@ -878,11 +933,11 @@ function ExportList({ items, disabled }: { items: ExportItem[]; disabled: boolea
           <button type="button" className={'btn sm' + (it.primary ? ' primary' : '')} disabled={disabled || !!running} aria-busy={running === it.k}
             onClick={async () => {
               setRunning(it.k); setRes(null);
-              try { await it.run(); setRes({ k: it.k, ok: true, msg: `«${it.label}»: listo, revisa tu carpeta de descargas.` }); }
+              try { await it.run(); if (!it.opens) setRes({ k: it.k, ok: true, msg: `«${it.label}»: listo, revisa tu carpeta de descargas.` }); }
               catch (e) { setRes({ k: it.k, ok: false, msg: `«${it.label}» no se pudo generar: ${e instanceof Error ? e.message : String(e)}` }); }
               setRunning('');
             }}>
-            <Icon d={ICONS.download} size={13} /> {running === it.k ? 'Generando…' : 'Descargar'}
+            <Icon d={ICONS.download} size={13} /> {running === it.k ? 'Generando…' : it.opens ? 'Abrir' : 'Descargar'}
           </button>
         </div>
       ))}
