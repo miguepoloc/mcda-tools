@@ -64,6 +64,8 @@ type Props = {
   /** Extensión que se ve en el mapa ahora (alternativa táctil a dibujar con el ratón). */
   getView?: () => Bounds | null;
   palette: PaletteKey;
+  /** Qué significa un valor alto del índice (para rotular y orientar la rampa del resultado). */
+  direction?: "suitability" | "risk";
   draft: Bounds | null; setDraft: (b: Bounds | null) => void;
   drawing: boolean; setDrawing: (d: boolean) => void;
   quota: Quota | null; onQuotaChange: () => void;
@@ -502,14 +504,14 @@ export default function GeoLayersPanel(p: Props) {
             {p.quota.used_bytes > p.quota.quota_bytes && <b>Sobre la cuota: no puedes subir más hasta borrar capas.</b>}
           </div>
         )}
-        <LayerRow id="result" label="Resultado (idoneidad)" role="resultado" vis={p.vis} setVis={p.setVis} swatch={rampCss(p.palette)} />
+        <LayerRow id="result" label={p.direction === "risk" ? "Resultado (riesgo)" : "Resultado (idoneidad)"} role="resultado" vis={p.vis} setVis={p.setVis} swatch={rampCss(p.palette, p.direction)} />
         {p.virtual.map((x) => <LayerRow key={x.id} id={x.id} label={x.label} role={x.role} vis={p.vis} setVis={p.setVis} swatch={x.swatch} />)}
         {data && Object.entries(data.info).map(([k, l]) => {
           const meta = layers[k];
           return (
             <div key={k}>
               <LayerRow id={`l:${k}`} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
-                swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette) : RAW_RAMP_CSS}
+                swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette, p.direction) : RAW_RAMP_CSS}
                 note={[l.origin ? `${l.origin}${meta && !meta.path ? ' · sin guardar (solo esta sesión)' : ''}` : '', !meta && isPack ? 'Del paquete del curso · solo lectura (no se puede borrar)' : '', l.license ? `Licencia: ${l.license}` : ''].filter(Boolean).join(' · ') || undefined}
                 onDelete={meta ? () => setConfirmDrop(k) : undefined}
                 onEdit={meta ? () => setEditKey((cur) => (cur === k ? null : k)) : undefined}

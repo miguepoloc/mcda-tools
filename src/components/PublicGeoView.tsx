@@ -7,9 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
-import { CLASS_LABEL, PALETTES, classHex, paintResult } from '@/lib/geo/paint';
-import { decodePlanes, type PublishedMeta } from '@/lib/geo/publish';
-import { CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
+import { PALETTES, classHexOf, paintResult } from '@/lib/geo/paint';
+import { decodePlanes, publishedView, type PublishedMeta } from '@/lib/geo/publish';
+import { DIR_TEXT } from '@/lib/geo/classes';
+import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
 import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type RasterOverlay } from './GeoMap';
 import { BasemapChips, PaletteChips, ResultLegend, StyleChips } from './GeoHud';
 import { Icon, ICONS, usePalette } from './GeoBits';
@@ -18,31 +19,37 @@ import PublicAhp from './PublicAhp';
 export type PublicGeo = { status: 'ok'; title: string; objective: string; grid_b64: string; meta: PublishedMeta; updated_at: string };
 
 /** Variables CSS de clase según la paleta (recuadros de color de los paneles). */
-const paletteVars = (pal: keyof typeof PALETTES) => {
-  const h = classHex(pal);
-  return { '--geo-alta': h[CLASS_ALTA], '--geo-media': h[CLASS_MODERADA], '--geo-noapta': h[CLASS_NO_APTA], '--geo-excl': h[CLASS_EXCLUDED] } as React.CSSProperties;
-};
+const paletteVars = (h: Record<number, string>, n: number, risk: boolean) => (
+  { '--geo-alta': h[risk ? 1 : n], '--geo-media': h[Math.ceil(n / 2)], '--geo-noapta': h[risk ? n : 1], '--geo-excl': h[CLASS_EXCLUDED] } as React.CSSProperties
+);
 
 export default function PublicGeoView({ data }: { data: PublicGeo }) {
   const { meta } = data;
+  // v1 (aptitud, 3 clases) y v2 (dirección + N clases) se leen igual a través de la vista normalizada.
+  const view = useMemo(() => publishedView(meta), [meta]);
+  const model = useMemo(() => ({
+    n: view.classes.length, direction: view.direction, names: view.classes.map((c) => c.name),
+    colors: view.classes.map((c) => c.color), breaks: view.classes.slice(1).map((c) => c.from),
+  }), [view]);
+  const T = DIR_TEXT[view.direction];
   const [planes, setPlanes] = useState<Awaited<ReturnType<typeof decodePlanes>> | null>(null);
   const [error, setError] = useState('');
   const [basemap, setBasemap] = useState<BasemapKey>('sat');
   const [style, setStyle] = useState<'continuous' | 'classes'>('continuous');
   const [palette, setPalette] = usePalette();
-  const HEX = useMemo(() => classHex(palette), [palette]);
+  const HEX = useMemo(() => classHexOf(model, palette), [model, palette]);
   const [sel, setSel] = useState<{ col: number; row: number } | null>(null);
   const mapRef = useRef<GeoMapHandle>(null);
   const coordRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let alive = true;
-    decodePlanes(data.grid_b64, meta.grid.width * meta.grid.height).then((p) => alive && setPlanes(p)).catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
+    decodePlanes(data.grid_b64, meta.grid.width * meta.grid.height, { legacyVeto: view.legacyVeto }).then((p) => alive && setPlanes(p)).catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
     return () => { alive = false; };
-  }, [data.grid_b64, meta.grid.width, meta.grid.height]);
+  }, [data.grid_b64, meta.grid.width, meta.grid.height, view.legacyVeto]);
 
   const om = useMemo(() => buildOverlayMap(meta.grid, 'mercator'), [meta.grid]);
-  const rasters = useMemo<RasterOverlay[]>(() => (planes ? [{ id: 'result', url: toUrl(om, paintResult(planes.pct, planes.cls, planes.mask, style, palette)), bounds: om.bounds, opacity: 0.9, visible: true, z: 20 }] : []), [planes, om, style, palette]);
+  const rasters = useMemo<RasterOverlay[]>(() => (planes ? [{ id: 'result', url: toUrl(om, paintResult(planes.pct, planes.cls, planes.mask, style, palette, model)), bounds: om.bounds, opacity: 0.9, visible: true, z: 20 }] : []), [planes, om, style, palette, model]);
 
   const onClick = useCallback((lat: number, lon: number) => {
     const [c, r] = lonLatToPixel(lon, lat, meta.grid.transform, meta.grid.crs);
@@ -58,16 +65,17 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
     const m = planes.mask[i];
     if (m === MASK_NODATA) return { lat, lon, pct: null as number | null, cls: CLASS_EXCLUDED, label: 'Fuera del área de estudio' };
     if (m === MASK_EXCLUDED) return { lat, lon, pct: null, cls: CLASS_EXCLUDED, label: 'Exclusión (no se evalúa)' };
-    return { lat, lon, pct: planes.pct[i], cls: planes.cls[i], label: CLASS_LABEL[planes.cls[i]] };
-  }, [sel, planes, meta.grid]);
+    return { lat, lon, pct: planes.pct[i], cls: planes.cls[i], label: planes.cls[i] === CLASS_VETO ? T.critical : (model.names[planes.cls[i] - 1] ?? 'Sin clase') };
+  }, [sel, planes, meta.grid, model, T]);
   const markers = useMemo<MapMarker[]>(() => (point ? [{ id: 'sel', lat: point.lat, lon: point.lon, selected: true }] : []), [point]);
 
   if (error) return <div className="banner"><span><b>No se pudo mostrar el mapa:</b> {error}</span></div>;
-  const rows = [[CLASS_ALTA, meta.classes.alta, meta.pct.alta], [CLASS_MODERADA, meta.classes.media, meta.pct.media], [CLASS_NO_APTA, meta.classes.noapta, meta.pct.noapta]] as const;
+  // De la clase más alta a la más baja (código = posición + 1).
+  const rows = view.classes.map((c, i) => ({ code: i + 1, ...c })).reverse();
 
   return (
     <div className="gv-wrap gv-public">
-      <div className="gv-shell" style={paletteVars(palette)}>
+      <div className="gv-shell" style={paletteVars(HEX, model.n, view.direction === 'risk')}>
         <aside className="gv-side">
           <div className="gv-side-body">
             <section className="gv-sec">
@@ -85,9 +93,9 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
               <header><h4>Superficie por clase</h4></header>
               <div className="gv-stats" style={{ display: 'block' }}>
                 <div className="bars">
-                  {rows.map(([c, ha, pct]) => (
+                  {rows.map(({ code: c, name, ha, pct }) => (
                     <div className="brow" key={c} style={{ gridTemplateColumns: '92px minmax(0,1fr) 92px' }}>
-                      <span>{CLASS_LABEL[c]}</span>
+                      <span title={name} style={{ overflowWrap: 'anywhere' }}>{name}</span>
                       <span className="bar"><span className="bfill" style={{ width: `${pct}%`, background: HEX[c] }} /></span>
                       <span className="mono">{pct.toFixed(1)} %</span>
                       <span className="mono muted" style={{ gridColumn: '2 / -1', fontSize: 11 }}>{ha.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</span>
@@ -95,10 +103,11 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
                   ))}
                 </div>
               </div>
-              <p className="gv-hint">Área evaluada: {meta.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{meta.classes.excl > 0 ? ` · exclusión: ${meta.classes.excl.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha` : ''} · celdas de {meta.grid.resM} m.</p>
+              <p className="gv-hint">Área evaluada: {meta.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{view.exclHa > 0 ? ` · exclusión: ${view.exclHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha` : ''} · celdas de {meta.grid.resM} m.</p>
+              {view.vetoHa > 0 && <p className="gv-hint">{view.vetoHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha vetadas por algún criterio («{T.critical.toLowerCase()}»): cuentan en la clase «{model.names[view.direction === 'risk' ? model.n - 1 : 0]}».</p>}
             </section>
             <section className="gv-sec">
-              <p className="gv-hint">Haz clic en el mapa (o, con el teclado, enfócalo, muévelo con las flechas y pulsa Intro) para ver la idoneidad de un punto. Es un <b>índice de 0 a 100</b> (suma ponderada de criterios), <b>no una probabilidad</b>.</p>
+              <p className="gv-hint">Haz clic en el mapa (o, con el teclado, enfócalo, muévelo con las flechas y pulsa Intro) para ver el índice de {T.noun} de un punto. Es un <b>índice de 0 a 100</b> (suma ponderada de criterios), <b>no una probabilidad</b>.</p>
               <p className="gv-hint">Publicado el {new Date(data.updated_at).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}{meta.attribution ? ` · Datos: ${meta.attribution}` : ''}</p>
             </section>
           </div>
@@ -109,13 +118,13 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
               initialBounds={meta.bounds} onClick={onClick} onMove={onMove} onDrawn={() => {}} />
             <div className="gv-hud gv-hud-tr">
               <BasemapChips value={basemap} onChange={setBasemap} />
-              <StyleChips value={style} onChange={setStyle} />
+              <StyleChips value={style} onChange={setStyle} nClasses={model.n} />
               <PaletteChips value={palette} onChange={setPalette} />
               <button type="button" className="gv-fit" onClick={() => mapRef.current?.fit(meta.bounds)}><Icon d={ICONS.fit} size={15} /> Área</button>
             </div>
             <div className="gv-coords mono"><span ref={coordRef}>—</span></div>
             {!planes && <div className="gv-toast" role="status">Cargando el mapa…</div>}
-            {planes && <div className="gv-legends"><ResultLegend style={style} thresholds={meta.thresholds} palette={palette} /></div>}
+            {planes && <div className="gv-legends"><ResultLegend style={style} model={model} palette={palette} /></div>}
             {point && (
               <div className="gv-point" role="status">
                 <button type="button" className="x" aria-label="Cerrar" onClick={() => setSel(null)}>×</button>
@@ -124,7 +133,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
                   <span className="dot" style={{ background: HEX[point.cls] }} />{point.label}
                 </span>
                 <div className="coords mono">{point.lat.toFixed(5)}, {point.lon.toFixed(5)}</div>
-                <div className="disc">Índice de idoneidad 0–100, no una probabilidad.</div>
+                <div className="disc">{T.disclaimer}</div>
               </div>
             )}
           </div>

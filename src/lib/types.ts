@@ -93,7 +93,16 @@ export type GeoConfig = {
   grid?: GeoGrid;
   layers?: Record<string, GeoLayerMeta>;
   rules: Record<string, { layerKey: string; fn: GeoFnSpec; veto?: GeoVetoSpec }>;
+  /** Cortes de las 3 clases históricas (alta / media). Se mantiene al día cuando hay 3 clases; con otro número de
+   * clases manda `classModel`. */
   classes: { alta: number; media: number };
+  /** Qué significa un valor alto del índice: 'suitability' (más apto, mejor) o 'risk' (más riesgo, peor).
+   * Ausente = 'suitability' (así lo existente no cambia). */
+  direction?: 'suitability' | 'risk';
+  /** Clases del mapa (2–8): `breaks` = N−1 cortes 0–1 ascendentes; `classes[i]` nombre/color opcionales de la clase i
+   * (de menor a mayor índice); `cut` = cómo se fijaron los cortes (los de cuantil/Jenks se congelan al calcularlos).
+   * Ausente = 3 clases con `classes`. Ver `lib/geo/classes.ts`. */
+  classModel?: { breaks: number[]; classes?: { name?: string; color?: string }[]; cut?: 'manual' | 'quantile' | 'jenks' };
   /** Área mínima (ha) de una parcela contigua de alta aptitud; 0 o ausente = sin filtro. */
   minPatchHa?: number;
 };

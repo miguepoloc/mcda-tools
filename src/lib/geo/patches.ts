@@ -6,10 +6,10 @@ import { CLASS_ALTA, MASK_VALID } from './suitability.ts';
 export type Parcel = { id: number; cells: number; ha: number; meanPct: number; minPct: number; col: number; row: number };
 
 export function findParcels(
-  cls: Uint8Array, pct: Uint8Array, mask: Uint8Array, w: number, h: number, minCells: number, haPerPixel: number,
+  cls: Uint8Array, pct: Uint8Array, mask: Uint8Array, w: number, h: number, minCells: number, haPerPixel: number, topClass: number = CLASS_ALTA,
 ): { labels: Uint32Array; parcels: Parcel[] } {
   const n = w * h;
-  const ok = (i: number) => mask[i] === MASK_VALID && pct[i] !== 255 && cls[i] === CLASS_ALTA;
+  const ok = (i: number) => mask[i] === MASK_VALID && pct[i] !== 255 && cls[i] === topClass;
   const comp = new Int32Array(n).fill(-1);
   const found: { cells: number[]; }[] = [];
   const stack: number[] = [];

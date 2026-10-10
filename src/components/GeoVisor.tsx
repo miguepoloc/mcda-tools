@@ -14,8 +14,12 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } from '@/lib/geo/data';
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
-import { CLASS_LABEL, PALETTES, classHex, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, paintResult, rampColor, type PaletteKey } from '@/lib/geo/paint';
+import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
+import { normalizeBreaks } from '@/lib/geo/classes';
+import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
 import { findParcels } from '@/lib/geo/patches';
+import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
 import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
@@ -27,7 +31,7 @@ import GeoPublishPanel from './GeoPublishPanel';
 import GeoCatalogPanel from './GeoCatalogPanel';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
-  areaStats, type AreaStats, CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA, CLASS_VETO, coverageStats, evaluateGrid, MASK_VALID, usableRules, type CriterionRule,
+  classStats, classify, CLASS_EXCLUDED, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
 } from '@/lib/geo/suitability';
 import { kmz, parcelsCsv, pixelsCsv, qmlClasses, qmlPct, resultRaster, safeName, slug, toGeoTiff, zipFiles } from '@/lib/geo/export';
 import { downloadGeoExcelBytes, type GeoSummary } from '@/lib/geoExcel';
@@ -56,14 +60,16 @@ const TOUR: TourStep[] = [
   { sel: '.gv-drop, .gv-sec', tab: 'capas', title: 'Sube tus mapas', text: 'Arrastra GeoTIFF, GeoJSON, shapefile en .zip, KML o GPX. El área de estudio se propone sola desde el primer archivo. Cada archivo puede ser un criterio, una exclusión o el área de estudio.' },
   { sel: '.gv-side-body', tab: 'modelo', title: 'Pesos y reglas', text: 'Aquí ves los pesos del panel y, por cada criterio, eliges la capa y la regla que la traduce a idoneidad (0 a 1), con vista previa. El mapa cambia en vivo.' },
   { sel: '.gv-leaflet', title: 'El mapa', text: 'Muévete y acerca como en cualquier mapa. Haz clic en un punto para ver su % de idoneidad, su clase y cuánto aporta cada criterio.' },
-  { sel: '.gv-hud-tr', title: 'Mapa base y estilo', text: 'Cambia el mapa base (satélite, calles, relieve, océano) y muestra el resultado continuo o en 3 clases.' },
+  { sel: '.gv-hud-tr', title: 'Mapa base y estilo', text: 'Cambia el mapa base (satélite, calles, relieve, océano) y muestra el resultado continuo o por clases.' },
   { sel: '.gv-side-body', tab: 'exportar', title: 'Exportar y publicar', text: 'GeoTIFF (con estilo para QGIS), PNG, KMZ, CSV, Excel y un .zip con todo. Aquí también activas la vista pública con enlace.' },
 ];
 type Deps = unknown[];
 /** Variables CSS de clase según la paleta: así los recuadros de color de los paneles (`--geo-alta`…) siguen a la del mapa. */
-const paletteVars = (pal: PaletteKey) => {
-  const h = classHex(pal);
-  return { '--geo-alta': h[CLASS_ALTA], '--geo-media': h[CLASS_MODERADA], '--geo-noapta': h[CLASS_NO_APTA], '--geo-excl': h[CLASS_EXCLUDED] } as React.CSSProperties;
+const paletteVars = (hex: Record<number, string>, n: number, risk: boolean) => {
+  // `--geo-alta` = el color «bueno» y `--geo-noapta` = el «malo» de la dirección (aptitud: clase alta = bueno; riesgo: al revés).
+  return {
+    '--geo-alta': hex[risk ? 1 : n], '--geo-media': hex[Math.ceil(n / 2)], '--geo-noapta': hex[risk ? n : 1], '--geo-excl': hex[CLASS_EXCLUDED],
+  } as React.CSSProperties;
 };
 const sameDeps = (a: Deps, b: Deps) => a.length === b.length && a.every((x, i) => x === b[i]);
 
@@ -82,11 +88,14 @@ export default function GeoVisor(props: Props) {
   const [style, setStyle] = useState<'continuous' | 'classes'>('continuous');
   const [palette, setPalette] = usePalette();
   const [layerErrs, setLayerErrs] = useState<string[]>([]);
-  const HEX = useMemo(() => classHex(palette), [palette]);
   const [vis, setVis] = useState<VisState>({});
   const [vecs, setVecs] = useState<VecItem[]>([]);
   const [selected, setSelected] = useState<{ col: number; row: number } | null>(null);
-  const [thresholds, setThresholds] = useState(geo.classes);
+  // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
+  // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
+  const [setup, setSetup] = useState<ClassSetup>(() => setupFromGeo(geo));
+  const model = useMemo(() => resolveModel(setup), [setup]);
+  const editHex = useMemo(() => classHexOf(model, palette), [model, palette]);
   const [exploring, setExploring] = useState(false);
   const [exploreWeights, setExploreWeights] = useState<number[] | null>(null);
   const [draft, setDraft] = useState<Bounds | null>(null);
@@ -94,7 +103,7 @@ export default function GeoVisor(props: Props) {
   const [imgs, setImgs] = useState<Record<string, string>>({});
   const [tour, setTour] = useState(false);
   const [minPatchHa, setMinPatchHa] = useState(geo.minPatchHa ?? 0);
-  const [baseline, setBaseline] = useState<{ label: string; pct: Uint8Array; stats: AreaStats } | null>(null);
+  const [baseline, setBaseline] = useState<{ label: string; pct: Uint8Array; stats: ClassStats } | null>(null);
   useEffect(() => { if (!tourSeen()) { const t = setTimeout(() => setTour(true), 900); return () => clearTimeout(t); } }, []);
 
   const mapRef = useRef<GeoMapHandle>(null);
@@ -102,8 +111,8 @@ export default function GeoVisor(props: Props) {
   const geoRef = useRef(geo);
   // Al cargar un ejemplo (o abrir otra configuración) los umbrales y el área mínima vienen en `geo`: sin esto la
   // interfaz seguía con los valores del montaje anterior (p. ej. 0.70/0.45 en vez de 0.75/0.25 de la boya).
-  useEffect(() => { setThresholds((t) => (t.alta === geo.classes.alta && t.media === geo.classes.media ? t : { alta: geo.classes.alta, media: geo.classes.media })); }, [geo.classes.alta, geo.classes.media]);
-  useEffect(() => { setMinPatchHa(geo.minPatchHa ?? 0); }, [geo.minPatchHa]);
+  const classesKey = JSON.stringify([geo.direction ?? null, geo.classModel ?? null, geo.classes]);
+  useEffect(() => { setSetup(setupFromGeo(geoRef.current)); }, [classesKey]);  useEffect(() => { setMinPatchHa(geo.minPatchHa ?? 0); }, [geo.minPatchHa]);
   const cache = useRef<Record<string, Float32Array>>({});
   const cachePack = useRef('');
   /** Paquete estático ya descargado (solo lectura): añadir una capa propia no lo vuelve a bajar. */
@@ -121,6 +130,7 @@ export default function GeoVisor(props: Props) {
     geoRef.current = next;
     props.onChangeGeo(next, true);
   }, [props]);
+  const onSetup = useCallback((s: ClassSetup) => { setSetup(s); commit((g) => applySetup(g, s)); }, [commit]);
 
   // ------------------------------------------------------------------ carga de datos
   const gridSig = geo.grid ? JSON.stringify(geo.grid) : '';
@@ -225,16 +235,23 @@ export default function GeoVisor(props: Props) {
     return Object.fromEntries(criteria.map((c, i) => [c.id, ready[i] !== null && sum > 0 ? (ready[i] as number) / sum : 0])) as Record<string, number>;
   }, [criteria, geo.rules, data, weights]);
   const dRules = useDeferredValue(rules);
-  const dThr = useDeferredValue(thresholds);
+  // Modelo con el que se calculó el mapa que se ve (diferido): leyendas, resumen y exportaciones usan este para que
+  // nunca muestren N clases distintas de las que tiene el mapa pintado.
+  const dSetup = useDeferredValue(setup);
+  const rm = useMemo(() => resolveModel(dSetup), [dSetup]);
+  const RHEX = useMemo(() => classHexOf(rm, palette), [rm, palette]);
+  const T = DIR_TEXT[rm.direction];
 
-  const ev = useMemo(() => (data ? evaluateGrid(data.layers, data.mask, dRules, dThr) : null), [data, dRules, dThr]);
-  const stats = useMemo(() => (data && ev ? areaStats(ev.cls, ev.pct, data.mask, data.grid.haPerPixel) : null), [data, ev]);
+  // Índice (sin clasificar) y clasificación separados: cambiar cortes, nombres o número de clases no reevalúa criterios.
+  const ix = useMemo(() => (data ? evaluateIndex(data.layers, data.mask, dRules, rm.direction) : null), [data, dRules, rm.direction]);
+  const ev = useMemo(() => (ix ? { pct: ix.pct, cls: classify(ix.s, ix.veto, rm.breaks) } : null), [ix, rm.breaks]);
+  const stats = useMemo(() => (data && ev ? classStats(ev.cls, ev.pct, data.mask, data.grid.haPerPixel, rm.n, rm.direction) : null), [data, ev, rm.n, rm.direction]);
   const coverage = useMemo(() => (data ? coverageStats(data.layers, data.mask, dRules) : null), [data, dRules]);
   const dMinPatch = useDeferredValue(minPatchHa);
   const parcelRes = useMemo(() => {
     if (!data || !ev || !(dMinPatch > 0)) return null;
-    return findParcels(ev.cls, ev.pct, data.mask, data.grid.width, data.grid.height, Math.ceil(dMinPatch / data.grid.haPerPixel), data.grid.haPerPixel);
-  }, [data, ev, dMinPatch]);
+    return findParcels(ev.cls, ev.pct, data.mask, data.grid.width, data.grid.height, Math.ceil(dMinPatch / data.grid.haPerPixel), data.grid.haPerPixel, rm.n);
+  }, [data, ev, dMinPatch, rm.n]);
   const om = useMemo(() => (data ? buildOverlayMap(data.grid, 'mercator') : null), [data]);
   const gridBounds = useMemo(() => (data ? gridBoundsLonLat(data.grid) : null), [data]);
 
@@ -254,16 +271,16 @@ export default function GeoVisor(props: Props) {
       const next: Record<string, string> = {};
       for (const id of onKey.split('|').filter(Boolean)) {
         let deps: Deps, paint: () => Uint32Array;
-        if (id === 'result') { deps = [data, ev, om, style, palette]; paint = () => paintResult(ev.pct, ev.cls, data.mask, style, palette); }
+        if (id === 'result') { deps = [data, ev, om, style, palette, rm]; paint = () => paintResult(ev.pct, ev.cls, data.mask, style, palette, rm); }
         else if (id === 'parcels') { deps = [parcelRes, om]; paint = () => paintParcels(parcelRes!.labels); }
-        else if (id === 'diff') { deps = [ev, baseline, om, data, palette]; paint = () => paintDiff(ev.pct, baseline!.pct, data.mask, 1, 30, palette); }
+        else if (id === 'diff') { deps = [ev, baseline, om, data, palette, rm.direction]; paint = () => paintDiff(ev.pct, baseline!.pct, data.mask, 1, 30, palette, rm.direction); }
         else {
           const k = id.slice(2), info = data.info[k];
           const rule = Object.values(geo.rules).find((r) => r.layerKey === k);
-          deps = [data, om, rule?.fn, palette];
+          deps = [data, om, rule?.fn, palette, rm.direction];
           paint = () => (info.role === 'exclusion' ? paintFlag(data.layers[k], [127, 140, 141])
             : info.role === 'area' ? paintFlag(data.layers[k], [132, 204, 22])
-              : rule ? paintCriterion(data.layers[k], data.mask, rule.fn, palette) : paintRaw(data.layers[k], info.min, info.max));
+              : rule ? paintCriterion(data.layers[k], data.mask, rule.fn, palette, rm.direction) : paintRaw(data.layers[k], info.min, info.max));
         }
         const hit = paintCache.current.get(id);
         if (hit && sameDeps(hit.deps, deps)) { next[id] = hit.url; continue; }
@@ -274,7 +291,7 @@ export default function GeoVisor(props: Props) {
       setImgs(next);
     }, 80);
     return () => clearTimeout(t);
-  }, [data, om, ev, style, onKey, geo.rules, parcelRes, baseline, palette]);
+  }, [data, om, ev, style, onKey, geo.rules, parcelRes, baseline, palette, rm]);
 
   const rasters = useMemo<RasterOverlay[]>(() => {
     if (!om) return [];
@@ -286,7 +303,7 @@ export default function GeoVisor(props: Props) {
   const vectors = useMemo(() => vecs.map((v) => ({ id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false })), [vecs, vis]);
 
   // ------------------------------------------------------------------ punto consultado
-  const point = useMemo(() => (selected && data && ev ? evaluateOnePoint(data, geo, rules, thresholds, selected) : null), [selected, data, ev, geo, rules, thresholds]);
+  const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, { breaks: rm.breaks, direction: rm.direction }, selected), rm) : null), [selected, data, ev, rules, rm]);
 
   const markers = useMemo<MapMarker[]>(() => {
     const out: MapMarker[] = [];
@@ -321,13 +338,20 @@ export default function GeoVisor(props: Props) {
     cr: weightResult.agg.cr, nExperts: expertIds.length,
     weightsOrigin: exploring ? 'Pesos explorados manualmente (NO son los del panel)' : expertIds.length ? 'Panel de expertos (AHP, media geométrica)' : 'Pesos iguales (sin juicios de expertos)',
     criteria: criteria.map((c, i) => { const r = geo.rules[c.id]; return { name: c.name, weight: weights[i] ?? 0, effective: r ? effW[c.id] ?? 0 : 0, layer: r ? (data?.info[r.layerKey]?.label ?? r.layerKey) : '—', rule: r ? describeFn(r.fn) : '—', veto: describeVeto(r?.veto) }; }),
-    thresholds, coverage,
+    direction: rm.direction,
+    ranges: rm.names.map((label, i) => { const [from, to] = classRange(rm.breaks, i); return { label, from, to }; }),
+    coverage,
     classes: stats ? [
-      { label: 'Alta aptitud', ha: stats.alta.ha, pct: stats.alta.pct }, { label: 'Moderada', ha: stats.media.ha, pct: stats.media.pct },
-      { label: 'No apta / vetada', ha: stats.noapta.ha, pct: stats.noapta.pct }, { label: 'Exclusión (fuera del cálculo)', ha: stats.excl.ha, pct: 0 },
+      ...stats.classes.map((c, i) => {
+        // Las vetadas ya están sumadas a la clase extrema de la dirección: se avisa en su fila.
+        const extreme = rm.direction === 'risk' ? rm.n - 1 : 0;
+        const note = i === extreme && stats.veto.ha > 0 ? ` (incluye ${stats.veto.ha.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha ${DIR_TEXT[rm.direction].critical.toLowerCase()})` : '';
+        return { label: rm.names[i] + note, ha: c.ha, pct: c.pct };
+      }).reverse(),
+      { label: 'Exclusión (fuera del cálculo)', ha: stats.excl.ha, pct: 0 },
     ] : [],
     layers: data ? Object.entries(data.info).map(([k, l]) => ({ key: k, label: l.label, role: l.role, origin: l.origin ?? 'Paquete del catálogo', source: l.source ?? '', unit: l.unit, min: l.min, max: l.max })) : [],
-  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, thresholds, stats, effW, coverage]);
+  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage]);
 
   async function framePng(withBase: boolean): Promise<HTMLCanvasElement> {
     if (!data || !ev || !om || !stats) throw new Error('No hay mapa que exportar.');
@@ -337,7 +361,7 @@ export default function GeoVisor(props: Props) {
       cv = await mapRef.current.capture();
       attribution = `Base: ${BASEMAPS[basemap].attr}`;
     } else {
-      return toCanvas(om, paintResult(ev.pct, ev.cls, data.mask, style, palette));
+      return toCanvas(om, paintResult(ev.pct, ev.cls, data.mask, style, palette, rm));
     }
     const ctx = cv.getContext('2d')!;
     const W = cv.width, H = cv.height, f = Math.max(1, Math.round(W / 900));
@@ -346,23 +370,34 @@ export default function GeoVisor(props: Props) {
     ctx.fillStyle = 'rgba(11,15,23,.82)'; ctx.fillRect(12 * f, 12 * f, tw, 50 * f);
     ctx.fillStyle = '#fff'; ctx.fillText(props.title, 24 * f, 34 * f, tw - 24 * f);
     ctx.font = `500 ${11 * f}px system-ui, sans-serif`; ctx.fillStyle = '#CBD5E1';
-    ctx.fillText(`Índice de idoneidad AHP + SIG · ${new Date().toLocaleDateString('es-CO')}`, 24 * f, 52 * f, tw - 24 * f);
-    const rows = [[CLASS_ALTA, `Alta aptitud (≥ ${Math.round(thresholds.alta * 100)}) · ${stats.alta.pct.toFixed(1)} %`], [CLASS_MODERADA, `Moderada · ${stats.media.pct.toFixed(1)} %`], [CLASS_NO_APTA, `No apta · ${stats.noapta.pct.toFixed(1)} %`], [CLASS_EXCLUDED, 'Exclusión']] as const;
+    ctx.fillText(`${T.indexName} AHP + SIG · ${new Date().toLocaleDateString('es-CO')}`, 24 * f, 52 * f, tw - 24 * f);
+    // Leyenda: de la clase más alta a la más baja, con su rango y % del área evaluada; luego la exclusión.
+    const rows: (readonly [number, string])[] = [
+      ...rm.names.map((nm, i) => {
+        const [from, to] = classRange(rm.breaks, i);
+        const rng = i === 0 ? `< ${Math.round(to * 100)}` : i === rm.n - 1 ? `≥ ${Math.round(from * 100)}` : `${Math.round(from * 100)}–${Math.round(to * 100)}`;
+        return [i + 1, `${nm} (${rng}) · ${stats.classes[i].pct.toFixed(1)} %`] as const;
+      }).reverse(),
+      [CLASS_EXCLUDED, 'Exclusión'] as const,
+    ];
     const rampH = style === 'continuous' ? 34 : 0;
-    const lw = 230 * f, lh = (rows.length * 20 + 16 + rampH) * f;
+    ctx.font = `500 ${12 * f}px system-ui, sans-serif`;
+    const widest = Math.max(...rows.map(([, t]) => ctx.measureText(t).width));
+    const lw = Math.min(W * 0.7, Math.max(230 * f, widest + 40 * f)), lh = (rows.length * 20 + 16 + rampH) * f;
     ctx.fillStyle = 'rgba(11,15,23,.82)'; ctx.fillRect(W - lw - 12 * f, H - lh - 12 * f, lw, lh);
     if (rampH) {
       // Resultado continuo: la leyenda de clases sola no explica los colores del mapa, se añade la rampa 0–100.
       const gx = W - lw - 2 * f, gw = lw - 20 * f, gy = H - lh - 4 * f;
       const grad = ctx.createLinearGradient(gx, 0, gx + gw, 0);
-      PALETTES[palette].stops.forEach(([t, c]) => grad.addColorStop(t, `rgb(${c[0]},${c[1]},${c[2]})`));
+      // En riesgo la rampa va al revés (lo alto es lo malo): se muestrean las paradas con `rampColor`.
+      PALETTES[palette].stops.forEach(([t]) => { const [r, g, b] = rampColor(t, palette, rm.direction); grad.addColorStop(t, `rgb(${r},${g},${b})`); });
       ctx.fillStyle = grad; ctx.fillRect(gx, gy, gw, 10 * f);
       ctx.fillStyle = '#E2E8F0'; ctx.font = `500 ${10 * f}px system-ui, sans-serif`;
-      ctx.fillText('0', gx, gy + 22 * f); ctx.fillText('50', gx + gw / 2 - 6 * f, gy + 22 * f); ctx.fillText('100 (idoneidad)', gx + gw - 74 * f, gy + 22 * f);
+      ctx.fillText('0', gx, gy + 22 * f); ctx.fillText('50', gx + gw / 2 - 6 * f, gy + 22 * f); ctx.fillText(`100 (${T.noun})`, gx + gw - 74 * f, gy + 22 * f);
     }
     rows.forEach(([c, txt], i) => {
       const y0 = H - lh - 4 * f + (rampH + i * 20) * f;
-      ctx.fillStyle = HEX[c]; ctx.fillRect(W - lw - 2 * f, y0, 14 * f, 14 * f);
+      ctx.fillStyle = RHEX[c]; ctx.fillRect(W - lw - 2 * f, y0, 14 * f, 14 * f);
       ctx.fillStyle = '#fff'; ctx.font = `500 ${12 * f}px system-ui, sans-serif`; ctx.fillText(txt, W - lw + 18 * f, y0 + 11 * f);
     });
     ctx.fillStyle = 'rgba(11,15,23,.7)'; ctx.fillRect(0, H - 16 * f, Math.min(W - lw - 20 * f, 520 * f), 16 * f);
@@ -370,8 +405,8 @@ export default function GeoVisor(props: Props) {
     return cv;
   }
 
-  const geotiffPct = async () => { const g = data!.grid; saveBytes(`${base}_idoneidad.tif`, await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'pct'), g, 255), 'image/tiff'); saveBytes(`${base}_idoneidad.qml`, qmlPct(palette), 'text/xml'); };
-  const geotiffCls = async () => { const g = data!.grid; saveBytes(`${base}_clases.tif`, await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'classes'), g, 255), 'image/tiff'); saveBytes(`${base}_clases.qml`, qmlClasses(palette), 'text/xml'); };
+  const geotiffPct = async () => { const g = data!.grid; saveBytes(`${base}_${T.fileIdx}.tif`, await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'pct'), g, 255), 'image/tiff'); saveBytes(`${base}_${T.fileIdx}.qml`, qmlPct(palette, rm.direction), 'text/xml'); };
+  const geotiffCls = async () => { const g = data!.grid; saveBytes(`${base}_clases.tif`, await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'classes', rm.n), g, 255), 'image/tiff'); saveBytes(`${base}_clases.qml`, qmlClasses(palette, rm), 'text/xml'); };
   const pngMap = async () => {
     try { saveBytes(`${base}_mapa.png`, await canvasBytes(await framePng(true)), 'image/png'); }
     catch (e) {
@@ -382,16 +417,16 @@ export default function GeoVisor(props: Props) {
   const pngOnly = async () => saveBytes(`${base}_resultado.png`, await canvasBytes(await framePng(false)), 'image/png');
   const kmzOne = async () => {
     const g = buildOverlayMap(data!.grid, 'geographic');
-    saveBytes(`${base}.kmz`, kmz(props.title, g.bounds, await canvasBytes(toCanvas(g, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette)))), 'application/vnd.google-earth.kmz');
+    saveBytes(`${base}.kmz`, kmz(props.title, g.bounds, await canvasBytes(toCanvas(g, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette, rm)))), 'application/vnd.google-earth.kmz');
   };
   const parcelsTif = async () => { saveBytes(`${base}_parcelas.tif`, await toGeoTiff(Uint16Array.from(parcelRes!.labels), data!.grid, 0), 'image/tiff'); };
   const parcelsFile = async () => saveBytes(`${base}_parcelas.csv`, parcelsCsv(parcelRes!.parcels, data!.grid), 'text/csv');
-  const csv = async () => saveBytes(`${base}_pixeles.csv`, pixelsCsv(ev!.pct, ev!.cls, data!.mask, data!.grid), 'text/csv');
+  const csv = async () => saveBytes(`${base}_pixeles.csv`, pixelsCsv(ev!.pct, ev!.cls, data!.mask, data!.grid, 200_000, rm), 'text/csv');
   const xlsx = async () => saveBytes(`${base}_resumen.xlsx`, await downloadGeoExcelBytes(summary()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   const zip = async () => {
     const g = data!.grid; const files: Record<string, Uint8Array | string> = {};
-    files['idoneidad.tif'] = await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'pct'), g, 255); files['idoneidad.qml'] = qmlPct(palette);
-    files['clases.tif'] = await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'classes'), g, 255); files['clases.qml'] = qmlClasses(palette);
+    files[`${T.fileIdx}.tif`] = await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'pct'), g, 255); files[`${T.fileIdx}.qml`] = qmlPct(palette, rm.direction);
+    files['clases.tif'] = await toGeoTiff(resultRaster(ev!.pct, ev!.cls, data!.mask, 'classes', rm.n), g, 255); files['clases.qml'] = qmlClasses(palette, rm);
     const used = new Set<string>();
     for (const [k, l] of Object.entries(data!.layers)) {
       let nm = safeName(k); for (let n = 2; used.has(nm); n++) nm = `${safeName(k)}_${n}`; used.add(nm);
@@ -399,45 +434,55 @@ export default function GeoVisor(props: Props) {
     }
     try { files['mapa.png'] = await canvasBytes(await framePng(true)); } catch { files['resultado.png'] = await canvasBytes(await framePng(false)); }
     const og = buildOverlayMap(g, 'geographic');
-    files['google-earth.kmz'] = kmz(props.title, og.bounds, await canvasBytes(toCanvas(og, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette))));
+    files['google-earth.kmz'] = kmz(props.title, og.bounds, await canvasBytes(toCanvas(og, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette, rm))));
     if (parcelRes?.parcels.length) { files['parcelas.tif'] = await toGeoTiff(Uint16Array.from(parcelRes.labels), g, 0); files['parcelas.csv'] = parcelsCsv(parcelRes.parcels, g); }
-    files['pixeles.csv'] = pixelsCsv(ev!.pct, ev!.cls, data!.mask, g);
+    files['pixeles.csv'] = pixelsCsv(ev!.pct, ev!.cls, data!.mask, g, 200_000, rm);
     files['resumen.xlsx'] = await downloadGeoExcelBytes(summary());
     const s = summary();
     files['receta.json'] = JSON.stringify({ ...s, grid: g, rules: geo.rules, layerMeta: Object.fromEntries(Object.entries(geo.layers ?? {}).map(([k, m]) => [k, { ...m, path: undefined }])), pack: geo.packId ?? null }, null, 2);
-    files['LEEME.txt'] = `Mapa de aptitud «${props.title}»\n\n- idoneidad.tif: índice 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: 3 = alta, 2 = moderada, 1 = no apta, 4 = vetada, 0 = exclusión (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n\nEl índice de idoneidad NO es una probabilidad.\n`;
+    // Códigos del GeoTIFF de clases: 1..N en orden ascendente del índice, N+1 = vetada, 0 = exclusión.
+    const codes = rm.names.map((nm, i) => `${i + 1} = ${nm}`).concat([`${rm.n + 1} = ${T.critical.toLowerCase()}`, '0 = exclusión']).join(', ');
+    files['LEEME.txt'] = `${T.mapTitle} «${props.title}»\n\n- ${T.fileIdx}.tif: ${T.indexName.toLowerCase()} 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los criterios; ${rm.direction === 'risk' ? 'un valor alto es más riesgo' : 'un valor alto es más apto'}) en ${g.crs}, ${g.resM} m/celda.\n- clases.tif: ${codes} (255 = fuera del área o sin dato).\n- *.qml: estilo para QGIS (Capa → Propiedades → Simbología → Estilo → Cargar estilo).\n- capas/: cada capa de entrada ya alineada a la grilla (Float32, -9999 = sin dato).\n- google-earth.kmz, mapa.png, pixeles.csv, resumen.xlsx, receta.json.\n\nEl ${T.indexName.toLowerCase()} NO es una probabilidad.\n`;
     saveBytes(`${base}_paquete.zip`, zipFiles(files), 'application/zip');
   };
 
   // ------------------------------------------------------------------ publicar
   const resultSig = useMemo(() => {
-    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, thresholds, layersSig, geo.packId ?? '']);
+    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? ""]);
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
-  }, [weightResult, geo.rules, thresholds, layersSig, geo.packId]);
+  }, [weightResult, geo.rules, setup, layersSig, geo.packId]);
 
   // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
   const sigParts = useMemo(() => {
     if (!data) return null;
     return publishParts({
-      criteria, weights: weightResult.agg.w, rules: geo.rules, thresholds,
+      criteria, weights: weightResult.agg.w, rules: geo.rules,
+      // `thresholds` solo cuenta mientras el modelo sea el antiguo (3 clases de aptitud); con otro, manda `classSig`.
+      thresholds: { alta: setup.breaks[setup.breaks.length - 1] ?? 0.7, media: setup.breaks[0] ?? 0.45 }, classSig: publishClassSig(setup),
       layers: Object.fromEntries(Object.entries(data.info).map(([k, l]) => [k, { role: l.role, min: l.min, max: l.max, bytes: l.bytes }])),
       packId: geo.packId, grid: data.grid,
     });
-  }, [data, criteria, weightResult, geo.rules, geo.packId, thresholds]);
+  }, [data, criteria, weightResult, geo.rules, geo.packId, setup]);
 
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
     const b64 = await encodePlanes(ev.pct, ev.cls, data.mask);
     const meta: PublishedMeta = {
-      v: 1, grid: data.grid, bounds: gridBounds,
+      v: 2, grid: data.grid, bounds: gridBounds,
+      direction: rm.direction,
+      // Una entrada por clase: nombre, color propio (si lo hay), rango y superficie. Las vetadas ya están en la clase extrema.
+      classes: rm.names.map((name, i) => {
+        const [from, to] = classRange(rm.breaks, i);
+        return { name, ...(rm.colors[i] ? { color: rm.colors[i] } : {}), from, to, ha: stats.classes[i].ha, pct: stats.classes[i].pct };
+      }),
+      vetoHa: stats.veto.ha, exclHa: stats.excl.ha,
       // Pesos EFECTIVOS (reescalados entre los criterios con mapa, suman 1): son los que produjeron el mapa publicado.
       weights: criteria.filter((c) => geo.rules[c.id] && data.layers[geo.rules[c.id].layerKey]).map((c) => ({ name: c.name, weight: effW[c.id] ?? 0 })),
       cr: weightResult.agg.cr, nExperts: expertIds.length,
       weightsOrigin: expertIds.length ? 'Panel de expertos (AHP)' : 'Pesos iguales (sin juicios de expertos)',
-      thresholds, classes: { alta: stats.alta.ha, media: stats.media.ha, noapta: stats.noapta.ha, excl: stats.excl.ha },
-      pct: { alta: stats.alta.pct, media: stats.media.pct, noapta: stats.noapta.pct }, evaluableHa: stats.evaluableHa,
+      evaluableHa: stats.evaluableHa,
       attribution: data.attribution, sig: resultSig, sigParts: sigParts ?? undefined,
       ahp: ahpSummary(criteria, weightResult) ?? undefined,
     };
@@ -468,8 +513,20 @@ export default function GeoVisor(props: Props) {
   }, [data, onKey, baseline, minPatchHa, geo.rules]); // eslint-disable-line react-hooks/exhaustive-deps
   const resultOn = onIds.includes('result');
 
+  // Cortes calculados sobre la distribución del índice. Se CONGELAN en `breaks` (no se recalculan solos al cambiar
+  // capas o pesos): «Recalcular» vuelve a llamar a esta función. Las celdas vetadas se dejan fuera del histograma
+  // porque su índice es 0 ó 100 por construcción y distorsionarían los cortes.
+  const recut = useCallback((mode: Exclude<CutMode, 'manual'>) => {
+    if (!ix) return;
+    const h = histogram(ix.pct, (i) => ix.veto[i] === 0);
+    const n = setup.breaks.length + 1;
+    const br = mode === 'quantile' ? quantileBreaks(h, n) : jenksBreaks(h, n);
+    if (br.length !== n - 1) return;
+    onSetup({ ...setup, breaks: normalizeBreaks(br), cut: mode });
+  }, [ix, setup, onSetup]);
+
   return (
-    <div className="gv-shell" style={paletteVars(palette)}>
+    <div className="gv-shell" style={paletteVars(RHEX, rm.n, rm.direction === "risk")}>
       <GeoTour steps={TOUR} open={tour} onClose={() => setTour(false)} onTab={setTab} />
       <aside className="gv-side">
         <div className="gv-steps-bar" aria-label="Progreso">
@@ -490,7 +547,7 @@ export default function GeoVisor(props: Props) {
           {error && <div className="banner"><span><b>No se pudo cargar:</b> {error}</span></div>}
           {tab === 'capas' && (
             <GeoLayersPanel geo={geo} data={data} criteria={criteria} commit={commit} cache={cache} sb={supabase} ownerId={props.ownerId} projectId={props.projectId}
-              vecs={vecs} setVecs={setVecs} vis={vis} setVis={setVis} fit={(b) => mapRef.current?.fit(b)} getView={() => mapRef.current?.getBounds() ?? null} palette={palette} draft={draft} setDraft={setDraft} drawing={drawing} setDrawing={setDrawing}
+              vecs={vecs} setVecs={setVecs} vis={vis} setVis={setVis} fit={(b) => mapRef.current?.fit(b)} getView={() => mapRef.current?.getBounds() ?? null} palette={palette} direction={rm.direction} draft={draft} setDraft={setDraft} drawing={drawing} setDrawing={setDrawing}
               quota={quota} onQuotaChange={refreshQuota} evaluableHa={stats?.evaluableHa ?? null}
               uploadFor={uploadFor} onCancelUpload={() => setUploadFor(null)} onLayerAdded={(id) => { setUploadFor(null); setFocusId(id); setTab('modelo'); }}
               virtual={[...(parcelRes ? [{ id: 'parcels', label: `Parcelas ≥ ${minPatchHa} ha`, role: `${parcelRes.parcels.length} parcelas`, swatch: '#6D28D9' }] : []), ...(baseline ? [{ id: 'diff', label: `Diferencia con el escenario ${baseline.label}`, role: palette === 'semaforo' ? 'rojo empeora · verde mejora' : 'naranja empeora · azul mejora', swatch: `linear-gradient(90deg, rgb(${PALETTES[palette].diffNeg.join(',')}), #eee, rgb(${PALETTES[palette].diffPos.join(',')}))` }] : [])]} />
@@ -498,7 +555,7 @@ export default function GeoVisor(props: Props) {
           {tab === 'modelo' && (
             <GeoModelPanel isPack={!!geo.packId} onUploadFor={(id) => { setFocusId(null); setUploadFor(id); setTab('capas'); }} focusId={focusId} criteria={criteria} weights={weightResult.agg.w} cr={weightResult.agg.cr} nExperts={expertIds.length} layers={data?.info ?? {}} rules={geo.rules}
               onRule={(id, rule) => commit((c) => { const r = { ...c.rules }; if (rule) r[id] = rule; else delete r[id]; return { ...c, rules: r }; })}
-              thresholds={thresholds} onThresholds={(c) => { setThresholds(c); commit((g) => ({ ...g, classes: c })); }}
+              setup={setup} onSetup={onSetup} editHex={editHex} onCut={recut} canCut={!!ix}
               exploring={exploring} exploreWeights={exploreWeights} onExplore={(on, w) => { setExploring(on); setExploreWeights(w ?? null); }}
               minPatchHa={minPatchHa} onMinPatch={(ha) => { setMinPatchHa(ha); commit((g) => ({ ...g, minPatchHa: ha })); }}
               parcels={parcelRes?.parcels ?? null}
@@ -520,14 +577,14 @@ export default function GeoVisor(props: Props) {
               )}
               <ExportList disabled={!ready} items={[
                 { k: 'zip', label: 'Paquete completo (.zip)', desc: 'Todo lo de abajo + cada capa de entrada como GeoTIFF + receta JSON. Lo que entregas al docente o abres en QGIS.', run: zip, primary: true },
-                { k: 'tif', label: 'GeoTIFF de idoneidad (0–100) + estilo .qml', desc: `Ráster georreferenciado en ${data?.grid.crs ?? 'UTM'}. Ábrelo en QGIS/ArcGIS y carga el .qml para los colores.`, run: geotiffPct },
-                { k: 'cls', label: 'GeoTIFF de clases + estilo .qml', desc: '3 alta · 2 moderada · 1 no apta · 4 vetada · 0 exclusión. Ideal para calcular áreas o vectorizar en QGIS.', run: geotiffCls },
+                { k: 'tif', label: `GeoTIFF de ${T.noun} (0–100) + estilo .qml`, desc: `Ráster georreferenciado en ${data?.grid.crs ?? 'UTM'}. Ábrelo en QGIS/ArcGIS y carga el .qml para los colores.`, run: geotiffPct },
+                { k: 'cls', label: 'GeoTIFF de clases + estilo .qml', desc: `${rm.names.map((nm, i) => `${i + 1} ${nm.toLowerCase()}`).join(' · ')} · ${rm.n + 1} ${T.critical.toLowerCase()} · 0 exclusión. Ideal para calcular áreas o vectorizar en QGIS.`, run: geotiffCls },
                 { k: 'png', label: 'PNG del mapa (con mapa base y leyenda)', desc: 'La vista actual tal como la ves, con título y leyenda, lista para tu informe.', run: pngMap },
                 { k: 'pngr', label: 'PNG solo del resultado (transparente)', desc: 'Únicamente los píxeles, sin mapa base: para superponer en tu propio diseño.', run: pngOnly },
                 { k: 'kmz', label: 'KMZ para Google Earth', desc: 'El resultado como imagen georreferenciada sobre el globo.', run: kmzOne },
                 ...(parcelRes?.parcels.length ? [
-                  { k: 'ptif', label: `GeoTIFF de parcelas (≥ ${minPatchHa} ha)`, desc: 'Cada parcela contigua de alta aptitud con su número (0 = ninguna). Ábrelo en QGIS y vectorízalo.', run: parcelsTif },
-                  { k: 'pcsv', label: 'CSV de parcelas', desc: 'Número, hectáreas, idoneidad media y mínima y centroide (lon, lat) de cada parcela.', run: parcelsFile },
+                  { k: 'ptif', label: `GeoTIFF de parcelas (≥ ${minPatchHa} ha)`, desc: `Cada ${rm.direction === 'risk' ? 'zona contigua de «' + rm.names[rm.n - 1] + '»' : 'parcela contigua de alta aptitud'} con su número (0 = ninguna). Ábrelo en QGIS y vectorízalo.`, run: parcelsTif },
+                  { k: 'pcsv', label: 'CSV de parcelas', desc: `Número, hectáreas, ${T.noun} media y mínima y centroide (lon, lat) de cada ${rm.direction === 'risk' ? 'zona' : 'parcela'}.`, run: parcelsFile },
                 ] : []),
                 { k: 'csv', label: 'CSV de píxeles (lon, lat, %, clase)', desc: 'Importable como puntos en QGIS o Excel (máx. ~200 000 filas).', run: csv },
                 { k: 'xls', label: 'Excel de resumen', desc: 'Pesos, reglas, superficie por clase y datos de las capas.', run: xlsx },
@@ -545,7 +602,7 @@ export default function GeoVisor(props: Props) {
 
           <div className="gv-hud gv-hud-tr">
             <BasemapChips value={basemap} onChange={setBasemap} />
-            <StyleChips value={style} onChange={setStyle} />
+            <StyleChips value={style} onChange={setStyle} nClasses={rm.n} />
             <PaletteChips value={palette} onChange={setPalette} />
             <button type="button" className="gv-fit" onClick={() => setTour(true)} title="Repetir el recorrido guiado"><span aria-hidden="true">?</span> Recorrido</button>
             {gridBounds && <button type="button" className="gv-fit" onClick={() => mapRef.current?.fit(gridBounds)} title="Encajar el área de estudio"><Icon d={ICONS.fit} size={15} /> Área</button>}
@@ -559,13 +616,13 @@ export default function GeoVisor(props: Props) {
           {(extraLegend || (ready && resultOn)) && (
             <div className="gv-legends">
               {/* El resultado siempre a la vista; la de la capa activa de arriba, plegable debajo. */}
-              {ready && resultOn && <ResultLegend style={style} thresholds={thresholds} palette={palette} />}
+              {ready && resultOn && <ResultLegend style={style} model={rm} palette={palette} />}
               {extraLegend && (ready && resultOn ? (
                 <details className="gv-legend-more">
                   <summary>Leyenda de otra capa activa</summary>
-                  <LayerLegend spec={extraLegend} palette={palette} />
+                  <LayerLegend spec={extraLegend} palette={palette} direction={rm.direction} />
                 </details>
-              ) : <LayerLegend spec={extraLegend} palette={palette} />)}
+              ) : <LayerLegend spec={extraLegend} palette={palette} direction={rm.direction} />)}
             </div>
           )}
 
@@ -573,8 +630,8 @@ export default function GeoVisor(props: Props) {
             <div className="gv-point" role="status">
               <button type="button" className="x" aria-label="Cerrar" onClick={() => setSelected(null)}>×</button>
               <div className="big">{point.pct === null ? '—' : `${point.pct}%`}</div>
-              <span className="cls-pill" style={{ background: `color-mix(in srgb, ${HEX[point.cls]} 22%, transparent)`, borderColor: HEX[point.cls] }}>
-                <span className="dot" style={{ background: HEX[point.cls] }} />{point.label}
+              <span className="cls-pill" style={{ background: `color-mix(in srgb, ${RHEX[point.cls]} 22%, transparent)`, borderColor: RHEX[point.cls] }}>
+                <span className="dot" style={{ background: RHEX[point.cls] }} />{point.label}
               </span>
               <div className="coords mono">{point.lat.toFixed(5)}, {point.lon.toFixed(5)}</div>
               <div className="tbl">
@@ -585,13 +642,13 @@ export default function GeoVisor(props: Props) {
                   </div>
                 ))}
               </div>
-              <div className="disc">Índice de idoneidad 0–100, no una probabilidad. Con el mapa enfocado, Intro consulta el punto central.</div>
+              <div className="disc">{T.disclaimer} Con el mapa enfocado, Intro consulta el punto central.</div>
             </div>
           )}
 
           {empty && !loading && (
             <div className="gv-empty">
-              <h3>Tu mapa de aptitud</h3>
+              <h3>Tu {T.mapTitle.toLowerCase()}</h3>
               <p>Combina mapas (distancias, temperatura, profundidad, pendiente…) con los pesos de tus expertos para encontrar dónde es mejor ubicar algo: una boya, una finca solar, un cultivo.</p>
               <div className="gv-empty-acts">
                 {props.examples.map((ex) => (
@@ -608,14 +665,19 @@ export default function GeoVisor(props: Props) {
         {stats && ready && (
           <div className="card gv-stats">
             <div className="bars">
-              {([[CLASS_ALTA, stats.alta], [CLASS_MODERADA, stats.media], [CLASS_NO_APTA, stats.noapta], [CLASS_EXCLUDED, stats.excl]] as const).map(([c, s]) => (
+              {[...stats.classes.map((s, i) => [i + 1, s, rm.names[i]] as const).reverse(), [CLASS_EXCLUDED, stats.excl, 'Exclusión'] as const].map(([c, s, nm]) => (
                 <div className="brow" key={c}>
-                  <span>{CLASS_LABEL[c]}</span>
-                  <span className="bar"><span className="bfill" style={{ width: `${c === CLASS_EXCLUDED ? (stats.totalHa ? (s.ha / stats.totalHa) * 100 : 0) : s.pct}%`, background: HEX[c] }} /></span>
+                  <span title={nm} style={{ overflowWrap: 'anywhere' }}>{nm}</span>
+                  <span className="bar"><span className="bfill" style={{ width: `${c === CLASS_EXCLUDED ? (stats.totalHa ? (s.ha / stats.totalHa) * 100 : 0) : s.pct}%`, background: RHEX[c] }} /></span>
                   <span className="mono">{s.ha.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{c === CLASS_EXCLUDED ? '' : ` · ${s.pct.toFixed(1)} %`}</span>
                 </div>
               ))}
             </div>
+            {stats.veto.ha > 0 && (
+              <div className="muted mono" style={{ fontSize: 12 }}>
+                {stats.veto.ha.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha {T.critical.toLowerCase()}s por algún criterio: cuentan en «{rm.names[rm.direction === 'risk' ? rm.n - 1 : 0]}».
+              </div>
+            )}
             <div className="muted mono" style={{ fontSize: 12 }}>
               Área evaluada: {stats.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha · {data!.grid.resM} × {data!.grid.resM} m por celda{exploring ? ' · con pesos explorados' : ''}{data!.attribution ? ` · Datos: ${data!.attribution}` : ''}{parcelRes ? ` · ${parcelRes.parcels.length} parcela(s) ≥ ${minPatchHa} ha` : ''}
             </div>
@@ -658,30 +720,8 @@ function ExportList({ items, disabled }: { items: ExportItem[]; disabled: boolea
   );
 }
 
-function evaluateOnePoint(data: GeoData, geo: GeoConfig, allRules: CriterionRule[], thr: GeoConfig['classes'], sel: { col: number; row: number }) {
-  const i = sel.row * data.grid.width + sel.col;
-  const [lon, lat] = pixelToLonLat(sel.col, sel.row, data.grid.transform, data.grid.crs);
-  const m = data.mask[i];
-  if (m !== MASK_VALID) {
-    return { pct: null, cls: CLASS_EXCLUDED, label: m === 2 ? 'Exclusión' : 'Fuera del área de estudio', lat, lon, rows: [] as { label: string; value: string; contrib: string; veto: boolean }[] };
-  }
-  const rules = usableRules(data.layers, data.mask.length, allRules);
-  // Mismo cálculo que `evaluatePixel`: los criterios sin dato en este punto no votan y los pesos se reescalan entre los que sí.
-  const wUsed = rules.reduce((a, r) => (Number.isNaN(data.layers[r.key][i]) ? a : a + r.weight), 0);
-  let sum = 0, anyVeto = false;
-  const rows = rules.map((r) => {
-    const info = data.info[r.key];
-    const x = data.layers[r.key][i];
-    const s = suitability(x, r.fn);
-    const veto = vetoed(x, r.veto);
-    if (veto) anyVeto = true;
-    const wn = wUsed > 0 ? r.weight / wUsed : 0;
-    if (!Number.isNaN(x)) sum += wn * s;
-    const value = Number.isNaN(x) ? 'sin dato' : `${Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2)} ${info?.unit ?? ''}`.trim();
-    return { label: info?.label ?? r.key, value, contrib: Number.isNaN(x) ? 'no vota' : `${s.toFixed(2)} × ${wn.toFixed(2)}${veto ? ' · VETO' : ''}`, veto };
-  });
-  const s = wUsed <= 0 ? NaN : anyVeto ? 0 : sum;
-  const cls = Number.isNaN(s) ? CLASS_EXCLUDED : anyVeto ? CLASS_VETO : s >= thr.alta ? CLASS_ALTA : s >= thr.media ? CLASS_MODERADA : CLASS_NO_APTA;
-  void geo;
-  return { pct: Number.isNaN(s) ? null : Math.round(s * 100), cls, label: Number.isNaN(s) ? 'Sin dato' : CLASS_LABEL[cls], lat, lon, rows };
+/** Texto de la ficha del punto a partir del cálculo puro (`lib/geo/pointEval.ts`). */
+function pointView(p: PointEval, m: ReturnType<typeof resolveModel>) {
+  const label = p.status === 'outside' ? 'Fuera del área de estudio' : p.status === 'excluded' ? 'Exclusión' : p.status === 'nodata' ? 'Sin dato' : classLabel(m, p.cls);
+  return { pct: p.pct, cls: p.cls, label, lat: p.lat, lon: p.lon, rows: p.rows };
 }

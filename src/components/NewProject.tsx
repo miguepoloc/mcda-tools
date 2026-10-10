@@ -34,7 +34,7 @@ const METHOD_LABELS: Record<MethodKey, string> = {
 // "Criterio 1/2/3" al crear su primer proyecto — no reemplaza su propio problema de tesis.
 const KINDS: { id: Kind; title: string; text: string; icon: string }[] = [
   { id: 'decision', title: 'Decisión con alternativas', text: 'Comparas opciones con tus criterios y sale un ranking (AHP, TOPSIS, VIKOR…).', icon: 'M3 3v18h18M7 16h6M7 11h10M7 6h4' },
-  { id: 'spatial', title: 'Mapa de aptitud (SIG)', text: 'Las alternativas son celdas de un territorio: subes tus mapas y el ranking sale como un mapa.', icon: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16' },
+  { id: 'spatial', title: 'Mapa SIG', text: 'Las alternativas son celdas de un territorio: subes tus mapas y el resultado sale como un mapa de aptitud o de riesgo.', icon: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16' },
 ];
 
 const IOT_PALMOR_TITLE = 'Selección de tecnología IoT — Palmor (ejemplo del curso)';
@@ -65,6 +65,8 @@ function NewProjectForm({ userId }: { userId: string }) {
   const sb = useMemo(() => createClient(), []);
   const examples = useExamples(sb);
   const [start, setStart] = useState<string>('blank');
+  // Qué significa un valor alto del índice del mapa: más apto (mejor) o más riesgo (peor). Se puede cambiar después en el Geovisor.
+  const [direction, setDirection] = useState<'suitability' | 'risk'>('suitability');
   const [method, setMethod] = useState<MethodKey>(validMethod);
   const [weighting, setWeighting] = useState<WeightingMethod>(validMethod === 'ahp' ? 'ahp' : validWeighting);
   const [useIotCase, setUseIotCase] = useState(false);
@@ -128,7 +130,7 @@ function NewProjectForm({ userId }: { userId: string }) {
     else router.push(`/projects/${data.id}`);
   }
 
-  // "Mapa de aptitud (SIG)": por defecto nace en blanco, como un proyecto de decisión (3 criterios
+  // "Mapa SIG" (aptitud o riesgo): por defecto nace en blanco, como un proyecto de decisión (3 criterios
   // genéricos que el estudiante renombra y sube sus propios mapas en el Geovisor). El ejemplo con
   // datos (la boya de la tesis) es opcional. El proyecto usa
   // method:'saw' únicamente para que el panel de expertos reutilice, sin cambios, el mecanismo ya
@@ -141,7 +143,8 @@ function NewProjectForm({ userId }: { userId: string }) {
     setBusy(true);
     setMsg('');
     const criteria = ex ? ex.criteria : [1, 2, 3].map((i) => ({ id: uid('k'), name: 'Criterio ' + i, hint: '', src: null }));
-    const geo: GeoConfig = ex ? ex.geo : { rules: {}, classes: { alta: 0.70, media: 0.45 } };
+    // Sin ejemplo: 3 clases (cortes 45 / 70) y la dirección elegida. Ausente = aptitud, para no tocar lo existente.
+    const geo: GeoConfig = ex ? ex.geo : { rules: {}, classes: { alta: 0.70, media: 0.45 }, ...(direction === 'risk' ? { direction: 'risk' as const } : {}) };
     const { data, error } = await createClient().from('projects').insert({
       owner_id: userId,
       kind: 'spatial',
@@ -291,6 +294,20 @@ function NewProjectForm({ userId }: { userId: string }) {
             <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
               {start === 'blank' ? 'Empiezas con 3 criterios genéricos y un mapa mundial vacío. Después subes tus capas en el Geovisor.' : examples.find((e) => e.id === start)?.blurb}
             </p>
+            {start === 'blank' && (
+              <fieldset style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', marginTop: 10 }}>
+                <legend className="lbl" style={{ padding: '0 4px' }}>Un valor alto del índice significa…</legend>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                  <input type="radio" name="direction" checked={direction === 'suitability'} onChange={() => setDirection('suitability')} />
+                  <span><b>Más apto (mejor)</b> — mapa de aptitud: dónde conviene ubicar algo.</span>
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', marginTop: 4 }}>
+                  <input type="radio" name="direction" checked={direction === 'risk'} onChange={() => setDirection('risk')} />
+                  <span><b>Más riesgo (peor)</b> — mapa de riesgo: dónde es más probable un daño.</span>
+                </label>
+                <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Cambia la paleta, los nombres de las clases y los títulos. Lo puedes ajustar después en el panel del modelo.</p>
+              </fieldset>
+            )}
           </div>
         )}
         {msg && <p className="err" role="alert">{msg}</p>}

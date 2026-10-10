@@ -1,8 +1,9 @@
 'use client';
 
 /** Controles flotantes del mapa que comparten el geovisor del dueño y la vista pública. */
-import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, classHex, rampCss, type PaletteKey } from '@/lib/geo/paint';
-import { CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA } from '@/lib/geo/suitability';
+import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, classHexOf, rampCss, type PaletteKey } from '@/lib/geo/paint';
+import { CLASS_EXCLUDED, type Direction } from '@/lib/geo/suitability';
+import { DIR_TEXT } from '@/lib/geo/classes';
 import { BASEMAPS, type BasemapKey } from './GeoMap';
 import { fmtNum } from './GeoBits';
 
@@ -16,11 +17,11 @@ export function BasemapChips({ value, onChange }: { value: BasemapKey; onChange:
   );
 }
 
-export function StyleChips({ value, onChange }: { value: 'continuous' | 'classes'; onChange: (v: 'continuous' | 'classes') => void }) {
+export function StyleChips({ value, onChange, nClasses = 3 }: { value: 'continuous' | 'classes'; onChange: (v: 'continuous' | 'classes') => void; nClasses?: number }) {
   return (
     <div className="gv-chips" role="group" aria-label="Estilo del resultado">
       <button type="button" aria-pressed={value === 'continuous'} onClick={() => onChange('continuous')}>Continuo</button>
-      <button type="button" aria-pressed={value === 'classes'} onClick={() => onChange('classes')}>3 clases</button>
+      <button type="button" aria-pressed={value === 'classes'} onClick={() => onChange('classes')}>{nClasses} clases</button>
     </div>
   );
 }
@@ -38,21 +39,36 @@ export function PaletteChips({ value, onChange }: { value: PaletteKey; onChange:
   );
 }
 
-export function ResultLegend({ style, thresholds, palette = 'semaforo', title = 'Idoneidad AHP + SIG' }: { style: 'continuous' | 'classes'; thresholds: { alta: number; media: number }; palette?: PaletteKey; title?: string }) {
-  const hex = classHex(palette);
+/** Clases que dibuja la leyenda (lo cumple `ClassModel`): de menor a mayor índice, `breaks` = N−1 cortes 0–1. */
+export type LegendModel = { n: number; direction: Direction; names: string[]; breaks: number[]; colors?: (string | undefined)[] };
+
+/** Leyenda del resultado. Con `model` dibuja las N clases (nombre y rango, de la más alta a la más baja, con el
+ * texto del rango además del color); sin él, las 3 de aptitud con los umbrales `thresholds` (proyectos antiguos). */
+export function ResultLegend({ style, model, thresholds, palette = 'semaforo', title }: { style: 'continuous' | 'classes'; model?: LegendModel; thresholds?: { alta: number; media: number }; palette?: PaletteKey; title?: string }) {
+  const m: LegendModel = model ?? {
+    n: 3, direction: 'suitability', names: ['No apta', 'Moderada', 'Alta aptitud'],
+    breaks: thresholds ? [thresholds.media, thresholds.alta] : [0.45, 0.7],
+  };
+  const T = DIR_TEXT[m.direction];
+  const hex = classHexOf(m, palette);
+  const heading = title ?? T.legendTitle;
+  const pc = (v: number) => Math.round(v * 100);
   return (
-    <div className="gv-legend" role="group" aria-label={`Leyenda: ${title}`}>
-      <b>{title} <span className="mono">(0–100)</span></b>
+    <div className="gv-legend" role="group" aria-label={`Leyenda: ${heading}`}>
+      <b>{heading} <span className="mono">(0–100)</span></b>
       {style === 'continuous' ? (
         <>
-          <div className="ramp" style={{ background: rampCss(palette) }} aria-hidden="true" />
-          <div className="ends mono"><span>0 · no apta</span><span>50</span><span>100 · óptima</span></div>
+          <div className="ramp" style={{ background: rampCss(palette, m.direction) }} aria-hidden="true" />
+          <div className="ends mono"><span>{T.lowEnd}</span><span>50</span><span>{T.highEnd}</span></div>
         </>
       ) : (
         <>
-          <div className="row"><i style={{ background: hex[CLASS_ALTA] }} />Alta · ≥ {Math.round(thresholds.alta * 100)}</div>
-          <div className="row"><i style={{ background: hex[CLASS_MODERADA] }} />Moderada · {Math.round(thresholds.media * 100)}–{Math.round(thresholds.alta * 100)}</div>
-          <div className="row"><i style={{ background: hex[CLASS_NO_APTA] }} />No apta · &lt; {Math.round(thresholds.media * 100)}</div>
+          {Array.from({ length: m.n }, (_, k) => m.n - 1 - k).map((i) => (
+            <div className="row" key={i}>
+              <i style={{ background: hex[i + 1] }} />
+              {m.names[i]} · {i === m.n - 1 ? `≥ ${pc(m.breaks[i - 1])}` : i === 0 ? `< ${pc(m.breaks[0])}` : `${pc(m.breaks[i - 1])}–${pc(m.breaks[i])}`}
+            </div>
+          ))}
         </>
       )}
       <div className="row"><i style={{ background: hex[CLASS_EXCLUDED] }} />Exclusión (no se evalúa)</div>
@@ -68,7 +84,8 @@ export type LayerLegendSpec =
   | { kind: 'diff'; label: string };
 
 /** Leyenda de la capa que queda arriba (criterio, exclusión, parcelas, diferencia): con unidades y qué significa cada color. */
-export function LayerLegend({ spec, palette = 'semaforo' }: { spec: LayerLegendSpec; palette?: PaletteKey }) {
+export function LayerLegend({ spec, palette = 'semaforo', direction = 'suitability' }: { spec: LayerLegendSpec; palette?: PaletteKey; direction?: Direction }) {
+  const risk = direction === 'risk';
   const P = PALETTES[palette];
   const rgb = (c: number[]) => `rgb(${c[0]},${c[1]},${c[2]})`;
   return (
@@ -76,9 +93,9 @@ export function LayerLegend({ spec, palette = 'semaforo' }: { spec: LayerLegendS
       <b>{spec.label}</b>
       {spec.kind === 'criterion' && (
         <>
-          <div className="ramp" style={{ background: rampCss(palette) }} aria-hidden="true" />
-          <div className="ends mono"><span>0 · mala</span><span>1 · óptima</span></div>
-          <span className="sub">Idoneidad parcial del criterio, ya con su regla aplicada.</span>
+          <div className="ramp" style={{ background: rampCss(palette, direction) }} aria-hidden="true" />
+          <div className="ends mono"><span>{risk ? '0 · bajo' : '0 · mala'}</span><span>{risk ? '1 · máximo' : '1 · óptima'}</span></div>
+          <span className="sub">{risk ? 'Riesgo parcial' : 'Idoneidad parcial'} del criterio, ya con su regla aplicada.</span>
         </>
       )}
       {spec.kind === 'raw' && (
@@ -89,7 +106,7 @@ export function LayerLegend({ spec, palette = 'semaforo' }: { spec: LayerLegendS
         </>
       )}
       {spec.kind === 'flag' && <div className="row"><i style={{ background: spec.color }} />{spec.what}</div>}
-      {spec.kind === 'parcels' && <div className="row"><i style={{ background: spec.color }} />Parcela contigua de alta aptitud</div>}
+      {spec.kind === 'parcels' && <div className="row"><i style={{ background: spec.color }} />{risk ? 'Zona contigua de la clase más alta' : 'Parcela contigua de alta aptitud'}</div>}
       {spec.kind === 'diff' && (
         <>
           <div className="row"><i style={{ background: rgb(P.diffNeg) }} />Empeora respecto al escenario guardado</div>
