@@ -37,7 +37,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
 
   useEffect(() => {
     let alive = true;
-    decodePlanes(data.grid_b64, meta.grid.width * meta.grid.height).then((p) => alive && setPlanes(p)).catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
+    decodePlanes(data.grid_b64, meta.grid.width * meta.grid.height, { legacyVeto: meta.v === 1 }).then((p) => alive && setPlanes(p)).catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
     return () => { alive = false; };
   }, [data.grid_b64, meta.grid.width, meta.grid.height]);
 

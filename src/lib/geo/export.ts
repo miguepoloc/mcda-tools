@@ -1,8 +1,19 @@
 /** Exportadores del mapa de aptitud: GeoTIFF georreferenciado, estilo QGIS (.qml), KML/KMZ, CSV y
  * zip. Solo bytes/strings — la descarga la hace la UI. Sin DOM (el PNG lo genera el navegador). */
 import { zipSync, strToU8 } from 'fflate';
-import { CLASS_LABEL, PALETTES, classHex, type PaletteKey } from './paint.ts';
-import { MASK_EXCLUDED, MASK_NODATA } from './suitability.ts';
+import { PALETTES, classHexOf, type ClassPaint, type PaletteKey } from './paint.ts';
+import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, type Direction } from './suitability.ts';
+import { DIR_TEXT } from './classes.ts';
+
+/** Clases tal como salen en los archivos: las N con nombre y color (lo cumple `ClassModel`). Por defecto, las 3 de aptitud. */
+export type ClassExport = ClassPaint & { names: string[] };
+export const DEFAULT_EXPORT: ClassExport = { n: 3, direction: 'suitability', names: ['No apta', 'Moderada', 'Alta aptitud'] };
+/** Nombre de un código del plano `cls` en los archivos. */
+export function exportLabel(m: ClassExport, code: number): string {
+  if (code === CLASS_EXCLUDED) return 'Exclusión';
+  if (code === CLASS_VETO) return DIR_TEXT[m.direction].critical;
+  return m.names[code - 1] ?? String(code);
+}
 import { pixelToLonLat } from './crs.ts';
 import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
@@ -34,12 +45,13 @@ export async function toGeoTiff(values: Float32Array | Uint8Array | Uint16Array,
 /** Resultado como GeoTIFF UInt8: idoneidad 0–100 (255 = sin dato: fuera del área, exclusión o sin dato en todos los
  * criterios) o clases (0 = exclusión, 1–4 = clases, 255 = sin dato: fuera del área o sin dato en todos los criterios).
  * Es el mismo criterio que `paintResult` (lo que ves en pantalla) y `areaStats` (las hectáreas que se reportan). */
-export function resultRaster(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, kind: 'pct' | 'classes'): Uint8Array {
+export function resultRaster(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, kind: 'pct' | 'classes', nClasses = 3): Uint8Array {
   const out = new Uint8Array(pct.length);
   for (let i = 0; i < out.length; i++) {
     if (mask[i] === MASK_NODATA) out[i] = 255;
     else if (kind === 'pct') out[i] = pct[i];
-    else out[i] = mask[i] !== MASK_EXCLUDED && pct[i] === 255 ? 255 : cls[i];
+    // Las vetadas salen con el código N+1 (consecutivo; con 3 clases es el 4 de siempre).
+    else out[i] = mask[i] !== MASK_EXCLUDED && pct[i] === 255 ? 255 : cls[i] === CLASS_VETO ? nClasses + 1 : cls[i];
   }
   return out;
 }
@@ -47,9 +59,11 @@ export function resultRaster(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array,
 const hexA = (hex: string) => hex.toLowerCase();
 
 /** Estilo de QGIS para el GeoTIFF de clases (Capa → Propiedades → Simbología → Estilo → Cargar). */
-export function qmlClasses(pal: PaletteKey = 'semaforo'): string {
-  const hex = classHex(pal);
-  const entries = [0, 1, 2, 3, 4].map((k) => `        <paletteEntry value="${k}" color="${hexA(hex[k])}" label="${CLASS_LABEL[k]}" alpha="255"/>`).join('\n');
+export function qmlClasses(pal: PaletteKey = 'semaforo', model: ClassExport = DEFAULT_EXPORT): string {
+  const hex = classHexOf(model, pal);
+  // Valores: 0 exclusión, 1..N clases, N+1 vetadas (el mismo código que `resultRaster(..., 'classes', N)`).
+  const codes: [number, number][] = [[0, 0], ...Array.from({ length: model.n }, (_, i) => [i + 1, i + 1] as [number, number]), [model.n + 1, CLASS_VETO]];
+  const entries = codes.map(([v, code]) => `        <paletteEntry value="${v}" color="${hexA(hex[code])}" label="${xml(exportLabel(model, code))}" alpha="255"/>`).join('\n');
   return `<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
 <qgis version="3.28.0" styleCategories="Symbology">
   <pipe>
@@ -68,8 +82,9 @@ ${entries}
 }
 
 /** Estilo de QGIS para el GeoTIFF de idoneidad 0–100: la misma rampa de 3 paradas (0, 50, 100) que la leyenda de pantalla. */
-export function qmlPct(pal: PaletteKey = 'semaforo'): string {
-  const c = (i: number) => '#' + PALETTES[pal].stops[i][1].map((v) => v.toString(16).padStart(2, '0')).join('');
+export function qmlPct(pal: PaletteKey = 'semaforo', dir: Direction = 'suitability'): string {
+  // En riesgo la rampa va invertida (0 = verde, 100 = rojo), igual que en pantalla.
+  const c = (i: number) => '#' + PALETTES[pal].stops[dir === 'risk' ? 2 - i : i][1].map((v) => v.toString(16).padStart(2, '0')).join('');
   return `<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
 <qgis version="3.28.0" styleCategories="Symbology">
   <pipe>
@@ -109,18 +124,21 @@ export function kmz(title: string, bounds: Bounds, png: Uint8Array): Uint8Array 
 
 /** CSV de píxeles (lon, lat, idoneidad 0–100, clase) para importar como puntos en QGIS/Excel. Toma
  * 1 de cada `stride` píxeles para no pasar de `maxRows`. */
-export function pixelsCsv(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, grid: GeoGrid, maxRows = 200_000): string {
+/** Celda de CSV: los nombres de clase los escribe el usuario y pueden llevar comas o comillas. */
+const csvCell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+
+export function pixelsCsv(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, grid: GeoGrid, maxRows = 200_000, model: ClassExport = DEFAULT_EXPORT): string {
   let valid = 0;
   for (let i = 0; i < mask.length; i++) if (mask[i] !== MASK_NODATA && pct[i] !== 255) valid++;
   const stride = Math.max(1, Math.ceil(valid / maxRows));
-  const lines = ['lon,lat,idoneidad_0_100,clase'];
+  const lines = [`lon,lat,${DIR_TEXT[model.direction].csvIdx},clase`];
   let seen = 0;
   for (let i = 0; i < mask.length; i++) {
     if (mask[i] === MASK_NODATA || pct[i] === 255) continue;
     if (seen++ % stride) continue;
     const row = Math.floor(i / grid.width), col = i - row * grid.width;
     const [lon, lat] = pixelToLonLat(col, row, grid.transform, grid.crs);
-    lines.push(`${lon.toFixed(6)},${lat.toFixed(6)},${pct[i]},${CLASS_LABEL[cls[i]] ?? cls[i]}`);
+    lines.push(`${lon.toFixed(6)},${lat.toFixed(6)},${pct[i]},${csvCell(exportLabel(model, cls[i]))}`);
   }
   return lines.join('\n') + '\n';
 }

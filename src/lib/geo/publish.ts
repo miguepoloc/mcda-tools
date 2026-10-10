@@ -1,7 +1,7 @@
 /** Codificación del mapa publicado (vista pública `/p/<token>`): dos planos Uint8 (idoneidad 0–100 y
  * clase) concatenados, gzip y base64, guardados en `geo_results.grid_b64` (ver migración 12). Puro
  * salvo por `CompressionStream`/`btoa`, presentes en navegadores y en Node ≥ 18. */
-import { MASK_EXCLUDED, MASK_NODATA, MASK_VALID } from './suitability.ts';
+import { CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, MASK_VALID } from './suitability.ts';
 import type { Bounds } from './grid.ts';
 import type { GeoGrid } from '../types.ts';
 import type { AhpSummary } from './ahpSummary.ts';
@@ -62,7 +62,7 @@ export async function encodePlanes(pct: Uint8Array, cls: Uint8Array, mask: Uint8
 }
 
 /** Inversa: devuelve planos listos para `paintResult` / `areaStats` (mask con los códigos de suitability.ts). */
-export async function decodePlanes(b64: string, n: number): Promise<{ pct: Uint8Array; cls: Uint8Array; mask: Uint8Array }> {
+export async function decodePlanes(b64: string, n: number, opts: { legacyVeto?: boolean } = {}): Promise<{ pct: Uint8Array; cls: Uint8Array; mask: Uint8Array }> {
   const raw = await pipe(fromBase64(b64), new DecompressionStream('gzip'));
   if (raw.length !== 2 * n) throw new Error('El mapa publicado está dañado (tamaño inesperado).');
   const pct = raw.slice(0, n), code = raw.subarray(n);
@@ -70,7 +70,8 @@ export async function decodePlanes(b64: string, n: number): Promise<{ pct: Uint8
   for (let i = 0; i < n; i++) {
     if (code[i] === CODE_NODATA) { mask[i] = MASK_NODATA; }
     else if (code[i] === CODE_EXCLUDED) { mask[i] = MASK_EXCLUDED; }
-    else { mask[i] = MASK_VALID; cls[i] = code[i]; }
+    // Publicaciones v1 codificaban «vetada» como 4; hoy es CLASS_VETO (el 4 pasó a ser una clase más cuando hay ≥ 4).
+    else { mask[i] = MASK_VALID; cls[i] = opts.legacyVeto && code[i] === 4 ? CLASS_VETO : code[i]; }
   }
   return { pct, cls, mask };
 }

@@ -1,6 +1,6 @@
 /** Colorea grillas a RGBA (Uint32 little-endian 0xAABBGGRR, listo para `ImageData`). Puro. */
 import { suitability, type FnSpec } from './membership.ts';
-import { CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from './suitability.ts';
+import { CLASS_ALTA, CLASS_EXCLUDED, CLASS_MODERADA, CLASS_NO_APTA, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, type Direction } from './suitability.ts';
 
 export const rgba = (r: number, g: number, b: number, a = 255) => (((a << 24) | (b << 16) | (g << 8) | r) >>> 0);
 
@@ -55,23 +55,49 @@ function ramp(stops: Stops, t: number): Rgb {
 }
 
 /** Rampa continua de idoneidad (por defecto roja→amarilla→verde, como el notebook 07). t en [0,1]. */
-export const rampColor = (t: number, pal: PaletteKey = 'semaforo') => ramp(PALETTES[pal].stops, t);
+export const rampColor = (t: number, pal: PaletteKey = 'semaforo', dir: Direction = 'suitability') => ramp(PALETTES[pal].stops, dir === 'risk' ? 1 - t : t);
 /** Rampa secuencial azul→amarillo para valores crudos (temperatura, distancia, profundidad…). */
 export const seqColor = (t: number) => ramp(SEQ, t);
 /** `linear-gradient` CSS de la rampa de idoneidad, para leyendas y muestras. */
-export const rampCss = (pal: PaletteKey = 'semaforo') => `linear-gradient(90deg, ${PALETTES[pal].stops.map(([, c]) => `rgb(${c[0]},${c[1]},${c[2]})`).join(',')})`;
+export const rampCss = (pal: PaletteKey = 'semaforo', dir: Direction = 'suitability') => {
+  const stops = dir === 'risk' ? [...PALETTES[pal].stops].reverse() : PALETTES[pal].stops;
+  return `linear-gradient(90deg, ${stops.map(([, c]) => `rgb(${c[0]},${c[1]},${c[2]})`).join(',')})`;
+};
+
+/** Lo que `paintResult` necesita del modelo de clases (lo cumple `ClassModel`). */
+export type ClassPaint = { n: number; direction: Direction; colors?: (string | undefined)[] };
+const DEFAULT_PAINT: ClassPaint = { n: 3, direction: 'suitability' };
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+export const hexToRgb = (h: string): Rgb => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+export { hexOf as rgbToHex };
+
+/** Color de cada código del plano de clase: 1..N en la rampa de la paleta (de índice bajo a alto; invertida en riesgo,
+ * donde lo alto es lo malo) salvo que el usuario fije un color; 0 = exclusión; `CLASS_VETO` = el de la clase extrema
+ * de la dirección (aptitud: la más baja; riesgo: la más alta). Con 3 clases en aptitud da exactamente `PALETTES[pal].cls`. */
+export function classRgb(m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): Record<number, Rgb> {
+  const out: Record<number, Rgb> = { [CLASS_EXCLUDED]: PALETTES[pal].cls[CLASS_EXCLUDED] };
+  for (let i = 0; i < m.n; i++) {
+    const own = m.colors?.[i];
+    out[i + 1] = own && HEX6.test(own) ? hexToRgb(own) : rampColor(m.n > 1 ? i / (m.n - 1) : 0, pal, m.direction);
+  }
+  out[CLASS_VETO] = out[m.direction === 'risk' ? m.n : 1];
+  return out;
+}
+export const classHexOf = (m: ClassPaint = DEFAULT_PAINT, pal: PaletteKey = 'semaforo'): Record<number, string> =>
+  Object.fromEntries(Object.entries(classRgb(m, pal)).map(([k, v]) => [k, hexOf(v)]));
 export const RAW_RAMP_CSS = `linear-gradient(90deg, ${SEQ.map(([, c]) => `rgb(${c[0]},${c[1]},${c[2]})`).join(',')})`;
 
 const CLEAR = 0;
 const greyOf = (pal: PaletteKey) => { const [r, g, b] = PALETTES[pal].cls[CLASS_EXCLUDED]; return rgba(r, g, b); };
 
-/** Resultado: continuo (0–100 en rampa) o por clases (alta / moderada / no apta). */
-export function paintResult(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, style: 'continuous' | 'classes', pal: PaletteKey = 'semaforo'): Uint32Array {
+/** Resultado: continuo (0–100 en rampa) o por clases (las N del modelo; por defecto 3 de aptitud). */
+export function paintResult(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, style: 'continuous' | 'classes', pal: PaletteKey = 'semaforo', model: ClassPaint = DEFAULT_PAINT): Uint32Array {
   const out = new Uint32Array(pct.length);
   const GREY = greyOf(pal);
-  const lut = Array.from({ length: 101 }, (_, i) => { const [r, g, b] = rampColor(i / 100, pal); return rgba(r, g, b); });
+  const lut = Array.from({ length: 101 }, (_, i) => { const [r, g, b] = rampColor(i / 100, pal, model.direction); return rgba(r, g, b); });
   const cl: Record<number, number> = {};
-  for (const k of [CLASS_NO_APTA, CLASS_MODERADA, CLASS_ALTA, CLASS_VETO]) { const [r, g, b] = PALETTES[pal].cls[k]; cl[k] = rgba(r, g, b); }
+  for (const [k, [r, g, b]] of Object.entries(classRgb(model, pal))) cl[Number(k)] = rgba(r, g, b);
   for (let i = 0; i < out.length; i++) {
     const m = mask[i];
     if (m === MASK_NODATA) out[i] = CLEAR;
@@ -82,8 +108,8 @@ export function paintResult(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, 
   return out;
 }
 
-/** Idoneidad parcial (0–1) de un criterio con su función, sobre la capa cruda. */
-export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec, pal: PaletteKey = 'semaforo'): Uint32Array {
+/** Idoneidad (o riesgo) parcial (0–1) de un criterio con su función, sobre la capa cruda. */
+export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec, pal: PaletteKey = 'semaforo', dir: Direction = 'suitability'): Uint32Array {
   const out = new Uint32Array(layer.length);
   const GREY = greyOf(pal);
   for (let i = 0; i < out.length; i++) {
@@ -91,7 +117,7 @@ export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec
     if (mask[i] === MASK_EXCLUDED) { out[i] = GREY; continue; }
     const v = layer[i];
     if (Number.isNaN(v)) continue;
-    const [r, g, b] = rampColor(suitability(v, fn), pal);
+    const [r, g, b] = rampColor(suitability(v, fn), pal, dir);
     out[i] = rgba(r, g, b);
   }
   return out;
@@ -128,14 +154,16 @@ export function paintFlag(layer: Float32Array, color: [number, number, number]):
 
 /** Diferencia de idoneidad (actual − escenario guardado): rojo = empeora, verde = mejora, transparente si
  * el cambio es menor a `eps` puntos. Solo celdas evaluables en AMBOS mapas. Intensidad hasta ±`full` puntos. */
-export function paintDiff(pct: Uint8Array, base: Uint8Array, mask: Uint8Array, eps = 1, full = 30, pal: PaletteKey = 'semaforo'): Uint32Array {
+export function paintDiff(pct: Uint8Array, base: Uint8Array, mask: Uint8Array, eps = 1, full = 30, pal: PaletteKey = 'semaforo', dir: Direction = 'suitability'): Uint32Array {
   const out = new Uint32Array(pct.length);
   for (let i = 0; i < out.length; i++) {
     if (mask[i] !== 1 || pct[i] === 255 || base[i] === 255) continue;
     const d = pct[i] - base[i];
     if (Math.abs(d) < eps) continue;
     const t = Math.min(1, Math.abs(d) / full);
-    const [r, g, b] = d < 0 ? PALETTES[pal].diffNeg : PALETTES[pal].diffPos;
+    // En aptitud empeora = el índice baja; en riesgo empeora = el índice sube.
+    const worse = dir === 'risk' ? d > 0 : d < 0;
+    const [r, g, b] = worse ? PALETTES[pal].diffNeg : PALETTES[pal].diffPos;
     out[i] = rgba(r, g, b, Math.round(90 + 165 * t));
   }
   return out;
