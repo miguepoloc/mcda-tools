@@ -14,6 +14,7 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 | Dónde viven los puntos | Pestaña nueva «Puntos»; se guardan en `projects.geo` (jsonb), sin migración | 9 oct |
 | Diseño | Dirección «Afinado» (identidad actual con contraste arreglado); tipografía actual; modo compacto solo en tablas del Geovisor | 9 oct |
 | Animación | CSS + FLIP; sin anime.js por ahora | 9 oct |
+| Decisiones delegadas (el docente pidió que se decidan por él) | Guía de consistencia: solo aplica con botón y no se registra si la aplicó · Orden agregado: Borda por defecto, Copeland alternativo · Cortes por cuantiles/Jenks: se congelan al elegirlos · 3 clases con nombres editables · Ranking por índice (%) · Puntos: por archivo (CSV/GeoJSON) primero; «desde capa subida» después · Exclusión se muestra siempre como «Excluido», nunca como 0 % | 10 oct |
 
 ## Entradas
 
@@ -26,3 +27,12 @@ Origen: `Propuesta global de mejoras para mcda.tools.md` (40 mejoras, hallazgos 
 - **Qué:** `.wrap:has(.gv-wrap)` se ensancha a 1560 px y `.gv-wrap` deja de salirse con `transform`; fondo del topbar al 94 %.
 - **Por qué:** el Topbar (dentro de `.wrap`, 1100 px) quedaba más angosto que el geovisor (1560 px); al hacer scroll el panel lateral pasaba por debajo y asomaba a los lados (captura del docente).
 - **Verificación:** pendiente de revisión visual del docente (la herramienta de navegador no pudo medirlo antes).
+
+### 3. Guía de consistencia AHP (E1) — merge `30898e5`
+- **Qué:** con CR ≥ 0.10 y la hoja completa, el editor señala la comparación que más se aparta de las demás y el valor Saaty que la haría coherente, con el CR resultante y hasta 3 candidatas. Botón «Aplicar sugerencia» opcional; nunca cambia nada sola. `src/lib/ahpGuide.ts` + `JudgmentEditor`.
+- **Por qué:** el formulario solo decía «revisa tus juicios» sin decir qué par; el estudiante corregía a ciegas.
+- **Método:** residuo |ln a_ij − ln(w_i/w_j)| con pesos del eigenvector; CR recalculado cambiando solo ese par con `analyze`. No altera pesos, λmax, CI, CR ni el Excel.
+- **Verificación:** `scripts/check-ahp-guide.ts` contra numpy (`ahp-guide-ref.py`); typecheck, `npm test` y `test:excel` en verde. Pendiente revisión visual.
+
+### 4. Plan técnico de puntos, G1 y zonal — `a71011c`
+- Ver `docs/PLAN_puntos_ranking.md`. Hallazgos que cambian el plan: los vectores subidos no se persisten (solo se rasterizan), el Excel del geovisor es solo valores, y los marcadores de punto son SVG (no salen en el PNG).
