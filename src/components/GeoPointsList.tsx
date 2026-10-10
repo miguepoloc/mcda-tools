@@ -45,6 +45,11 @@ export default function GeoPointsList({ rows, heading, criticalLabel, selectedKe
   const firstNa = shown.findIndex((r) => r.status !== 'ok');
   const hasRanked = shown.some((r) => r.status === 'ok');
 
+  // Un punto elegido en el mapa que la búsqueda esconde: se limpia la búsqueda para que su fila abierta se vea.
+  useEffect(() => {
+    if (selectedKey && query && !shown.some((r) => r.key === selectedKey) && rows.some((r) => r.key === selectedKey)) setQuery('');
+  }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // El punto elegido en el mapa se trae a la vista dentro del panel (un solo desplazamiento: el del panel).
   useEffect(() => {
     if (!selectedKey) return;
