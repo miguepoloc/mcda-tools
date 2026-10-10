@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
-import { PALETTES, classHexOf, paintResult } from '@/lib/geo/paint';
+import { PALETTES, classHexOf, modelRampHex, paintResult } from '@/lib/geo/paint';
 import { decodePlanes, publishedPoints, publishedView, publishedZones, type PublishedMeta } from '@/lib/geo/publish';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
@@ -81,10 +81,11 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
     const veto = ok && p.cls === CLASS_VETO;
     return {
       key: String(i), rank: p.rank, name: p.name || `Punto ${i + 1}`, lat: p.lat, lon: p.lon, pct: ok ? p.pct : null, status: p.status, vetoed: veto,
-      color: ok ? HEX[p.cls] ?? '#9CA3AF' : '#9CA3AF',
+      // «Continuo»: color de la rampa del modelo en su índice (igual que el fondo); «N clases»: el de su clase.
+      color: !ok ? '#9CA3AF' : style === 'continuous' && p.pct !== null && p.pct !== undefined ? modelRampHex(p.pct / 100, model, palette) : HEX[p.cls] ?? '#9CA3AF',
       label: !ok ? STATUS_LABEL[p.status as Exclude<typeof p.status, 'ok'>] : veto ? model.names[view.direction === 'risk' ? model.n - 1 : 0] : (model.names[p.cls - 1] ?? `Clase ${p.cls}`),
     };
-  }), [pubPoints, HEX, model, view.direction]);
+  }), [pubPoints, HEX, model, view.direction, style, palette]);
   const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
     id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank, name: r.name, pct: r.pct,
     tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
