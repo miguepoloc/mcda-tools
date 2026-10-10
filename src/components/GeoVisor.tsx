@@ -31,14 +31,17 @@ import GeoPublishPanel from './GeoPublishPanel';
 import GeoCatalogPanel from './GeoCatalogPanel';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
-  classStats, classify, CLASS_EXCLUDED, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
+  classStats, classify, CLASS_EXCLUDED, CLASS_VETO, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
 } from '@/lib/geo/suitability';
 import { kmz, parcelsCsv, pixelsCsv, qmlClasses, qmlPct, resultRaster, safeName, slug, toGeoTiff, zipFiles } from '@/lib/geo/export';
 import { downloadGeoExcelBytes, type GeoSummary } from '@/lib/geoExcel';
 import type { Criterion, ExpertRow, GeoConfig, GeoLayerMeta } from '@/lib/types';
-import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type RasterOverlay } from './GeoMap';
+import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rankingCsv, rankPoints, round6, sanitizePoints, toPublishedPoints, type GeoPoint } from '@/lib/geo/points';
+import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import GeoPointsPanel from './GeoPointsPanel';
+import type { RankRow } from './GeoPointsTable';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
 import { canvasBytes, saveBytes, toCanvas, toUrl } from '@/lib/geo/canvas';
@@ -53,7 +56,7 @@ type Props = {
   share: { isPublic: boolean; token: string; onTogglePublic: (on: boolean) => void } | null;
 };
 
-type Tab = 'capas' | 'modelo' | 'exportar';
+type Tab = 'capas' | 'modelo' | 'puntos' | 'exportar';
 
 const TOUR: TourStep[] = [
   { sel: '.gv-steps-bar', tab: 'capas', title: 'Cuatro pasos', text: 'Área → Capas → Reglas → Pesos. Cada marca se pone verde cuando ese paso está listo. Los pesos vienen de tus expertos (pestaña «Expertos» del proyecto).' },
@@ -91,6 +94,10 @@ export default function GeoVisor(props: Props) {
   const [vis, setVis] = useState<VisState>({});
   const [vecs, setVecs] = useState<VecItem[]>([]);
   const [selected, setSelected] = useState<{ col: number; row: number } | null>(null);
+  // Puntos con ranking: modo «Agregar punto» (explícito), punto resaltado (tabla <-> mapa) y aviso del último intento.
+  const [addMode, setAddMode] = useState(false);
+  const [selPoint, setSelPoint] = useState<string | null>(null);
+  const [addNote, setAddNote] = useState('');
   // Clases del mapa: dirección + N cortes + nombres/colores (ver lib/geo/classes.ts). Un proyecto antiguo con solo
   // `classes: {alta, media}` se lee como 3 clases de aptitud sin migrar nada.
   const [setup, setSetup] = useState<ClassSetup>(() => setupFromGeo(geo));
@@ -259,6 +266,33 @@ export default function GeoVisor(props: Props) {
   const boundsKey = gridBounds ? [gridBounds.west, gridBounds.south, gridBounds.east, gridBounds.north].map((n) => n.toFixed(4)).join(',') : '';
   useEffect(() => { if (gridBounds) setTimeout(() => mapRef.current?.fit(gridBounds), 60); }, [boundsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ------------------------------------------------------------------ puntos con ranking
+  const points = useMemo(() => sanitizePoints(geo.points), [geo.points]);
+  // Rótulo de clase: la vetada cuenta en la clase extrema de la dirección (así lo define pointEval) y lleva su insignia aparte.
+  const labelOf = useCallback((cls: number) => (cls === CLASS_VETO ? rm.names[rm.direction === 'risk' ? rm.n - 1 : 0] : (rm.names[cls - 1] ?? `Clase ${cls}`)), [rm]);
+  // Se evalúa con las reglas diferidas y el modelo diferido, igual que el mapa pintado: el ranking nunca contradice lo que se ve.
+  const ranked = useMemo(() => rankPoints(points, (pt) => (data
+    ? evaluateLonLat(data, dRules, { breaks: rm.breaks, direction: rm.direction }, pt)
+    : { status: 'nodata' as const, s: null, pct: null, cls: 0, vetoed: false, lat: pt.lat, lon: pt.lon, rows: [] }), labelOf), [points, data, dRules, rm, labelOf]);
+  const rankRows = useMemo<RankRow[]>(() => ranked.map((r) => ({
+    key: r.id, rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, label: r.label, status: r.status, vetoed: r.vetoed,
+    color: r.status === 'ok' ? RHEX[r.cls] ?? '#9CA3AF' : '#9CA3AF',
+  })), [ranked, RHEX]);
+  const pointMarks = useMemo<PointMark[]>(() => rankRows.map((r) => ({
+    id: r.key, lat: r.lat, lon: r.lon, color: r.color, rank: r.rank,
+    tip: r.status === 'ok' ? `${r.rank}. ${r.name} · ${r.pct} % · ${r.label}${r.vetoed ? ` (${T.critical})` : ''}` : `${r.name} · ${r.label}`,
+  })), [rankRows, T]);
+  const setPoints = useCallback((next: GeoPoint[]) => commit((g) => { const o = { ...g }; if (next.length) o.points = next; else delete o.points; return o; }), [commit]);
+  // El modo «Agregar punto» no sobrevive a salir de la pestaña ni a Esc: un clic perdido no debe crear puntos.
+  useEffect(() => { if (tab !== 'puntos') setAddMode(false); }, [tab]);
+  useEffect(() => {
+    if (!addMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAddMode(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [addMode]);
+  useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
+
   // ------------------------------------------------------------------ imágenes sobre el mapa
   const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
   const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
@@ -313,12 +347,21 @@ export default function GeoVisor(props: Props) {
   }, [data, selected]);
 
   const onMapClick = useCallback((lat: number, lon: number) => {
+    if (addMode) {
+      // Modo explícito: cada clic crea un punto. Fuera del modo, el clic sigue siendo la consulta de un punto de siempre.
+      const cur = sanitizePoints(geoRef.current.points);
+      if (cur.length >= MAX_POINTS) { setAddNote(`Tope de ${MAX_POINTS} puntos alcanzado: elimina alguno para agregar más.`); return; }
+      const id = newPointId();
+      setPoints([...cur, { id, name: nextPointName(cur), lat: round6(lat), lon: round6(lon) }]);
+      setSelPoint(id); setAddNote('');
+      return;
+    }
     if (!data) return;
     const [c, r] = lonLatToPixel(lon, lat, data.grid.transform, data.grid.crs);
     const col = Math.round(c), row = Math.round(r);
     if (col < 0 || row < 0 || col >= data.grid.width || row >= data.grid.height) { setSelected(null); return; }
     setSelected({ col, row });
-  }, [data]);
+  }, [data, addMode, setPoints]);
 
   const onMarkerClick = useCallback((id: string) => {
     if (!data || !id.startsWith('ref:')) return;
@@ -536,8 +579,8 @@ export default function GeoVisor(props: Props) {
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
         <div className="gv-tabs" role="tablist">
-          {(['capas', 'modelo', 'exportar'] as Tab[]).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', exportar: 'Exportar' }[t]}</button>
+          {(['capas', 'modelo', 'puntos', 'exportar'] as Tab[]).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{{ capas: 'Capas', modelo: 'Modelo', puntos: points.length ? `Puntos ${points.length}` : 'Puntos', exportar: 'Exportar' }[t]}</button>
           ))}
         </div>
         <div className="gv-side-body">
@@ -563,6 +606,15 @@ export default function GeoVisor(props: Props) {
               stats={stats} baseline={baseline ? { label: baseline.label, stats: baseline.stats } : null}
               onSaveBaseline={(label) => { if (ev && stats) { setBaseline({ label, pct: ev.pct.slice(), stats }); setVis((v) => ({ ...v, diff: { on: true, op: 0.9 } })); } }}
               onClearBaseline={() => setBaseline(null)} />
+          )}
+          {tab === 'puntos' && (
+            <GeoPointsPanel
+              points={points} ranked={ranked} rows={rankRows} direction={rm.direction} criticalLabel={T.critical}
+              ready={!!(data && rules.length > 0)} addMode={addMode} onAddMode={setAddMode} addNote={addNote}
+              selectedKey={selPoint} onSelect={setSelPoint}
+              onCenter={(id) => { const pt = points.find((x) => x.id === id); if (pt) { setSelPoint(id); mapRef.current?.flyTo(pt.lat, pt.lon, 13); } }}
+              onChange={setPoints}
+              onExportCsv={() => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv')} />
           )}
           {tab === 'exportar' && (
             <div className="gv-sec-stack">
@@ -596,7 +648,7 @@ export default function GeoVisor(props: Props) {
 
       <section className="gv-main">
         <div className="gv-stage">
-          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} draft={draft} drawing={drawing}
+          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
             initialBounds={gridBounds} onClick={onMapClick} onMove={onMove} onMarkerClick={onMarkerClick}
             onDrawn={(b) => { setDraft(b); setDrawing(false); }} />
 
@@ -610,6 +662,12 @@ export default function GeoVisor(props: Props) {
 
           <div className="gv-coords mono"><span ref={coordRef}>—</span></div>
 
+          {addMode && (
+            <div className="gv-addbar" role="status">
+              <span><b>Agregar punto:</b> haz clic en el mapa para colocar cada punto.</span>
+              <button type="button" className="btn sm" onClick={() => setAddMode(false)}>Terminar (Esc)</button>
+            </div>
+          )}
           {loading && <div className="gv-toast" role="status">Cargando capas… {Math.round(progress * 100)}%</div>}
           {!ready && data && !loading && <div className="gv-toast" role="status">Asigna capas a tus criterios (pestaña Modelo) para ver el resultado.</div>}
 

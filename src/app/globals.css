@@ -1581,3 +1581,35 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 .gitem:not(.top){padding-top:8px;border-top:1px dashed var(--line)}
 .gacts{display:flex;flex-wrap:wrap;gap:8px}
 .gnote{margin:0;font-size:12.5px}
+
+/* ---- Geovisor: puntos con ranking ---- */
+.gv-tabs{grid-template-columns:repeat(4,1fr)}
+.gv-tabs button{min-height:36px;padding:7px 4px;font-size:12.5px}
+.gv-leaflet.gv-addmode,.gv-leaflet.gv-addmode .leaflet-grab,.gv-leaflet.gv-addmode .leaflet-interactive{cursor:crosshair !important}
+.gv-addbar{position:absolute;z-index:1000;left:50%;top:14px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--accent-soft);color:var(--ink);border:2px solid var(--accent);border-radius:12px;padding:6px 8px 6px 14px;font-size:12.5px;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:calc(100% - 120px)}
+.gv-addnote{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gv-perrs{margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--warn-text)}
+.gv-perrs.ok{color:var(--muted)}
+.gv-ptable-wrap{max-height:min(60vh,520px);overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.gv-ptable{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.gv-ptable caption{text-align:left;padding:7px 10px;font-size:12px;color:var(--muted);position:sticky;top:0;background:var(--surface2);z-index:2;border-bottom:1px solid var(--line)}
+.gv-ptable caption b{color:var(--ink)}
+.gv-ptable th,.gv-ptable td{padding:0 6px;height:36px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+.gv-ptable thead th{position:sticky;top:31px;z-index:1;background:var(--surface2);font:600 11px var(--f-mono);color:var(--muted);height:28px}
+.gv-ptable .num{text-align:right;white-space:nowrap}
+.gv-ptable tbody th{font-weight:600;min-width:90px}
+.gv-ptable tbody tr{cursor:pointer}
+.gv-ptable tbody tr.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.gv-ptable tbody tr.na{color:var(--muted)}
+.gv-ptable input{width:100%;min-width:0;height:30px;padding:0 6px;border:1px solid transparent;border-radius:6px;background:transparent;font:600 12.5px var(--f-body);color:inherit}
+.gv-ptable input:hover{border-color:var(--line)}
+.gv-ptable input:focus-visible,.gv-pbtn:focus-visible,.gv-plink:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.gv-ptable td.cls{display:table-cell}
+.gv-ptable td.cls .dot{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:6px;border:1px solid rgba(0,0,0,.45);vertical-align:-1px}
+.gv-ptable td.cls .t.na{font-style:italic}
+.gv-ptable td.cls .gv-badge{margin-left:6px;white-space:nowrap}
+.gv-ptable td.acts{white-space:nowrap;text-align:right;padding-right:2px}
+.gv-pbtn{appearance:none;width:36px;height:36px;display:inline-grid;place-items:center;background:transparent;border:0;border-radius:8px;color:var(--muted);cursor:pointer}
+.gv-pbtn:hover{background:var(--surface2);color:var(--ink)}
+.gv-plink{appearance:none;border:0;background:transparent;color:inherit;font:600 12.5px var(--f-body);cursor:pointer;padding:0;min-height:36px;text-align:left}
+@media (prefers-reduced-motion:no-preference){.gv-pbtn{transition:background .12s,color .12s}}
