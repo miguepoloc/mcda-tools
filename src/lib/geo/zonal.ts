@@ -146,3 +146,30 @@ export function zonesCsv(rows: ZoneStat[], classNames: string[], direction: Dire
   }
   return lines.join('\n') + '\n';
 }
+
+/** Una zona tal como viaja en la publicación (`meta.zones`): SOLO agregados. Nunca los polígonos de entrada ni la
+ * población por manzana. `points`/`pop*` solo existen si el dueño los publicó. */
+export type PublishedZone = {
+  name: string; meanPct: number | null; ha: number; classPct: (number | null)[];
+  points?: number; pop?: number; popExtremePct?: number | null;
+};
+export type PublishedZones = {
+  /** Nombre de la capa de zonas (para el título). */
+  layer: string;
+  rows: PublishedZone[];
+  /** Nombre de la clase más extrema (encabezado de la columna de % de población), si hay población. */
+  extremeName?: string;
+};
+
+const r1 = (v: number | null) => (v === null ? null : Math.round(v * 10) / 10);
+
+/** Agregados por zona para publicar, ya en el orden por defecto. `withPoints`: incluir el conteo de puntos (solo si los
+ * puntos son públicos); `pop`: exposición por zona (aligned por índice) o null. */
+export function toPublishedZones(stats: ZoneStat[], o: { layer: string; withPoints: boolean; pop?: ZonePopCsv[] | null; extremeName?: string }): PublishedZones {
+  const rows = defaultZoneOrder(stats).map((z): PublishedZone => ({
+    name: z.name, meanPct: r1(z.meanPct), ha: Math.round(z.ha * 10) / 10, classPct: z.classPct.map(r1),
+    ...(o.withPoints ? { points: z.points } : {}),
+    ...(o.pop ? { pop: Math.round(o.pop[z.index]?.evaluated ?? 0), popExtremePct: r1(o.pop[z.index]?.extremePct ?? null) } : {}),
+  }));
+  return { layer: o.layer, rows, ...(o.pop && o.extremeName ? { extremeName: o.extremeName } : {}) };
+}

@@ -8,12 +8,13 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
 import { PALETTES, classHexOf, paintResult } from '@/lib/geo/paint';
-import { decodePlanes, publishedPoints, publishedView, type PublishedMeta } from '@/lib/geo/publish';
+import { decodePlanes, publishedPoints, publishedView, publishedZones, type PublishedMeta } from '@/lib/geo/publish';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
 import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
 import GeoPointsTable, { type RankRow } from './GeoPointsTable';
+import GeoZonesTable from './GeoZonesTable';
 import { BasemapChips, PaletteChips, ResultLegend, StyleChips } from './GeoHud';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import PublicAhp from './PublicAhp';
@@ -73,6 +74,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
 
   // Puntos con ranking: solo si el dueño los publicó (`showPoints`); publicaciones anteriores no los traen.
   const pubPoints = useMemo(() => publishedPoints(meta), [meta]);
+  const pubZones = useMemo(() => publishedZones(meta), [meta]);
   const [selPoint, setSelPoint] = useState<string | null>(null);
   const rankRows = useMemo<RankRow[]>(() => (pubPoints ?? []).map((p, i) => {
     const ok = p.status === 'ok';
@@ -133,6 +135,20 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
                   selectedKey={selPoint} onSelect={setSelPoint}
                   onCenter={(k) => { const r = rankRows.find((x) => x.key === k); if (r) { setSelPoint(k); mapRef.current?.flyTo(r.lat, r.lon, 13); } }} />
                 <p className="gv-hint">Cada punto toma el índice de la celda donde cae. Los puntos sin evaluar van al final, sin puesto.</p>
+              </section>
+            )}
+            {pubZones && (
+              <section className="gv-sec">
+                <header><h4>Resumen por zonas</h4><span className="gv-badge ok">{pubZones.rows.length}</span></header>
+                <GeoZonesTable
+                  rows={pubZones.rows.map((r, i) => ({
+                    key: String(i), name: r.name, meanPct: r.meanPct, ha: r.ha, classPct: r.classPct, points: r.points ?? null,
+                    ...(pubZones.extremeName ? { pop: r.pop ?? 0, popExtremePct: r.popExtremePct ?? null } : {}),
+                  }))}
+                  classNames={model.names} indexLabel={view.direction === 'risk' ? 'Riesgo medio' : 'Idoneidad media'}
+                  heading={view.direction === 'risk' ? 'Mayor riesgo primero' : 'Más apto primero'}
+                  showPoints={pubZones.rows.some((r) => r.points !== undefined)} showPop={!!pubZones.extremeName} extremeName={pubZones.extremeName} />
+                <p className="gv-hint">Promedio del índice de las celdas evaluadas de cada zona{pubZones.layer ? ` («${pubZones.layer}»)` : ''}. Una zona sin celdas evaluadas se indica como «Sin área evaluada», no como 0 %.{pubZones.extremeName ? ' La población de cada polígono se asignó a la celda de su centroide.' : ''}</p>
               </section>
             )}
             <section className="gv-sec">
