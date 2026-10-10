@@ -41,7 +41,7 @@ import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, t
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
 import GeoPointsPanel from './GeoPointsPanel';
-import type { RankRow } from './GeoPointsTable';
+import type { RankRow } from './GeoPointsList';
 import { Icon, ICONS, usePalette } from './GeoBits';
 import { BasemapChips, LayerLegend, PaletteChips, ResultLegend, StyleChips, type LayerLegendSpec } from './GeoHud';
 import { canvasBytes, saveBytes, toCanvas, toUrl } from '@/lib/geo/canvas';
@@ -618,7 +618,8 @@ export default function GeoVisor(props: Props) {
             <GeoPointsPanel
               points={points} ranked={ranked} rows={rankRows} direction={rm.direction} criticalLabel={T.critical}
               ready={!!(data && rules.length > 0)} addMode={addMode} onAddMode={setAddMode} addNote={addNote}
-              selectedKey={selPoint} onSelect={setSelPoint}
+              selectedKey={selPoint}
+              onSelect={(id) => { setSelPoint(id); const pt = id ? points.find((x) => x.id === id) : null; if (pt) mapRef.current?.panTo(pt.lat, pt.lon); }}
               onCenter={(id) => { const pt = points.find((x) => x.id === id); if (pt) { setSelPoint(id); mapRef.current?.flyTo(pt.lat, pt.lon, 13); } }}
               onChange={setPoints}
               onExportCsv={() => saveBytes(`${base}_ranking_puntos.csv`, rankingCsv(ranked, rm.direction), 'text/csv')} />

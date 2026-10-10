@@ -8,7 +8,7 @@ import { mergeImported, parseCsvPoints, pointsFromFc, type ImportResult } from '
 import type { Direction } from '@/lib/geo/suitability';
 import ConfirmDialog from './ConfirmDialog';
 import { Icon, ICONS } from './GeoBits';
-import GeoPointsTable, { type RankRow } from './GeoPointsTable';
+import GeoPointsList, { type RankRow } from './GeoPointsList';
 
 type Preview = { fileName: string; result: ImportResult; fc: unknown | null };
 /** `after` = firma de la lista tal como quedó: el «Deshacer» solo se ofrece mientras nada más la haya cambiado. */
@@ -28,7 +28,7 @@ type Props = {
   /** Aviso del último intento de agregar (p. ej. tope alcanzado). */
   addNote: string;
   selectedKey: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
   onCenter: (id: string) => void;
   onChange: (points: GeoPoint[]) => void;
   onExportCsv: () => void;
@@ -149,7 +149,7 @@ export default function GeoPointsPanel(p: Props) {
         ) : (
           <>
             {!p.ready && <p className="gv-hint warn" role="status">Todavía no hay un mapa calculado (área, capas y reglas): los puntos se guardan y se evaluarán cuando lo haya.</p>}
-            <GeoPointsTable
+            <GeoPointsList
               rows={p.rows} heading={rankHeading(p.direction)} criticalLabel={p.criticalLabel}
               selectedKey={p.selectedKey} onSelect={p.onSelect} onCenter={p.onCenter}
               onRename={(id, name) => p.onChange(p.points.map((x) => (x.id === id ? { ...x, name } : x)))}
@@ -171,6 +171,7 @@ export default function GeoPointsPanel(p: Props) {
             const next = prev.filter((x) => x.id !== toDelete.id);
             p.onChange(next);
             setUndo({ prev, after: sigOf(next), msg: `Se eliminó «${toDelete.name}».` });
+            if (p.selectedKey === toDelete.id) p.onSelect(null);
             setToDelete(null);
           }}
         />

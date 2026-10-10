@@ -37,6 +37,8 @@ export type GeoMapHandle = {
   /** Extensión lon/lat de lo que se ve ahora (alternativa táctil a dibujar el área con el ratón). */
   getBounds: () => Bounds | null;
   flyTo: (lat: number, lon: number, zoom?: number) => void;
+  /** Centra suavemente sin cambiar el zoom (sin animación con «reducir movimiento»). */
+  panTo: (lat: number, lon: number) => void;
   /** Dibuja mapa base + capas visibles en un canvas (para el PNG). Lanza si el navegador bloquea las teselas. */
   capture: () => Promise<HTMLCanvasElement>;
   size: () => { w: number; h: number };
@@ -312,6 +314,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
       const z = zoom ?? Math.max(m.getZoom(), 12);
       if (reducedMotion()) m.setView([lat, lon], z, { animate: false }); else m.flyTo([lat, lon], z, { duration: 0.8 });
     },
+    panTo: (lat, lon) => { map.current?.panTo([lat, lon], { animate: !reducedMotion(), duration: 0.5 }); },
     size: () => { const s = map.current?.getSize(); return { w: s?.x ?? 0, h: s?.y ?? 0 }; },
     capture: async () => {
       const m = map.current;
