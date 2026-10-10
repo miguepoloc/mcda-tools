@@ -69,3 +69,16 @@ Integrado en `main` local (sin push): contraste, header, E1, G4/G5/G14/R5/rueda,
 - **Compatibilidad:** proyecto antiguo = 3 clases sin migrar; `geo.classes {alta, media}` queda como espejo con 3 clases (lo lee el catálogo); un proyecto sin tocar conserva su firma de publicación; publicación v2 y vista pública lee v1 como aptitud de 3 clases.
 - **Verificación:** `check-geo-points`, `check-geo-cuts`, `check-geo-classes`, `check-geo-direction` y `check-geo-publish` (v1/v2); typecheck, 884 verificaciones y `test:excel` en verde.
 - **Pendiente (visual):** editor de clases, leyendas con N filas, rampa invertida, `<input type="color">`, pregunta en NewProject, vista pública v1/v2, PNG con N clases, persistencia real en Supabase; textos de «idoneidad» que quedan en el tutorial/tour en modo riesgo; pruebas de parcelas con N≠3.
+
+### 9. Puntos con ranking — merge `1f1f584`
+- **Qué:** `geo.points?` (tope 300) y `geo.publicPoints?` en `projects.geo` (sin migración). Pestaña «Puntos» con «Agregar punto» en modo explícito (Esc o el mismo botón salen; fuera del modo el clic consulta como siempre), importación de CSV (`nombre,lat,lon` o `x,y`, coma o `;`, coma decimal) y GeoJSON/KML/GPX/shapefile (Point/MultiPoint) con vista previa y deshacer. Ranking por el índice de la celda: descendente, empates 1,2,2,4; en riesgo «Mayor riesgo primero», en aptitud «Más apto primero». Excluido, fuera del área y sin dato van al final, sin puesto ni índice (nunca 0 %). Veto: «Vetada» / «Condición crítica».
+- **Mapa:** capa propia de `circleMarker`, tooltip con nombre, puesto e índice, resaltado tabla↔mapa y puntos dibujados en el PNG (con puesto, hasta 100).
+- **Público:** interruptor global «Mostrar puntos y ranking en la vista pública», apagado por defecto y con advertencia. Con él apagado **no viaja** ni la lista (`public_get` entrega todo el meta a cualquiera con el enlace). Meta aditivo (`points`, `showPoints`) sin subir `v`; parte `puntos` en la firma; publicaciones anteriores se leen sin puntos.
+- **Salidas:** hoja «Puntos» en el Excel (solo valores, con nota) y `puntos_ranking.csv` en el zip.
+- **Decisiones del agente:** filas de 36 px (no 32) para cumplir objetivos táctiles; tooltips como nodo de texto (los nombres importados no se interpretan como HTML); empates por el índice entero que ve el usuario.
+- **Verificación:** `check-geo-points`, `check-geo-points-import` (20 casos, nuevo), `check-geo-publish`, `check-geo-publish-sig`; typecheck, 939 verificaciones y `test:excel` en verde.
+- **Riesgos:** el meta publicado crece ~30–40 KB con 300 puntos y el RPC no limita su tamaño; un clic sobre un marcador de referencia en modo agregar crea un punto ahí.
+- **Pendiente (visual):** modo agregar, tabla y vista previa, 4 pestañas en móvil, foco y contraste, PNG con puntos, 300 puntos fluidos, publicación y vista pública contra Supabase real, importar KML/shapefile reales. El tour no menciona Puntos. «Desde capa subida» queda para después (exige persistir el FC).
+
+## Estado al 10 oct (fin de la segunda ola)
+Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. Siguen (tercera ola): persistir polígonos (G6/G7), estadística zonal y exposición (G9/G10), composición de mapa PDF (R1) e informe del mapa (R2).
