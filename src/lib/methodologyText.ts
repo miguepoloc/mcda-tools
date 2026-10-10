@@ -115,3 +115,72 @@ export function buildMethodologyParagraph(i: MethodologyInput, lang: Methodology
     : `The analysis was carried out with ${APP_FULL_NAME} (version ${APP_VERSION}; https://doi.org/${APP_DOI}).`;
   return [software, weightingSentence(i, lang), methodSentence(i, lang)].join(' ');
 }
+
+// ------------------------------------------------------------------ proyectos de mapa (Geovisor AHP + SIG)
+export type GeoMethodologyInput = {
+  criteria: { name: string; weight: number }[];
+  /** Expertos con juicios (0 = pesos iguales). */
+  expertCount: number;
+  weightMethod?: 'eigenvector' | 'mean';
+  /** CR de la matriz de criterios (solo con expertos). */
+  cr?: number;
+  /** Los pesos se exploraron a mano: no son los del panel. */
+  exploring?: boolean;
+  direction: 'suitability' | 'risk';
+  nClasses: number;
+  /** Resolución de la grilla en metros y su CRS. */
+  resM?: number;
+  crs?: string;
+  hasExclusion?: boolean;
+  hasVeto?: boolean;
+};
+
+/** Párrafo de metodología de un mapa AHP + SIG (suma ponderada con vetos y exclusión, clasificada en N clases), es / en.
+ * Los números salen del estado del proyecto; la versión y el DOI, de version.ts. */
+export function buildGeoMethodologyParagraph(i: GeoMethodologyInput, lang: MethodologyLang = 'es'): string {
+  const es = lang === 'es';
+  const risk = i.direction === 'risk';
+  const list = i.criteria.map((c) => `${c.name} (${f(c.weight)})`).join('; ');
+  const software = es
+    ? `El mapa se elaboró con ${APP_FULL_NAME} (versión ${APP_VERSION}; https://doi.org/${APP_DOI}).`
+    : `The map was produced with ${APP_FULL_NAME} (version ${APP_VERSION}; https://doi.org/${APP_DOI}).`;
+  const how = i.weightMethod === 'mean'
+    ? (es ? 'el promedio de columnas normalizadas' : 'the normalized column average')
+    : (es ? 'el eigenvector principal de Saaty' : "Saaty's principal eigenvector");
+  let weights: string;
+  if (i.exploring) {
+    weights = es
+      ? `Los pesos de los ${i.criteria.length} criterios se fijaron manualmente para explorar escenarios (no corresponden al panel de expertos): ${list}.`
+      : `The weights of the ${i.criteria.length} criteria were set manually to explore scenarios (they are not the expert panel's): ${list}.`;
+  } else if (i.expertCount > 0) {
+    const ex = es ? `${i.expertCount} experto${i.expertCount === 1 ? '' : 's'}` : `${i.expertCount} expert${i.expertCount === 1 ? '' : 's'}`;
+    weights = es
+      ? `Los pesos de los ${i.criteria.length} criterios provienen de la comparación por pares de ${ex} en el Proceso Analítico Jerárquico (AHP; Saaty, 1980), con media geométrica entre expertos y pesos por ${how}: ${list}.`
+      : `The weights of the ${i.criteria.length} criteria come from the pairwise comparisons of ${ex} in the Analytic Hierarchy Process (AHP; Saaty, 1980), with the geometric mean across experts and weights by ${how}: ${list}.`;
+    if (i.cr != null) {
+      const ok = i.cr < CR_LIMIT;
+      weights += es
+        ? ` La razón de consistencia fue CR = ${f(i.cr, 4)} (${ok ? 'aceptable, < 0.10' : 'NO cumple el umbral de 0.10'}).`
+        : ` The consistency ratio was CR = ${f(i.cr, 4)} (${ok ? 'acceptable, < 0.10' : 'does NOT meet the 0.10 threshold'}).`;
+    }
+  } else {
+    weights = es
+      ? `No hay juicios de expertos: los ${i.criteria.length} criterios llevan pesos iguales (${list}).`
+      : `There are no expert judgments: the ${i.criteria.length} criteria carry equal weights (${list}).`;
+  }
+  const cell = i.resM ? (es ? ` de ${i.resM} m` : ` of ${i.resM} m`) : '';
+  const crs = i.crs ? (es ? ` en ${i.crs}` : ` in ${i.crs}`) : '';
+  const veto = i.hasVeto
+    ? (es
+      ? (risk ? ' Un veto fuerza el índice de la celda al máximo y la rotula «condición crítica».' : ' Un veto fuerza el índice de la celda a 0.')
+      : (risk ? " A veto forces the cell's index to the maximum and labels it 'critical condition'." : " A veto forces the cell's index to 0."))
+    : '';
+  const excl = i.hasExclusion ? (es ? ' Las áreas de exclusión quedan fuera del cálculo.' : ' Exclusion areas are left out of the calculation.') : '';
+  const calc = es
+    ? `Cada capa se transformó en ${risk ? 'un riesgo' : 'una idoneidad'} parcial de 0 a 1 con la regla de su criterio, y el índice de ${risk ? 'riesgo' : 'idoneidad'} de 0 a 100 de cada celda${cell}${crs} es la suma ponderada de esos parciales; si a una celda le falta un criterio, los pesos se reescalan entre los que sí tienen dato.${veto}${excl}`
+    : `Each layer was transformed into a partial ${risk ? 'risk' : 'suitability'} score from 0 to 1 using its criterion's rule, and each cell's 0 to 100 ${risk ? 'risk' : 'suitability'} index${cell}${crs} is the weighted sum of those partial scores; when a criterion is missing in a cell, the weights are rescaled among those with data.${veto}${excl}`;
+  const classes = es
+    ? `El índice se clasificó en ${i.nClasses} clases ordenadas (un valor alto significa ${risk ? 'más riesgo, es decir peor' : 'más aptitud, es decir mejor'}). El índice no es una probabilidad.`
+    : `The index was classified into ${i.nClasses} ordered classes (a high value means ${risk ? 'more risk, i.e. worse' : 'more suitability, i.e. better'}). The index is not a probability.`;
+  return [software, weights, calc, classes].join(' ');
+}

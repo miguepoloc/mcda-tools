@@ -56,8 +56,10 @@ import { canvasBytes, saveBytes, toCanvas, toUrl } from '@/lib/geo/canvas';
 import { composeFileName, defaultOptions, type ComposeAvailability, type ComposeOptions } from '@/lib/geo/compose';
 import { renderComposition, type ComposeInputs } from '@/lib/geo/composeCanvas';
 import { jpegToPdf } from '@/lib/geo/pdfImage';
+import { buildGeoReport } from '@/lib/geo/report';
 import { APP_DOI, APP_FULL_NAME, APP_VERSION } from '@/lib/version';
 import GeoComposeDialog from './GeoComposeDialog';
+import GeoReportModal from './GeoReportModal';
 
 type Props = {
   projectId: string; ownerId: string; title: string; objective: string;
@@ -563,6 +565,8 @@ export default function GeoVisor(props: Props) {
   // Todo se arma desde el estado del proyecto (datos, resultado calculado, clases, capas, puntos), nunca de lo que está
   // visible en pantalla: el estilo (clases / continuo), las capas y el mapa base los fija el diálogo.
   const [composeOpen, setComposeOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportMap, setReportMap] = useState<{ url: string | null; busy: boolean; warnings: string[] }>({ url: null, busy: false, warnings: [] });
   const refVecs = vecs.filter((v) => v.ref);
   const composeAvail: ComposeAvailability = {
     result: !!(data && ev && om && stats), zones: !!(zoneVec && zoneStats), points: points.length,
@@ -601,6 +605,14 @@ export default function GeoVisor(props: Props) {
     const jpg = await new Promise<Uint8Array>((res, rej) => cv.toBlob(async (b) => (b ? res(new Uint8Array(await b.arrayBuffer())) : rej(new Error('No se pudo generar la imagen del PDF'))), 'image/jpeg', 0.92));
     saveBytes(composeFileName(base, o.width, 'pdf'), jpegToPdf(jpg, cv.width, cv.height, { title: o.title }), 'application/pdf');
   };
+  async function openReport() {
+    setReportOpen(true);
+    setReportMap({ url: null, busy: true, warnings: [] });
+    try {
+      const r = await composeRender({ ...composeDefaults(), width: 1600, zones: false, subtitle: '' });
+      setReportMap({ url: r.canvas.toDataURL('image/jpeg', 0.9), busy: false, warnings: r.warnings });
+    } catch (e) { setReportMap({ url: null, busy: false, warnings: [e instanceof Error ? e.message : String(e)] }); }
+  }
   const kmzOne = async () => {
     const g = buildOverlayMap(data!.grid, 'geographic');
     saveBytes(`${base}.kmz`, kmz(props.title, g.bounds, await canvasBytes(toCanvas(g, paintResult(ev!.pct, ev!.cls, data!.mask, style, palette, rm)))), 'application/vnd.google-earth.kmz');
@@ -733,6 +745,10 @@ export default function GeoVisor(props: Props) {
           basemaps={Object.entries(BASEMAPS).map(([key, b]) => ({ key, label: b.label }))}
           onClose={() => setComposeOpen(false)} render={composeRender} save={composeSave} />
       )}
+      {reportOpen && (
+        <GeoReportModal onClose={() => setReportOpen(false)} mapUrl={reportMap.url} mapBusy={reportMap.busy} mapWarnings={reportMap.warnings}
+          report={buildGeoReport({ summary: summary(), ahp: exploring ? null : ahpSummary(criteria, weightResult), exploring, hasMap: !!reportMap.url })} />
+      )}
       <aside className="gv-side">
         <div className="gv-steps-bar" aria-label="Progreso">
           <span className={hasArea ? 'ok' : ''}><Icon d={hasArea ? ICONS.check : ICONS.minus} size={12} /> Área</span>
@@ -810,6 +826,7 @@ export default function GeoVisor(props: Props) {
                 { k: 'tif', label: `GeoTIFF de ${T.noun} (0–100) + estilo .qml`, desc: `Ráster georreferenciado en ${data?.grid.crs ?? 'UTM'}. Ábrelo en QGIS/ArcGIS y carga el .qml para los colores.`, run: geotiffPct },
                 { k: 'cls', label: 'GeoTIFF de clases + estilo .qml', desc: `${rm.names.map((nm, i) => `${i + 1} ${nm.toLowerCase()}`).join(' · ')} · ${rm.n + 1} ${T.critical.toLowerCase()} · 0 exclusión. Ideal para calcular áreas o vectorizar en QGIS.`, run: geotiffCls },
                 { k: 'compose', label: 'Componer mapa para entregar (PNG o PDF)', desc: 'Lámina con título, resultado, leyenda de las N clases, escala, norte y fuente. Se arma con el estado del proyecto, no con la vista actual; 1600, 2400 o 3600 px.', run: async () => setComposeOpen(true), opens: true },
+                { k: 'report', label: 'Informe ejecutivo (PDF)', desc: 'Objetivo, pesos con CR y consenso, reglas, mapa compuesto, área por clase, zonas, población, ranking de puntos y metodología (es/en). Se imprime desde el navegador.', run: async () => { void openReport(); }, opens: true },
                 { k: 'png', label: 'PNG de la vista actual (con mapa base y leyenda)', desc: 'El mapa tal como lo ves ahora, con título y leyenda. Para una lámina de entrega usa «Componer mapa».', run: pngMap },
                 { k: 'pngr', label: 'PNG solo del resultado (transparente)', desc: 'Únicamente los píxeles, sin mapa base: para superponer en tu propio diseño.', run: pngOnly },
                 { k: 'kmz', label: 'KMZ para Google Earth', desc: 'El resultado como imagen georreferenciada sobre el globo.', run: kmzOne },
