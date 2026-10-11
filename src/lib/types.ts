@@ -91,6 +91,33 @@ export type GeoLayerMeta = {
  * `grid` + `layers` (capas propias del estudiante). `rules` mapea el `id` de cada criterio de
  * `ProjectRow.criteria` a la capa que lo alimenta (`layerKey`) y su función de idoneidad; un
  * criterio sin regla no participa del cálculo. */
+/** Escenario con nombre guardado en `geo.scenarios` (hasta 5): lo que produjo un mapa (pesos, reglas, clases) y un
+ * resumen calculado. No guarda la grilla: para compararlo se recalcula con las capas actuales. Ver `lib/geo/scenarios.ts`. */
+export type GeoScenario = {
+  id: string; name: string;
+  /** ISO 8601 del momento de guardarlo. */
+  date: string;
+  direction: 'suitability' | 'risk';
+  /** Pesos con los que se calculó, por id de criterio (los del panel o los explorados). */
+  weights: Record<string, number>;
+  /** true = eran pesos explorados a mano, no los del panel de expertos. */
+  explored?: boolean;
+  rules: Record<string, { layerKey: string; fn: GeoFnSpec; veto?: GeoVetoSpec }>;
+  breaks: number[];
+  classes: { name?: string; color?: string }[];
+  cut: 'manual' | 'quantile' | 'jenks';
+  summary: {
+    /** Nombres de las clases (de menor a mayor índice) tal como se veían. */
+    names: string[];
+    classes: { ha: number; pct: number }[];
+    vetoHa: number; exclHa: number; evaluableHa: number;
+    /** Índice medio 0–100 de las celdas evaluadas (null = sin celdas). */
+    meanPct: number | null;
+    /** Pesos efectivos (reescalados a 1 entre los criterios con mapa), por id de criterio. */
+    effective: Record<string, number>;
+  };
+};
+
 export type GeoConfig = {
   packId?: string;
   grid?: GeoGrid;
@@ -117,6 +144,8 @@ export type GeoConfig = {
   zonal?: { layer: string; nameField?: string; popLayer?: string; popField?: string };
   /** Publicar en la vista pública el resumen AGREGADO por zona (por defecto NO: nombres de zonas y cifras serían públicos). */
   publicZones?: boolean;
+  /** Escenarios con nombre guardados (máx. 5, ver `lib/geo/scenarios.ts`). Solo del propietario: no se publican. */
+  scenarios?: GeoScenario[];
 };
 
 export type ProjectRow = {

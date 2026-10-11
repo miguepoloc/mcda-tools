@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**19 de 40 mejoras hechas** (9 de 16 hallazgos H cerrados del todo, 3 parcialmente). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**20 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 19). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -164,7 +164,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | G10 | Exposición por población | ✅ | entrada 12 (población al centroide) |
 | G11 | Regla de distancias y áreas | ⬜ | |
 | G12 | Dibujo de geometrías | ⬜ | fuera de v1 por plan |
-| G13 | Escenarios con nombre guardados | ⬜ | H7 sigue abierto |
+| G13 | Escenarios con nombre guardados | ✅ | entrada 19 (H7 cerrado) |
 | G14 | Gestión de capas | ◐ | duplicados y borrado confirmado sí; renombrar/reordenar/agrupar no |
 | G15 | Sensibilidad espacial de pesos | ⬜ | |
 | M1 | Orden agregado Borda/Copeland | ✅ | entrada 7 |
@@ -205,3 +205,10 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Lógica pura:** `src/lib/shareUi.ts` + `scripts/check-share-ui.ts`. Estilos en `share.css`.
 - **Verificación:** typecheck, `npm test` y `test:excel` (incluido el recálculo de LibreOffice) en verde.
 - **Pendiente (visual):** contraste y posición real del chip y del popover (puede recortarse bajo un ancestro con `overflow:hidden`), móvil, escaneo del QR, Web Share en celular, iframe real.
+
+### 19. Editor de clases legible y escenarios con nombre (G13, H7) — merge de `a05cab7`, `7e4cfd8`, `17726d5`
+- **Editor de clases:** franja proporcional 0–100 con cortes rotulados y texto alternativo; el nombre es el valor real del campo (el placeholder solo si se vacía); rangos «de 64 a 100» / «de 48 a menos de 64»; un número editable por corte con validación en línea, Intro aplica, ↑↓ ±1, Mayús ±5, Esc deshace; «Quitar clase …» con `aria-label` (confirma si el proyecto es público; mínimo 2 explicado); ayuda resumida y `<details>` «Cómo funciona»; nota «El mapa se muestra por clases mientras editas» solo en vista Continuo. Estilos en `geo-classes.css`.
+- **Escenarios:** hasta 5 por proyecto en `geo.scenarios` (nombre, fecha, pesos, reglas, cortes/clases, dirección y resumen; sin grilla). Crear, renombrar, eliminar (ConfirmDialog), comparar (tabla lado a lado en puntos porcentuales y capa «Diferencia» recalculada con las capas actuales) y restaurar con confirmación y «Deshacer». Avisa si cambió el número de clases o la dirección en vez de comparar. No se publican. `escenarios.json` en el zip (y línea en LEEME) y hoja «Escenarios» en el Excel, solo si hay alguno. Cierra **G13 y H7**.
+- **Decisiones y riesgos del agente:** «confirmar si la clase da nombre a algo publicado» usa `share.isPublic` como proxy (el geovisor no conoce el meta publicado); restaurar pesos solo como «exploración» porque los pesos del panel salen de los juicios; restaurar reemplaza todas las reglas (un criterio nuevo queda sin regla y con peso 0); «Cargar ejemplo» (ProjectWorkspace) reemplaza `geo` completo y borra los escenarios; el diff asume que las capas no cambiaron desde que se guardó (avisa si cambió el área evaluada); cortes con resolución 0,1 %.
+- **Verificación:** `check-geo-classes` ampliado y `check-geo-scenarios` nuevo; typecheck, 1296 verificaciones y `test:excel` en verde (merge con conflicto aditivo en `package.json`, resuelto uniendo los scripts de prueba).
+- **Pendiente (visual):** editor y franja en ancho angosto y oscuro, tabla de comparación, descargas, persistencia real en Supabase.
