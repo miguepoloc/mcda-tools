@@ -54,3 +54,10 @@ details.gx-group>summary:focus-visible{outline:2px solid var(--accent,#4D7C0F);o
 .gs-host{max-width:760px}
 .gs-host:empty::before{content:"Cargando el mapa para poder publicarlo…";display:block;color:var(--muted);font-size:14px;padding:12px 0}
 .gs-details{--accent:var(--geo-accent,#84CC16);--accent-soft:var(--geo-accent-soft,rgba(132,204,22,.14))}
+.gs-emb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;align-items:end}
+.gs-emb-grid label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.gs-emb-grid select,.gs-emb-grid input[type=number]{width:100%;min-height:36px}
+.gs-emb-grid .gs-emb-chk{display:flex;gap:8px;align-items:center;font-weight:500;min-height:36px}
+.gs-emb-code{width:100%;font:12px/1.45 var(--f-mono);resize:vertical;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--ink)}
+.gs-emb-prev{border:1px dashed var(--line);border-radius:10px;padding:8px;overflow:auto;background:var(--surface2)}
+.gs-hint-s{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}

@@ -62,7 +62,7 @@ export function PublicLinkBlock({ url, title, fileBase, qrSubheading, canShare =
       </div>
       <div className="sh-acts">
         <button type="button" className="btn sm" onClick={() => setQrOpen(true)}>Ver QR grande y descargar</button>
-        <button type="button" className="btn sm" onClick={async () => setMsg(await copyText(embedCode(url, title), 'Código para incrustar copiado.'))}>Copiar código para incrustar</button>
+        <button type="button" className="btn sm" onClick={async () => setMsg(await copyText(embedCode(`${url}/embed`, title), 'Código para incrustar copiado.'))}>Copiar código para incrustar</button>
       </div>
       <p className="sh-msg" role="status" aria-live="polite">{msg}</p>
       {qrOpen && (
