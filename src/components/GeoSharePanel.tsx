@@ -10,6 +10,8 @@ import QRCode from 'qrcode';
 import QrModal from './QrModal';
 import type { SigParts } from '@/lib/geo/publishSig';
 import { publicLink, publishView, viewerRows, type PublishedStatus } from '@/lib/geo/share';
+import { BASEMAPS } from './GeoMap';
+import { EMBED_BASES, EMBED_PRESETS, EMBED_SIZE, clampSize, embedUrl, iframeCode, type EmbedBase, type EmbedPanel, type EmbedStyle } from '@/lib/embed';
 import './geo-share.css';
 
 type Props = {
@@ -70,6 +72,19 @@ export default function GeoSharePanel(p: Props) {
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   }
+
+  // «Incrustar en otra página»: el código y la vista previa salen de la misma URL embebida.
+  const [embPreset, setEmbPreset] = useState('wide');
+  const [embFull, setEmbFull] = useState(true);
+  const [embW, setEmbW] = useState<number>(EMBED_SIZE.defW);
+  const [embH, setEmbH] = useState<number>(520);
+  const [embStyle, setEmbStyle] = useState<EmbedStyle>('continuous');
+  const [embBase, setEmbBase] = useState<EmbedBase>('sat');
+  const [embPanel, setEmbPanel] = useState<EmbedPanel>('map');
+  const [embPreview, setEmbPreview] = useState(false);
+  const panelOk = embPanel === 'map' || (embPanel === 'points' && p.showPoints && p.nPoints > 0) || (embPanel === 'zones' && p.showZones && p.zonesReady);
+  const embUrl = embedUrl(typeof window === 'undefined' ? '' : window.location.origin, p.token, { style: embStyle, base: embBase, panel: panelOk ? embPanel : 'map' });
+  const code = iframeCode({ url: embUrl, title: `Mapa: ${p.title}`, width: embFull ? '100%' : embW, height: embH });
 
   const view = publishView(status, p.parts, p.sig);
   const rows = viewerRows({ showPoints: p.showPoints, showZones: p.showZones, nPoints: p.nPoints, zonesReady: p.zonesReady, hasPop: p.hasPop, published: !!status });
@@ -141,6 +156,66 @@ export default function GeoSharePanel(p: Props) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card form gs-card" aria-labelledby={`${uid}-emb`}>
+        <h3 id={`${uid}-emb`}>Incrustar en otra página</h3>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>Pega este código en tu sitio, blog o plataforma de aprendizaje. Muestra solo el mapa publicado, con su leyenda y el selector de vista; sin cabecera de la plataforma.</p>
+        {!p.isPublic && <p className="gs-warn-inline">Activa «Hacer público con enlace» arriba: mientras el proyecto sea privado, el código mostrará «contenido no disponible».</p>}
+        {p.isPublic && !status && <p className="gs-warn-inline">Aún no has publicado el mapa: el código mostrará «aún no publicado» hasta que lo hagas.</p>}
+        <div className="gs-emb-grid">
+          <label>Tamaño
+            <select value={embPreset} onChange={(e) => {
+              setEmbPreset(e.target.value);
+              const pr = EMBED_PRESETS.find((x) => x.key === e.target.value);
+              if (pr) { setEmbFull(pr.w === '100%'); if (pr.w !== '100%') setEmbW(pr.w); setEmbH(pr.h); }
+            }}>
+              {EMBED_PRESETS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+              <option value="custom">Personalizado</option>
+            </select>
+          </label>
+          <label>Ancho (px)
+            <input type="number" inputMode="numeric" min={EMBED_SIZE.minW} max={EMBED_SIZE.maxW} step={10} value={embW} disabled={embFull}
+              onChange={(e) => { setEmbW(Number(e.target.value)); setEmbPreset('custom'); }} />
+          </label>
+          <label>Alto (px)
+            <input type="number" inputMode="numeric" min={EMBED_SIZE.minH} max={EMBED_SIZE.maxH} step={10} value={embH}
+              onChange={(e) => { setEmbH(Number(e.target.value)); setEmbPreset('custom'); }} />
+          </label>
+          <label className="gs-emb-chk"><input type="checkbox" checked={embFull} onChange={(e) => { setEmbFull(e.target.checked); setEmbPreset('custom'); }} /> Ocupar todo el ancho disponible</label>
+          <label>Estilo inicial
+            <select value={embStyle} onChange={(e) => setEmbStyle(e.target.value as EmbedStyle)}>
+              <option value="continuous">Continuo</option>
+              <option value="classes">Por clases</option>
+            </select>
+          </label>
+          <label>Mapa base
+            <select value={embBase} onChange={(e) => setEmbBase(e.target.value as EmbedBase)}>
+              {EMBED_BASES.map((b) => <option key={b} value={b}>{BASEMAPS[b].label}</option>)}
+            </select>
+          </label>
+          <label>Vista inicial
+            <select value={embPanel} onChange={(e) => setEmbPanel(e.target.value as EmbedPanel)}>
+              <option value="map">Mapa</option>
+              {p.showPoints && p.nPoints > 0 && <option value="points">Puntos y ranking</option>}
+              {p.showZones && p.zonesReady && <option value="zones">Resumen por zonas</option>}
+            </select>
+          </label>
+        </div>
+        <textarea className="gs-emb-code" readOnly rows={4} value={code} aria-label="Código para incrustar" onFocus={(e) => e.target.select()} />
+        <div className="acts">
+          <button type="button" className="btn sm primary" onClick={async () => { try { await navigator.clipboard.writeText(code); setMsg('Código copiado.'); } catch { setMsg('Selecciona el código y cópialo manualmente.'); } }}>Copiar código</button>
+          <button type="button" className="btn sm" onClick={() => setEmbPreview((v) => !v)} aria-expanded={embPreview}>{embPreview ? 'Ocultar vista previa' : 'Ver vista previa'}</button>
+        </div>
+        {embPreview && (
+          <div className="gs-emb-prev">
+            <iframe src={embUrl} title="Vista previa del mapa incrustado" loading="lazy"
+              style={{ border: 0, width: embFull ? '100%' : `${clampSize(embW, EMBED_SIZE.minW, EMBED_SIZE.maxW, EMBED_SIZE.defW)}px`, maxWidth: '100%', height: `${clampSize(embH, EMBED_SIZE.minH, EMBED_SIZE.maxH, EMBED_SIZE.defH)}px` }} />
+          </div>
+        )}
+        <p className="gs-hint-s">
+          <b>Seguridad:</b> solo esta dirección (<code>/p/…/embed</code>) puede mostrarse dentro de otros sitios; el resto de la plataforma (tu cuenta, el panel, los enlaces de expertos) bloquea ser enmarcado. Quien incruste el mapa ve exactamente lo que ve quien abre el enlace: lo de «Qué ve quien abra el enlace». Para dejar de mostrarlo, vuelve el proyecto privado o genera un enlace nuevo.
+        </p>
       </section>
 
       <section className="card form gs-card" aria-labelledby={`${uid}-oth`}>
