@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**20 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 19). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**21 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 19). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | G12 | Dibujo de geometrías | ⬜ | fuera de v1 por plan |
 | G13 | Escenarios con nombre guardados | ✅ | entrada 19 (H7 cerrado) |
 | G14 | Gestión de capas | ◐ | duplicados y borrado confirmado sí; renombrar/reordenar/agrupar no |
-| G15 | Sensibilidad espacial de pesos | ⬜ | |
+| G15 | Sensibilidad espacial de pesos | ✅ | entrada 20 |
 | M1 | Orden agregado Borda/Copeland | ✅ | entrada 7 |
 | M2 | PROMETHEE con 6 funciones y umbrales | ⬜ | |
 | M3 | ELECTRE TRI | ⬜ | esfuerzo alto |
@@ -212,3 +212,12 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Decisiones y riesgos del agente:** «confirmar si la clase da nombre a algo publicado» usa `share.isPublic` como proxy (el geovisor no conoce el meta publicado); restaurar pesos solo como «exploración» porque los pesos del panel salen de los juicios; restaurar reemplaza todas las reglas (un criterio nuevo queda sin regla y con peso 0); «Cargar ejemplo» (ProjectWorkspace) reemplaza `geo` completo y borra los escenarios; el diff asume que las capas no cambiaron desde que se guardó (avisa si cambió el área evaluada); cortes con resolución 0,1 %.
 - **Verificación:** `check-geo-classes` ampliado y `check-geo-scenarios` nuevo; typecheck, 1296 verificaciones y `test:excel` en verde (merge con conflicto aditivo en `package.json`, resuelto uniendo los scripts de prueba).
 - **Pendiente (visual):** editor y franja en ancho angosto y oscuro, tabla de comparación, descargas, persistencia real en Supabase.
+
+### 20. Sensibilidad espacial de pesos (G15)
+- **Qué:** sub-sección «Sensibilidad de los pesos» en la pestaña Modelo (tras Parcelas, antes de Comparar escenarios). Para cada criterio con regla y capa varía su peso ±10 % y ±20 % (relativo), reescala los demás en proporción (la suma no cambia) y recalcula el índice por celda con las mismas reglas, vetos, cortes y dirección del mapa. Muestra (a) la capa «Celdas que cambian de clase» en el mapa (selector de criterio y de variación; con «todos / cualquiera» pinta en cuántos de los (criterios × 4) casos cambia cada celda, más opaco = más inestable) y (b) dos tablas: % del área evaluada (y ha) que cambia por criterio y variación, y ha por clase con una variación elegida frente al mapa actual. Referencia: Chen, Yu y Khan (2010).
+- **Por qué:** los pesos de AHP salen de juicios con incertidumbre; el docente necesita ver *dónde* y *cuánto* el mapa depende de ellos, no solo un ranking de sensibilidad global.
+- **Cómo:** lógica pura en `src/lib/geo/sensitivity.ts` (`perturbWeights`, `sensitivitySteps` generador, `runSensitivity`, `changeCount`, `sensitivityRows`). La idoneidad parcial por criterio y celda se calcula una vez (Float64, misma aritmética que `indexPixel`); cada caso solo recombina. El generador cede el hilo entre casos y la interfaz lo avanza con `setTimeout` (barra de progreso, cancelar), así no congela. Pinta `paintChange` (`paint.ts`, tono Okabe-Ito púrpura rojizo, alfa por conteo), leyenda `kind:'sens'` en `GeoHud`, entrada «Sensibilidad…» en la lista de capas. Si hay análisis vigente, la hoja «Sensibilidad» (solo valores) entra al Excel y por tanto al zip (`resumen.xlsx`).
+- **Decisiones:** no se persiste en el proyecto (se recalcula a demanda con las capas actuales; avisa «desactualizado» si cambian pesos, reglas, clases o capas); usa los pesos explorados si la exploración está activa; las celdas vetadas nunca cambian de clase (el veto no depende de pesos); con un solo criterio no hay con quién compensar y el botón queda deshabilitado; un criterio de peso 0 no se mueve (±% de 0). Clase «mala» para el color de la tabla de ha: la peor de la dirección.
+- **Verificación:** `scripts/check-geo-sensitivity.ts` (43 verificaciones: reescalado, paridad celda por celda con `evaluateIndex`+`classify` en aptitud y riesgo, ha por clase contra `classStats`, vetos, exclusión, generador, selección del mapa, pintado, hoja Excel); registrado en `npm test` antes de `check-integration.ts`.
+- **Riesgos:** (1) memoria: guarda un mapa Uint8 por caso (criterios × 4 × celdas; ~20 MB por millón de celdas con 5 criterios) y la matriz parcial en Float64 durante el cálculo; en grillas de varios millones puede pesar y cada caso es un turno largo del hilo (no se probó con la grilla real de la boya). (2) La variación es relativa al peso (±10 % de 0.30 = 0.27–0.33), no puntos porcentuales: criterios con peso pequeño casi no se mueven por construcción. (3) El conteo «en cuántos casos cambia» no distingue si sube o baja de clase (sí lo hace el Excel: columnas «Suben / Bajan»).
+- **Pendiente (visual):** panel en ancho angosto y modo oscuro, tablas con 5–8 clases (scroll horizontal), contraste del tono sobre las tres bases (OSM / satélite / claro) y de la leyenda, tiempos en la grilla real, lectura con teclado y lector de pantalla del progreso y los selects.

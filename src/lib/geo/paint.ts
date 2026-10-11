@@ -207,6 +207,20 @@ export function paintDiff(pct: Uint8Array, base: Uint8Array, mask: Uint8Array, e
   return out;
 }
 
+/** Sensibilidad de pesos (G15): celdas que cambian de clase, con intensidad según en cuántas de las variaciones elegidas
+ * cambian (1..max). Un solo tono (el «púrpura rojizo» de Okabe-Ito, que no choca con la diferencia ni con las clases)
+ * y alfa creciente; el número de casos va siempre en la leyenda y la tabla, nunca solo en el color. */
+export const SENS_RGB: Rgb = [204, 121, 167];
+export function paintChange(count: Uint8Array, max: number, mask: Uint8Array): Uint32Array {
+  const out = new Uint32Array(count.length);
+  for (let i = 0; i < out.length; i++) {
+    if (!count[i] || mask[i] !== 1) continue;
+    const t = max > 1 ? (count[i] - 1) / (max - 1) : 1;
+    out[i] = rgba(SENS_RGB[0], SENS_RGB[1], SENS_RGB[2], Math.round(150 + 105 * t));
+  }
+  return out;
+}
+
 /** Parcelas (etiquetas > 0) en un color plano. */
 export function paintParcels(labels: Uint32Array, color: [number, number, number] = [109, 40, 217]): Uint32Array {
   const out = new Uint32Array(labels.length);

@@ -10,6 +10,7 @@ import type { Parcel } from '@/lib/geo/patches';
 import { DIR_TEXT, resolveModel, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import GeoClassesEditor from './GeoClassesEditor';
 import GeoScenariosPanel, { type ScenariosPanelProps } from './GeoScenariosPanel';
+import GeoSensitivityPanel, { type SensitivityPanelProps } from './GeoSensitivityPanel';
 import { fmtNum, Num } from './GeoBits';
 
 type Rule = GeoConfig['rules'][string];
@@ -48,6 +49,8 @@ type Props = {
   onFlyTo: (col: number, row: number) => void;
   /** Escenarios guardados: lista, comparación y restauración (ver GeoScenariosPanel). */
   scenarios: ScenariosPanelProps;
+  /** Sensibilidad espacial de pesos (G15): ver GeoSensitivityPanel. */
+  sensitivity: SensitivityPanelProps;
 };
 
 const FN_LABEL: Record<FnSpec['type'], string> = { steps: 'Por rangos', trapezoid: 'Trapecio (óptimo en el medio)', target: 'Valor objetivo (± tolerancia)', up: 'Más es mejor', down: 'Menos es mejor', classes: 'Por clases' };
@@ -334,6 +337,8 @@ export default function GeoModelPanel(p: Props) {
           </>
         )}
       </section>
+
+      <GeoSensitivityPanel {...p.sensitivity} />
 
       <GeoScenariosPanel {...p.scenarios} />
     </div>
