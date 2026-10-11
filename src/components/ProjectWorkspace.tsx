@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hexToken, uid, type Alternative, type Criterion, type ExpertRow, type GeoConfig, type JudgmentRow, type Method, type WeightingMethod, type ProjectRow } from '@/lib/types';
 import { indexJudgments, type JMap } from '@/lib/ahp';
@@ -25,6 +25,10 @@ import { seedExampleExpert } from '@/lib/geo/exampleExpert';
 import Results, { accentStyleFor } from './Results';
 import ScientificMethodModal, { type MethodKey } from './ScientificMethodModal';
 import QrModal from './QrModal';
+import { MethodBadgeMenu } from './MethodBadge';
+import ShareButton from './ShareDialog';
+import ShareTab from './ShareTab';
+import './share.css';
 
 type Props = { initialProject: ProjectRow; initialExperts: ExpertRow[]; initialJudgments: JudgmentRow[] };
 type Patch = Partial<Pick<ProjectRow, 'title' | 'objective' | 'method' | 'weighting_method' | 'criteria' | 'alternatives' | 'decision_matrix' | 'prioritization' | 'is_public' | 'public_token' | 'open_token' | 'open_enabled' | 'geo'>>;
@@ -318,10 +322,21 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
       await downloadPrioExcel(studyExport(), `${fileBase()}_priorizacion.xlsx`);
     } catch (e) { setMsg('No se pudo generar el Excel de priorización: ' + (e instanceof Error ? e.message : '')); }
   }
+  /** Atajo de la insignia: el método se cambia en la pestaña Proyecto (tarjetas de método, sin confirmación: no borra la matriz). */
+  const goChangeMethod = () => {
+    goTab('Proyecto');
+    setTimeout(() => document.getElementById('metodo-mcda')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+  };
+  /** Botón «Compartir»: el mismo en el encabezado y en la parte alta de Resultados/Comparativa. */
+  const shareBtn = (label?: string, align: 'left' | 'right' = 'right') => (
+    <ShareButton kind={project.kind === 'spatial' ? 'spatial' : 'decision'} isPublic={project.is_public} token={project.public_token}
+      title={project.title} fileBase={fileBase()} label={label} align={align}
+      onTogglePublic={project.kind === 'spatial' ? undefined : (on) => patch({ is_public: on }, true)}
+      onGoShareTab={() => goTab('Compartir')} />
+  );
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setMsg('Enlace copiado'); } catch { setMsg('Copia el enlace manualmente'); } };
 
   const editingExpert = experts.find((e) => e.id === editing);
-  const publicUrl = `${origin()}/p/${project.public_token}`;
   const openUrl = `${origin()}/o/${project.open_token}`;
 
   return (
@@ -330,8 +345,14 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         <div>
           <div className="eyebrow">Proyecto en edición</div>
           <h1 style={{ fontSize: 28, letterSpacing: '-0.01em' }}>{project.title}</h1>
+          <div style={{ marginTop: 8 }}>
+            {project.kind === 'spatial'
+              ? <span className="sh-chip" style={{ '--sh-color': 'var(--geo-accent)' } as CSSProperties}><span className="sh-dot" aria-hidden="true" /><span>Tipo: Mapa de aptitud</span><span className="sh-fam">· AHP + SIG</span></span>
+              : <MethodBadgeMenu method={project.method} onChangeMethod={goChangeMethod} />}
+          </div>
         </div>
         <div className="acts">
+          {shareBtn()}
           <span className="savest" aria-live="polite" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             {save === 'saving' && <span style={{ color: 'var(--warn)' }}>Guardando…</span>}
             {save === 'saved' && (
@@ -382,7 +403,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
               </a>
             </div>
 
-            <div className="methods-cards-grid" role="group" aria-label="Método de decisión multicriterio">
+            <div id="metodo-mcda" className="methods-cards-grid" role="group" aria-label="Método de decisión multicriterio">
               {METHOD_OPTIONS.map((m) => {
                 const isSelected = project.method === m.key;
                 return (
@@ -711,6 +732,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             prio={prio}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
+            headerExtra={shareBtn('Compartir este resultado')}
           />
         </div>
       )}
@@ -731,6 +753,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             projectObjective={project.objective}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
+            headerExtra={shareBtn('Compartir este resultado')}
           />
         </div>
       )}
@@ -740,40 +763,13 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         <div className="panel"><div ref={setShareSlot} className="gs-host" /></div>
       )}
       {tab === 'Compartir' && project.kind !== 'spatial' && (
-        <div className="panel">
-          <div className="card form">
-            <h3>Resultados públicos</h3>
-              <>
-                <p className="muted" style={{ maxWidth: '70ch' }}>Por defecto, nadie más que tú ve tu proyecto. Si activas el enlace público, cualquier persona con el enlace podrá ver los resultados ({objectiveWeighting
-                  ? `ranking y los pesos ${WEIGHTING_SHORT[weighting]}, calculados de la matriz de decisión, que también verá`
-                  : project.method === 'ahp' ? 'ranking, pesos y consistencia' : 'ranking, pesos y consistencia, más la matriz de decisión'}). No verá nombres de expertos, ni sus enlaces, ni la priorización de criterios.{objectiveWeighting && ' Con pesos objetivos los juicios de expertos guardados no se muestran ni cuentan.'}</p>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
-                  <input type="checkbox" checked={project.is_public} onChange={(e) => patch({ is_public: e.target.checked }, true)} /> Hacer público con enlace
-                </label>
-                {project.is_public ? (
-                  <>
-                    <div className="linkbox"><input type="text" readOnly value={publicUrl} aria-label="Enlace público" onFocus={(ev) => ev.target.select()} /><button type="button" className="btn sm" onClick={() => copy(publicUrl)}>Copiar</button></div>
-                    <div className="acts"><button type="button" className={'btn sm' + (pendDel === 'tok' ? ' danger' : '')} onClick={() => twoClick('tok', () => patch({ public_token: hexToken() }, true))}>{pendDel === 'tok' ? '¿Seguro? El enlace anterior deja de funcionar' : 'Generar enlace nuevo'}</button></div>
-                  </>
-                ) : <p className="muted" style={{ fontSize: 13 }}>Ahora mismo es privado: solo tú lo ves.</p>}
-              </>
-          </div>
-          <div className="card form">
-            <h3>Exportar</h3>
-              <>
-                <p className="muted">
-                  {project.method === 'ahp'
-                    ? 'Excel con la misma estructura del ejercicio del curso: Notas, Criterios, una hoja por criterio y Síntesis.'
-                    : `Excel con Notas, Criterios, Matriz de decisión y ${METHOD_OPTIONS.find((m) => m.key === project.method)?.label} (fórmulas vivas, con su propio color de acento).`}
-                  {' '}La priorización de criterios (Sesión 1) es un Excel aparte, para no descargarla siempre que solo hace falta el método.
-                </p>
-                <div className="acts">
-                  <button className="btn primary" type="button" onClick={exportExcel}>Descargar Excel</button>
-                  <button className="btn" type="button" onClick={exportPrioExcel}>Descargar Excel de priorización</button>
-                </div>
-              </>
-          </div>
-        </div>
+        <ShareTab
+          isPublic={project.is_public} token={project.public_token} title={project.title} fileBase={fileBase()}
+          method={project.method} objectiveWeights={objectiveWeighting} weightsLabel={WEIGHTING_SHORT[weighting]}
+          onTogglePublic={(on) => patch({ is_public: on }, true)}
+          onRegenerate={() => patch({ public_token: hexToken() }, true)}
+          onExcel={exportExcel} onPrioExcel={exportPrioExcel}
+        />
       )}
 
       {showSciModal && (
