@@ -148,5 +148,21 @@ ok(sanitizeScenarios([{ ...s1, summary: { ...s1.summary, classes: s1.summary.cla
   ok(j.proyecto === 'P' && j.escenarios.length === 1 && j.escenarios[0].id === 's1', 'escenarios.json: proyecto y escenarios');
 }
 
+// --- hoja «Escenarios» del Excel del geovisor: solo si hay alguno
+{
+  const { buildGeoWorkbook } = await import('../src/lib/geoExcel.ts');
+  const XLSX = (await import('xlsx-js-style')).default as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const summary = {
+    title: 'T', objective: '', date: '2026-10-10', crs: 'EPSG:32618', resM: 100, width: 5, height: 4, cr: 0, nExperts: 0, weightsOrigin: '',
+    criteria: [], classes: [], layers: [],
+  };
+  const sheetRows = scenarioRows([s1], { criteria: [{ id: 'c1', name: 'Pendiente' }, { id: 'c2', name: 'Distancia' }], layerLabel: (k) => k });
+  const wb = buildGeoWorkbook(XLSX, { ...summary, scenarioRows: sheetRows });
+  ok(wb.SheetNames.includes('Escenarios'), 'Excel: existe la hoja «Escenarios»');
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets.Escenarios, { header: 1, defval: '' }) as unknown[][];
+  ok(String(aoa[0][0]).includes('no son fórmulas vivas') && aoa.some((r) => r[0] === '1. Base inicial'), 'Excel: nota de solo valores y bloque del escenario');
+  ok(!buildGeoWorkbook(XLSX, summary).SheetNames.includes('Escenarios') && !buildGeoWorkbook(XLSX, { ...summary, scenarioRows: scenarioRows([], { criteria: [], layerLabel: (k) => k }) }).SheetNames.includes('Escenarios'), 'Excel: sin escenarios no hay hoja');
+}
+
 console.log(fails === 0 ? '\nTodo OK (check-geo-scenarios)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);

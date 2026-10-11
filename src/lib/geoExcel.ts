@@ -23,6 +23,8 @@ export type GeoSummary = {
   points?: { rank: number | null; name: string; lat: number; lon: number; pct: number | null; classLabel: string; state: string }[];
   /** Texto del orden: «Más apto primero» / «Mayor riesgo primero». */
   pointsOrder?: string;
+  /** Filas ya armadas de la hoja «Escenarios» (solo valores; ver `scenarioRows`). Ausente o vacío = sin hoja. */
+  scenarioRows?: (string | number)[][];
   /** Resumen por zonas ya ordenado. Ausente = sin hoja «Zonas». `meanPct`/`classPct` null = sin área evaluada (celda vacía, nunca 0). */
   zones?: {
     layer: string; order: string; classNames: string[]; extremeName?: string;
@@ -89,6 +91,7 @@ export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
       ...(hasPop ? [['Población', 'La población de cada polígono se asigna entera a la celda de su centroide (el total se conserva; un polígono que cruza varias celdas cuenta en una sola).']] : []),
     ], [28, 18, 14, 14, ...z.classNames.map(() => 14), 9, ...(hasPop ? [...z.classNames.map(() => 14), 16, 18, 22] : []), 20]);
   }
+  if (s.scenarioRows && s.scenarioRows.length > 2) add('Escenarios', s.scenarioRows, [34, 26, 16, 26, 60, 24]);
   return wb;
 }
 
