@@ -26,6 +26,7 @@ import Results, { accentStyleFor } from './Results';
 import ScientificMethodModal, { type MethodKey } from './ScientificMethodModal';
 import QrModal from './QrModal';
 import { MethodBadgeMenu } from './MethodBadge';
+import ShareButton from './ShareDialog';
 import './share.css';
 
 type Props = { initialProject: ProjectRow; initialExperts: ExpertRow[]; initialJudgments: JudgmentRow[] };
@@ -325,6 +326,13 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
     goTab('Proyecto');
     setTimeout(() => document.getElementById('metodo-mcda')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
   };
+  /** Botón «Compartir»: el mismo en el encabezado y en la parte alta de Resultados/Comparativa. */
+  const shareBtn = (label?: string, align: 'left' | 'right' = 'right') => (
+    <ShareButton kind={project.kind === 'spatial' ? 'spatial' : 'decision'} isPublic={project.is_public} token={project.public_token}
+      title={project.title} fileBase={fileBase()} label={label} align={align}
+      onTogglePublic={project.kind === 'spatial' ? undefined : (on) => patch({ is_public: on }, true)}
+      onGoShareTab={() => goTab('Compartir')} />
+  );
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setMsg('Enlace copiado'); } catch { setMsg('Copia el enlace manualmente'); } };
 
   const editingExpert = experts.find((e) => e.id === editing);
@@ -344,6 +352,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           </div>
         </div>
         <div className="acts">
+          {shareBtn()}
           <span className="savest" aria-live="polite" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             {save === 'saving' && <span style={{ color: 'var(--warn)' }}>Guardando…</span>}
             {save === 'saved' && (
@@ -723,6 +732,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             prio={prio}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
+            headerExtra={shareBtn('Compartir este resultado')}
           />
         </div>
       )}
@@ -743,6 +753,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             projectObjective={project.objective}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
+            headerExtra={shareBtn('Compartir este resultado')}
           />
         </div>
       )}
