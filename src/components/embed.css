@@ -1,0 +1,14 @@
+/* Vista embebida del mapa publicado (/p/<token>/embed): ocupa todo el marco del iframe, sin cabecera ni pie de la plataforma. */
+.gv-embed.gv-wrap{position:fixed;inset:0;left:0;top:0;transform:none;width:auto;display:flex;flex-direction:column;background:var(--bg)}
+.gv-embed .emb-stage{flex:1;min-height:0;height:auto;border:0;border-radius:0}
+.emb-views{position:absolute;z-index:1000;top:10px;left:52px}
+.emb-panel{position:absolute;z-index:1000;left:10px;right:10px;bottom:10px;max-height:62%;overflow:auto;padding:10px 12px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);backdrop-filter:blur(8px)}
+@media(min-width:760px){.emb-panel{right:auto;width:min(420px,45%);top:52px;bottom:34px;max-height:none}}
+.emb-point{top:52px}
+.emb-foot{flex:none;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:4px 10px;min-height:26px;background:var(--surface);border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+.emb-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.emb-foot a{flex:none;color:var(--gv-accent-strong);text-decoration:none;font-weight:600}
+.emb-foot a:hover{text-decoration:underline}
+.emb-msg{padding:16px;color:var(--ink);font-size:14px}
+@media(max-width:520px){.gv-embed .gv-hud-tr{max-width:calc(100% - 60px)}.emb-views{top:52px;left:10px}.emb-point{top:92px}}
+.emb-doc{padding:12px;display:grid;gap:10px}
