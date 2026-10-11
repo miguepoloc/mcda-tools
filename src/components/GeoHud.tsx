@@ -84,8 +84,8 @@ export function ResultLegend({ style, model, thresholds, palette = 'semaforo', t
 }
 
 export type LayerLegendSpec =
-  | { kind: 'criterion'; label: string }
-  | { kind: 'raw'; label: string; unit: string; min: number; max: number }
+  | { kind: 'criterion'; label: string; rampCss?: string }
+  | { kind: 'raw'; label: string; unit: string; min: number; max: number; rampCss?: string }
   | { kind: 'flag'; label: string; color: string; what: string }
   | { kind: 'parcels'; label: string; color: string }
   | { kind: 'diff'; label: string }
@@ -101,14 +101,14 @@ export function LayerLegend({ spec, palette = 'semaforo', direction = 'suitabili
       <b>{spec.label}</b>
       {spec.kind === 'criterion' && (
         <>
-          <div className="ramp" style={{ background: rampCss(palette, direction) }} aria-hidden="true" />
+          <div className="ramp" style={{ background: spec.rampCss ?? rampCss(palette, direction) }} aria-hidden="true" />
           <div className="ends mono"><span>{risk ? '0 · bajo' : '0 · mala'}</span><span>{risk ? '1 · máximo' : '1 · óptima'}</span></div>
           <span className="sub">{risk ? 'Riesgo parcial' : 'Idoneidad parcial'} del criterio, ya con su regla aplicada.</span>
         </>
       )}
       {spec.kind === 'raw' && (
         <>
-          <div className="ramp" style={{ background: RAW_RAMP_CSS }} aria-hidden="true" />
+          <div className="ramp" style={{ background: spec.rampCss ?? RAW_RAMP_CSS }} aria-hidden="true" />
           <div className="ends mono"><span>{fmtNum(spec.min)}</span><span>{fmtNum(spec.max)}{spec.unit ? ` ${spec.unit}` : ''}</span></div>
           <span className="sub">Valor de la capa, sin regla (aún no está asignada a un criterio).</span>
         </>

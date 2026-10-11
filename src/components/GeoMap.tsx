@@ -26,6 +26,9 @@ export type RasterOverlay = { id: string; url: string; bounds: Bounds; opacity: 
 export type VectorOverlay = {
   id: string; fc: FC; color: string; visible: boolean;
   weight?: number; fillOpacity?: number; fills?: (string | null)[]; labels?: (string | null)[];
+  /** Estilo por capa (G3): `color` = contorno; `fillColor` = relleno plano (por defecto, el mismo color); `fillOpacityFilled` =
+   * opacidad del relleno coroplético (por defecto 0.55). */
+  fillColor?: string; fillOpacityFilled?: number;
 };
 export type MapMarker = { id: string; lat: number; lon: number; label?: string; selected?: boolean };
 /** Punto del ranking: `color` = el de su clase (gris si no se evaluó), `tip` = «nombre · índice», `rank` = puesto (null = sin puesto). */
@@ -214,7 +217,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     for (const v of props.vectors) {
       let o = vecs.current.get(v.id);
       // Estilo/relleno/etiquetas cambian la capa: se recrea (el FeatureCollection es el mismo objeto; la firma evita rehacerla sin motivo).
-      const sig = `${v.fc.features.length}|${v.color}|${v.weight ?? ''}|${v.fillOpacity ?? ''}|${(v.fills ?? []).join(',')}|${(v.labels ?? []).join('¦')}`;
+      const sig = `${v.fc.features.length}|${v.color}|${v.fillColor ?? ''}|${v.fillOpacityFilled ?? ''}|${v.weight ?? ''}|${v.fillOpacity ?? ''}|${(v.fills ?? []).join(',')}|${(v.labels ?? []).join('¦')}`;
       if (o && (vsig.current.get(v.id) !== sig || (o as unknown as { __fc?: FC }).__fc !== v.fc)) { o.remove(); vecs.current.delete(v.id); o = undefined; }
       if (!o) {
         const renderer = L.canvas({ pane: 'gv-vector' });
@@ -224,9 +227,9 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
           style: (f: unknown) => {
             const i = order.get(f as never) ?? -1;
             const fill = v.fills?.[i];
-            return { color: v.color, weight: v.weight ?? 1.5, fillColor: fill ?? v.color, fillOpacity: fill ? 0.55 : (v.fillOpacity ?? 0.12), opacity: 0.95 };
+            return { color: v.color, weight: v.weight ?? 1.5, fillColor: fill ?? v.fillColor ?? v.color, fillOpacity: fill ? (v.fillOpacityFilled ?? 0.55) : (v.fillOpacity ?? 0.12), opacity: 0.95 };
           },
-          pointToLayer: (_f: unknown, ll: Lf.LatLngExpression) => L.circleMarker(ll, { radius: 4, color: v.color, weight: 1.5, fillOpacity: 0.7, pane: 'gv-vector', renderer }),
+          pointToLayer: (_f: unknown, ll: Lf.LatLngExpression) => L.circleMarker(ll, { radius: 4, color: v.color, weight: v.weight ?? 1.5, fillColor: v.fillColor ?? v.color, fillOpacity: 0.7, pane: 'gv-vector', renderer }),
           onEachFeature: (f: unknown, lyr: Lf.Layer) => {
             const t = v.labels?.[order.get(f as never) ?? -1];
             if (t) lyr.bindTooltip(tipEl(t), { permanent: true, direction: 'center', className: 'gv-zlabel' });

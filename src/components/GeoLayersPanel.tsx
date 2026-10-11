@@ -15,9 +15,11 @@ import { slug } from '@/lib/geo/export';
 import type { GeoData } from '@/lib/geo/data';
 import type { FnSpec } from '@/lib/geo/membership';
 import { RAW_RAMP_CSS, rampCss, type PaletteKey } from '@/lib/geo/paint';
+import { styleRampCss, type LayerStyle, type LayerStyles } from '@/lib/geo/layerStyle';
 import type { Criterion, GeoConfig, GeoGrid, GeoLayerMeta } from '@/lib/types';
 import { Icon, ICONS, Num } from './GeoBits';
 import ConfirmDialog from './ConfirmDialog';
+import GeoLayerStyle, { STYLE_ICON, type StyleKind } from './GeoLayerStyle';
 
 const kmFmt = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
 
@@ -77,6 +79,12 @@ type Props = {
   /** Criterio para el que se está subiendo un mapa (viene del botón «Subir el mapa de este criterio»). */
   uploadFor?: string | null; onCancelUpload?: () => void; onLayerAdded?: (criterionId: string) => void;
   virtual: { id: string; label: string; role: string; swatch: string }[];
+  /** Estilo por capa (G3): lo guardado en `geo.styles`, el cambio de un campo y el restablecer. Ausentes = sin editor de estilo. */
+  styles?: LayerStyles;
+  onStyle?: (id: string, patch: Partial<Record<keyof LayerStyle, unknown>>) => void;
+  onResetStyle?: (id: string) => void;
+  /** `linear-gradient` de la rampa del resultado según el modelo de clases (para el recuadro de color de «Resultado»). */
+  resultCss?: string;
 };
 
 export default function GeoLayersPanel(p: Props) {
@@ -97,6 +105,8 @@ export default function GeoLayersPanel(p: Props) {
   const [editingArea, setEditingArea] = useState(false);
   const [touched, setTouched] = useState(false);
   const [editKey, setEditKey] = useState<string | null>(null);
+  // Capa cuyo editor de estilo está abierto (id de la lista: `l:<clave>` o `v:<clave>`).
+  const [styleKey, setStyleKey] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const layers = geo.layers ?? {};
   const maxPx = p.quota?.max_pixels ?? MAX_PIXELS;
@@ -552,18 +562,28 @@ export default function GeoLayersPanel(p: Props) {
             {p.quota.used_bytes > p.quota.quota_bytes && <b>Sobre la cuota: no puedes subir más hasta borrar capas.</b>}
           </div>
         )}
-        <LayerRow id="result" label={p.direction === "risk" ? "Resultado (riesgo)" : "Resultado (idoneidad)"} role="resultado" vis={p.vis} setVis={p.setVis} swatch={rampCss(p.palette, p.direction)} />
+        <LayerRow id="result" label={p.direction === "risk" ? "Resultado (riesgo)" : "Resultado (idoneidad)"} role="resultado" vis={p.vis} setVis={p.setVis} swatch={p.resultCss ?? rampCss(p.palette, p.direction)} />
         {p.virtual.map((x) => <LayerRow key={x.id} id={x.id} label={x.label} role={x.role} vis={p.vis} setVis={p.setVis} swatch={x.swatch} />)}
         {data && Object.entries(data.info).map(([k, l]) => {
           const meta = layers[k];
+          const sid = `l:${k}`, st = p.styles?.[sid];
+          const hasRule = Object.values(geo.rules).some((r) => r.layerKey === k);
+          const autoRamp = hasRule ? rampCss(p.palette, p.direction) : RAW_RAMP_CSS;
+          const skind: StyleKind = l.role === 'exclusion' || l.role === 'area' ? 'flag' : hasRule ? 'criterion' : 'raw';
+          const flagDef = l.role === 'exclusion' ? '#7F8C8D' : '#84CC16';
           return (
             <div key={k}>
-              <LayerRow id={`l:${k}`} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
-                swatch={l.role === 'exclusion' ? '#7F8C8D' : l.role === 'area' ? '#84CC16' : Object.values(geo.rules).some((r) => r.layerKey === k) ? rampCss(p.palette, p.direction) : RAW_RAMP_CSS}
+              <LayerRow id={sid} label={l.label} role={ROLE_LABEL[l.role].toLowerCase()} vis={p.vis} setVis={p.setVis}
+                swatch={skind === 'flag' ? st?.color ?? flagDef : styleRampCss(st, autoRamp)}
+                onStyle={p.onStyle ? () => setStyleKey((cur) => (cur === sid ? null : sid)) : undefined} styling={styleKey === sid}
                 note={[l.origin ? `${l.origin}${meta && !meta.path ? ' · sin guardar (solo esta sesión)' : ''}` : '', !meta && isPack ? 'Del paquete del curso · solo lectura (no se puede borrar)' : '', l.license ? `Licencia: ${l.license}` : ''].filter(Boolean).join(' · ') || undefined}
                 onDelete={meta ? () => setConfirmDrop(k) : undefined}
                 onEdit={meta ? () => setEditKey((cur) => (cur === k ? null : k)) : undefined}
                 editing={editKey === k} />
+              {styleKey === sid && p.onStyle && (
+                <GeoLayerStyle kind={skind} label={l.label} style={st} defaults={{ color: flagDef }} autoRampCss={autoRamp}
+                  onPatch={(patch) => p.onStyle?.(sid, patch)} onReset={() => p.onResetStyle?.(sid)} onClose={() => setStyleKey(null)} />
+              )}
               {editKey === k && meta && (
                 <LayerEditForm
                   meta={meta}
@@ -578,16 +598,44 @@ export default function GeoLayersPanel(p: Props) {
             </div>
           );
         })}
-        {p.vecs.filter((v) => layers[v.id]?.role !== 'reference').map((v) => (
-          <LayerRow key={v.id} id={`v:${v.id}`} label={`${v.name} · vector original`} role="vector" vis={p.vis} setVis={p.setVis} swatch={v.color} />
-        ))}
+        {p.vecs.filter((v) => layers[v.id]?.role !== 'reference').map((v) => {
+          const sid = `v:${v.id}`, st = p.styles?.[sid];
+          return (
+            <div key={v.id}>
+              <LayerRow id={sid} label={`${v.name} · vector original`} role="vector" vis={p.vis} setVis={p.setVis} swatch={st?.color ?? v.color}
+                onStyle={p.onStyle ? () => setStyleKey((cur) => (cur === sid ? null : sid)) : undefined} styling={styleKey === sid} />
+              {styleKey === sid && p.onStyle && (
+                <GeoLayerStyle kind="vector" label={v.name} style={st} defaults={{ color: v.color, weight: 1.5, fillOp: 0.12 }}
+                  onPatch={(patch) => p.onStyle?.(sid, patch)} onReset={() => p.onResetStyle?.(sid)} onClose={() => setStyleKey(null)} />
+              )}
+            </div>
+          );
+        })}
         {Object.entries(layers).filter(([, m]) => m.role === 'reference').map(([k, m]) => {
           const v = p.vecs.find((x) => x.id === k);
+          const sid = `v:${k}`, st = p.styles?.[sid];
           return (
             <div key={k}>
-              <LayerRow id={`v:${k}`} label={m.label} role={`referencia · ${m.ref?.count ?? '?'} polígonos`} vis={p.vis} setVis={p.setVis} swatch={m.ref?.color ?? '#22D3EE'} defaultOn
+              <LayerRow id={sid} label={m.label} role={`referencia · ${m.ref?.count ?? '?'} polígonos`} vis={p.vis} setVis={p.setVis} swatch={m.ref?.color ?? '#22D3EE'} defaultOn
+                onStyle={p.onStyle ? () => setStyleKey((cur) => (cur === sid ? null : sid)) : undefined} styling={styleKey === sid}
                 note={!m.path ? 'Solo esta sesión: no se pudo guardar' : !v ? 'No se pudo cargar (revisa tu conexión y recarga)' : `${m.origin} · guardada tal cual (${bytesFmt(m.bytes)})`}
                 onDelete={() => setConfirmDrop(k)} onEdit={() => setEditKey((cur) => (cur === k ? null : k))} editing={editKey === k} />
+              {styleKey === sid && p.onStyle && (
+                // Color y grosor de una referencia viven en `layers[k].ref` (lo mismo que edita el lápiz); borde y relleno, en `styles`.
+                <GeoLayerStyle kind="reference" label={m.label} style={{ ...st, color: m.ref?.color ?? '#22D3EE', weight: m.ref?.weight ?? 2 }}
+                  defaults={{ color: m.ref?.color ?? '#22D3EE', weight: m.ref?.weight ?? 2, fillOp: 0 }}
+                  onPatch={(patch) => {
+                    const own: Record<string, unknown> = {}, rest: Record<string, unknown> = {};
+                    for (const [pk, pv] of Object.entries(patch)) (pk === 'color' || pk === 'weight' ? own : rest)[pk] = pv;
+                    if (Object.keys(rest).length) p.onStyle?.(sid, rest);
+                    if (Object.keys(own).length) p.commit((c) => { const cur = c.layers?.[k]; if (!cur) return c; return { ...c, layers: { ...(c.layers ?? {}), [k]: { ...cur, ref: { ...(cur.ref ?? { count: 0, labels: false }), ...(own.color ? { color: String(own.color) } : {}), ...(typeof own.weight === 'number' ? { weight: own.weight } : {}) } as NonNullable<GeoLayerMeta['ref']> } } }; });
+                  }}
+                  onReset={() => {
+                    p.onResetStyle?.(sid);
+                    p.commit((c) => { const cur = c.layers?.[k]; if (!cur?.ref) return c; return { ...c, layers: { ...(c.layers ?? {}), [k]: { ...cur, ref: { ...cur.ref, color: '#22D3EE', weight: 2 } } } }; });
+                  }}
+                  onClose={() => setStyleKey(null)} />
+              )}
               {editKey === k && (
                 <RefEditForm meta={m} fields={v ? nameFields(v.fc) : []} onCancel={() => setEditKey(null)}
                   onSave={(patch) => { p.commit((c) => { const cur = c.layers?.[k]; if (!cur) return c; return { ...c, layers: { ...(c.layers ?? {}), [k]: { ...cur, label: patch.label.trim() || cur.label, ref: { ...(cur.ref ?? { count: 0 }), color: patch.color, weight: patch.weight, labels: patch.labels, nameField: patch.nameField } } } }; }); setEditKey(null); }} />
@@ -601,9 +649,9 @@ export default function GeoLayersPanel(p: Props) {
   );
 }
 
-function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit, editing, defaultOn }: {
+function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit, editing, defaultOn, onStyle, styling }: {
   defaultOn?: boolean; id: string; label: string; role: string; vis: VisState; setVis: Dispatch<SetStateAction<VisState>>; swatch: string; note?: string; onDelete?: () => void;
-  onEdit?: () => void; editing?: boolean;
+  onEdit?: () => void; editing?: boolean; onStyle?: () => void; styling?: boolean;
 }) {
   const v = vis[id] ?? { on: defaultOn ?? (id === 'result' || id === 'parcels' || id === 'diff'), op: id === 'result' ? 0.9 : 0.85 };
   return (
@@ -614,6 +662,11 @@ function LayerRow({ id, label, role, vis, setVis, swatch, note, onDelete, onEdit
       <span className="sw" style={{ background: swatch }} />
       <span className="nm" title={label}>{label}<small>{role}</small></span>
       <span className="gv-layer-acts">
+        {onStyle && (
+          <button type="button" className={'btn icon sm' + (styling ? ' on' : '')} aria-pressed={styling} aria-label={`${styling ? 'Cerrar el estilo de' : 'Estilo de'} ${label}`} title="Estilo (color, borde, grosor)" onClick={onStyle}>
+            <Icon d={STYLE_ICON} size={14} />
+          </button>
+        )}
         {onEdit && (
           <button type="button" className={'btn icon sm' + (editing ? ' on' : '')} aria-pressed={editing} aria-label={`${editing ? 'Cerrar edición de' : 'Editar'} ${label}`} onClick={onEdit}>
             <Icon d={ICONS.edit} size={14} />

@@ -43,6 +43,26 @@ export const CLASS_LABEL: Record<number, string> = {
 
 const SEQ: Stops = [[0, [33, 102, 172]], [0.5, [146, 197, 222]], [1, [253, 219, 128]]];
 
+/** Rampas que el usuario puede elegir para UNA capa de entrada (editor de estilo, G3). `auto` = la de siempre (la de la
+ * paleta del resultado en criterios con regla; azul→amarillo en capas crudas). El resto son rampas monótonas en
+ * luminosidad, legibles en escala de grises y con daltonismo. */
+export type LayerRampKey = 'auto' | 'viridis' | 'azules' | 'grises' | 'calida';
+export const LAYER_RAMPS: Record<Exclude<LayerRampKey, 'auto'>, { label: string; stops: Stops }> = {
+  viridis: { label: 'Violeta–amarillo', stops: [[0, [68, 1, 84]], [0.5, [33, 145, 140]], [1, [253, 231, 37]]] },
+  azules: { label: 'Azules', stops: [[0, [239, 243, 255]], [0.5, [107, 174, 214]], [1, [8, 48, 107]]] },
+  grises: { label: 'Grises', stops: [[0, [245, 245, 245]], [0.5, [150, 150, 150]], [1, [37, 37, 37]]] },
+  calida: { label: 'Cálida (amarillo–rojo)', stops: [[0, [255, 255, 178]], [0.5, [253, 141, 60]], [1, [128, 0, 38]]] },
+};
+export const LAYER_RAMP_KEYS = ['auto', 'viridis', 'azules', 'grises', 'calida'] as const;
+/** Paradas de la rampa elegida (`rev` = invertida); null = `auto` (se usa la de siempre). */
+export function layerRampStops(key: LayerRampKey | undefined, rev = false): Stops | null {
+  if (!key || key === 'auto') return null;
+  const st = LAYER_RAMPS[key]?.stops;
+  if (!st) return null;
+  return rev ? [...st].reverse().map(([t, c]) => [1 - t, c] as [number, Rgb]) : st;
+}
+export const stopsCss = (st: Stops): string => `linear-gradient(90deg, ${st.map(([t, c]) => `rgb(${c[0]},${c[1]},${c[2]}) ${(t * 100).toFixed(0)}%`).join(',')})`;
+
 function ramp(stops: Stops, t: number): Rgb {
   const x = Math.max(0, Math.min(1, t));
   for (let i = 0; i < stops.length - 1; i++) {
@@ -147,7 +167,7 @@ export function paintResult(pct: Uint8Array, cls: Uint8Array, mask: Uint8Array, 
 }
 
 /** Idoneidad (o riesgo) parcial (0–1) de un criterio con su función, sobre la capa cruda. */
-export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec, pal: PaletteKey = 'semaforo', dir: Direction = 'suitability'): Uint32Array {
+export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec, pal: PaletteKey = 'semaforo', dir: Direction = 'suitability', stops?: Stops | null): Uint32Array {
   const out = new Uint32Array(layer.length);
   const GREY = greyOf(pal);
   for (let i = 0; i < out.length; i++) {
@@ -155,20 +175,20 @@ export function paintCriterion(layer: Float32Array, mask: Uint8Array, fn: FnSpec
     if (mask[i] === MASK_EXCLUDED) { out[i] = GREY; continue; }
     const v = layer[i];
     if (Number.isNaN(v)) continue;
-    const [r, g, b] = rampColor(suitability(v, fn), pal, dir);
+    const [r, g, b] = stops ? ramp(stops, suitability(v, fn)) : rampColor(suitability(v, fn), pal, dir);
     out[i] = rgba(r, g, b);
   }
   return out;
 }
 
 /** Capa cruda en rampa secuencial entre `min` y `max`. */
-export function paintRaw(layer: Float32Array, min: number, max: number): Uint32Array {
+export function paintRaw(layer: Float32Array, min: number, max: number, stops?: Stops | null): Uint32Array {
   const out = new Uint32Array(layer.length);
   const span = max > min ? max - min : 1;
   for (let i = 0; i < out.length; i++) {
     const v = layer[i];
     if (Number.isNaN(v)) continue;
-    const [r, g, b] = seqColor((v - min) / span);
+    const [r, g, b] = stops ? ramp(stops, (v - min) / span) : seqColor((v - min) / span);
     out[i] = rgba(r, g, b);
   }
   return out;

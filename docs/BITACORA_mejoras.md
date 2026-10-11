@@ -148,13 +148,13 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**21 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 19). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**22 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 22). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
 | G1 | Dirección del índice (aptitud/riesgo) | ✅ | entrada 8 |
 | G2 | Clases editables, cuantiles/Jenks | ✅ | entrada 8 (2–8 clases) |
-| G3 | Editor de estilo por capa (paletas, opacidad, borde) | ⬜ | |
+| G3 | Editor de estilo por capa (paletas, opacidad, borde) | ✅ | entrada 22 (rampa, color, borde, grosor, visibilidad persistida) |
 | G4 | Leyendas plegables | ✅ | entrada 6 |
 | G5 | Un solo rótulo de área | ✅ | entrada 6 |
 | G6 | Vectores sin rasterizar | ◐ | polígonos «Referencia» sí (entrada 12); simbología de puntos/líneas de entrada no |
@@ -231,3 +231,12 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Verificación:** `scripts/check-geo-sensitivity.ts` (43 verificaciones: reescalado, paridad celda por celda con `evaluateIndex`+`classify` en aptitud y riesgo, ha por clase contra `classStats`, vetos, exclusión, generador, selección del mapa, pintado, hoja Excel); registrado en `npm test` antes de `check-integration.ts`.
 - **Riesgos:** (1) memoria: guarda un mapa Uint8 por caso (criterios × 4 × celdas; ~20 MB por millón de celdas con 5 criterios) y la matriz parcial en Float64 durante el cálculo; en grillas de varios millones puede pesar y cada caso es un turno largo del hilo (no se probó con la grilla real de la boya). (2) La variación es relativa al peso (±10 % de 0.30 = 0.27–0.33), no puntos porcentuales: criterios con peso pequeño casi no se mueven por construcción. (3) El conteo «en cuántos casos cambia» no distingue si sube o baja de clase (sí lo hace el Excel: columnas «Suben / Bajan»).
 - **Pendiente (visual):** panel en ancho angosto y modo oscuro, tablas con 5–8 clases (scroll horizontal), contraste del tono sobre las tres bases (OSM / satélite / claro) y de la leyenda, tiempos en la grilla real, lectura con teclado y lector de pantalla del progreso y los selects.
+
+### 22. Estilo por capa y pulido del geovisor (G3)
+- **Estilo por capa (G3):** botón de gota en cada fila de «Capas» que abre un editor bajo la fila (`GeoLayerStyle.tsx`, `geo-layerstyle.css`). Capas ráster de entrada: rampa de color (la de siempre, violeta–amarillo, azules, grises o cálida) e inversión; exclusión / área: color plano; vectores: relleno, borde, grosor (0,5–8 px) y opacidad del relleno; polígonos de referencia: lo mismo (su color y grosor siguen en `layers[k].ref`, igual que el lápiz; borde y relleno van en `styles`). «Restablecer estilo» vuelve a lo de siempre. El resultado no tiene editor: sus colores salen del modelo de clases y la paleta.
+- **Persistencia:** `geo.styles?: Record<id, {on, op, ramp, rev, color, border, weight, fillOp}>` (aditivo y opcional; `id` = `result`, `l:<clave>` o `v:<clave>`). Visibilidad y opacidad, que antes se perdían al recargar, ahora también se guardan ahí (con debounce de 600 ms, solo capas existentes y tocadas). Un proyecto sin `styles` se ve idéntico a antes. Lógica pura y saneado tolerante en `src/lib/geo/layerStyle.ts`; rampas en `paint.ts` (`LAYER_RAMPS`, parámetro opcional en `paintRaw`/`paintCriterion`).
+- **Dónde se aplica:** mapa (rásters y vectores en `GeoMap`), recuadro de color de la lista, leyenda de la capa superior (rampa y color elegidos), y la composición/lámina (contorno y grosor de las referencias).
+- **No se aplica (decisión):** la lámina PNG/PDF y el GeoTIFF/QGIS solo llevan el resultado y las referencias, no las capas de entrada, así que rampa y color de esas capas no entran ahí; el zip no incluye aún un `estilos.json`.
+- **Pulido (B):** (1) «Cargar ejemplo» avisa «Reemplaza criterios, mapa y escenarios guardados»; (2) el recuadro de «Resultado» usa la rampa del modelo de clases (`modelRampCss`) y la lámina PNG marca los cortes reales (0, cortes, 100 · idoneidad/riesgo) en vez de un «50» fijo, omitiendo marcas que se encimarían; (3) el recorrido guiado incluye un paso en la pestaña «Puntos» (`GeoTour` acepta todas las pestañas).
+- **Verificación:** `scripts/check-geo-layerstyle.ts` nuevo (registrado antes de `check-integration.ts`); typecheck, `npm test` y `test:excel` en verde.
+- **Riesgos / pendiente (visual):** editor en ancho angosto y oscuro; que `input[type=color]` se vea bien en Safari; rampas invertidas y su leyenda; grosor/borde de referencias en pantalla y en la composición; ticks del PNG con 6–8 clases (se omiten las encimadas); que visibilidad/opacidad persistan al recargar. Al cambiar el color de una referencia desde «Estilo» se guarda en `layers[k].ref` (mismo origen que el lápiz).
