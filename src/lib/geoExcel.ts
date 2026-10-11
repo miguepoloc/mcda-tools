@@ -25,6 +25,8 @@ export type GeoSummary = {
   pointsOrder?: string;
   /** Filas ya armadas de la hoja «Escenarios» (solo valores; ver `scenarioRows`). Ausente o vacío = sin hoja. */
   scenarioRows?: (string | number)[][];
+  /** Filas ya armadas de la hoja «Sensibilidad» (sensibilidad espacial de pesos, G15). Ausente = sin hoja. */
+  sensitivityRows?: (string | number)[][];
   /** Resumen por zonas ya ordenado. Ausente = sin hoja «Zonas». `meanPct`/`classPct` null = sin área evaluada (celda vacía, nunca 0). */
   zones?: {
     layer: string; order: string; classNames: string[]; extremeName?: string;
@@ -92,6 +94,7 @@ export function buildGeoWorkbook(XLSX: any, s: GeoSummary) {
     ], [28, 18, 14, 14, ...z.classNames.map(() => 14), 9, ...(hasPop ? [...z.classNames.map(() => 14), 16, 18, 22] : []), 20]);
   }
   if (s.scenarioRows && s.scenarioRows.length > 2) add('Escenarios', s.scenarioRows, [34, 26, 16, 26, 60, 24]);
+  if (s.sensitivityRows && s.sensitivityRows.length > 7) add('Sensibilidad', s.sensitivityRows, [34, 14, 12, 18, 16, 16, 14, 14, 18, 18, 18, 18]);
   return wb;
 }
 

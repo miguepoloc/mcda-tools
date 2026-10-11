@@ -1,7 +1,7 @@
 'use client';
 
 /** Controles flotantes del mapa que comparten el geovisor del dueño y la vista pública. */
-import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, classHexOf, modelRampCss, rampCss, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, PALETTE_KEYS, RAW_RAMP_CSS, SENS_RGB, classHexOf, modelRampCss, rampCss, type PaletteKey } from '@/lib/geo/paint';
 import { CLASS_EXCLUDED, type Direction } from '@/lib/geo/suitability';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { BASEMAPS, type BasemapKey } from './GeoMap';
@@ -88,7 +88,8 @@ export type LayerLegendSpec =
   | { kind: 'raw'; label: string; unit: string; min: number; max: number }
   | { kind: 'flag'; label: string; color: string; what: string }
   | { kind: 'parcels'; label: string; color: string }
-  | { kind: 'diff'; label: string };
+  | { kind: 'diff'; label: string }
+  | { kind: 'sens'; label: string; cases: number; max: number };
 
 /** Leyenda de la capa que queda arriba (criterio, exclusión, parcelas, diferencia): con unidades y qué significa cada color. */
 export function LayerLegend({ spec, palette = 'semaforo', direction = 'suitability' }: { spec: LayerLegendSpec; palette?: PaletteKey; direction?: Direction }) {
@@ -114,6 +115,12 @@ export function LayerLegend({ spec, palette = 'semaforo', direction = 'suitabili
       )}
       {spec.kind === 'flag' && <div className="row"><i style={{ background: spec.color }} />{spec.what}</div>}
       {spec.kind === 'parcels' && <div className="row"><i style={{ background: spec.color }} />{risk ? 'Zona contigua de la clase más alta' : 'Parcela contigua de alta aptitud'}</div>}
+      {spec.kind === 'sens' && (
+        <>
+          <div className="row"><i style={{ background: rgb(SENS_RGB) }} />Celda que cambia de clase al variar los pesos</div>
+          <span className="sub">{spec.max > 1 ? `Más opaco = cambia en más de los ${spec.cases} casos (hasta ${spec.max}).` : `Cambia en ${spec.cases === 1 ? 'el caso elegido' : 'al menos uno de los ' + spec.cases + ' casos'}.`} Sin color: la clase no cambia.</span>
+        </>
+      )}
       {spec.kind === 'diff' && (
         <>
           <div className="row"><i style={{ background: rgb(P.diffNeg) }} />Empeora respecto al escenario guardado</div>

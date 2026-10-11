@@ -14,7 +14,7 @@ import { lonLatToPixel, pixelToLonLat } from '@/lib/geo/crs';
 import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } from '@/lib/geo/data';
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
-import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, modelRampColor, modelRampCss, modelRampHex, paintResult, type PaletteKey } from '@/lib/geo/paint';
+import { PALETTES, SENS_RGB, classHexOf, paintCriterion, paintChange, paintDiff, paintFlag, paintParcels, paintRaw, modelRampColor, modelRampCss, modelRampHex, paintResult, type PaletteKey } from '@/lib/geo/paint';
 import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import { normalizeBreaks } from '@/lib/geo/classes';
 import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
@@ -47,6 +47,7 @@ import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rank
 import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import { changeCount, sensitivityRows, sensitivitySteps, type ChangeSel, type SensitivityResult } from '@/lib/geo/sensitivity';
 import { addScenario, buildScenario, cleanName, meanIndex, nextScenarioName, removeScenario, renameScenario, restorePlan, sanitizeScenarios, scenarioRows, scenariosJson } from '@/lib/geo/scenarios';
 import type { LabelMode } from '@/lib/geo/pointLabels';
 import PointFicha from './GeoPointFicha';
@@ -374,6 +375,42 @@ export default function GeoVisor(props: Props) {
     setUndo(null);
   };
 
+  // ------------------------------------------------------------------ sensibilidad espacial de pesos (G15)
+  // Se calcula a demanda y por trozos (un caso por turno del hilo principal, ver `sensitivitySteps`); no se guarda en el
+  // proyecto: cada vez se recalcula con las capas, reglas y pesos actuales. `stale` = algo cambió desde que se calculó.
+  const [sens, setSens] = useState<{ res: SensitivityResult; rules: CriterionRule[]; model: typeof model; data: GeoData } | null>(null);
+  const [sensRun, setSensRun] = useState<{ done: number; total: number } | null>(null);
+  const [sensSel, setSensSel] = useState<ChangeSel>({ criterion: 'all', delta: 'any' });
+  const sensJob = useRef(0);
+  useEffect(() => () => { sensJob.current++; }, []);
+  const sensRules = useMemo(() => {
+    // Criterios con regla y capa, en el mismo orden que `rules` (así `labels` queda alineado con las reglas).
+    return criteria.filter((c) => geo.rules[c.id] && data?.layers[geo.rules[c.id].layerKey]).map((c) => c.name);
+  }, [criteria, geo.rules, data]);
+  const runSensitivity = () => {
+    if (!data || rules.length < 2) return;
+    const id = ++sensJob.current;
+    const snapshot = { rules, model, data };
+    const gen = sensitivitySteps({
+      layers: data.layers, mask: data.mask, rules, labels: sensRules, direction: model.direction, breaks: model.breaks, haPerPixel: data.grid.haPerPixel,
+    });
+    setSensRun({ done: 0, total: 1 + rules.length * 4 });
+    const step = () => {
+      if (sensJob.current !== id) return;
+      const r = gen.next();
+      if (r.done) { setSens({ res: r.value, ...snapshot }); setSensRun(null); setSensSel({ criterion: 'all', delta: 'any' }); setVis((v) => ({ ...v, sens: { on: true, op: 0.85 } })); return; }
+      setSensRun(r.value);
+      setTimeout(step, 0);
+    };
+    setTimeout(step, 0);
+  };
+  const cancelSensitivity = () => { sensJob.current++; setSensRun(null); };
+  const clearSensitivity = () => { sensJob.current++; setSensRun(null); setSens(null); };
+  const sensStale = !!sens && (sens.rules !== rules || sens.model !== model || sens.data !== data);
+  const sensMap = useMemo(() => (sens && data ? changeCount(sens.res, sensSel, data.mask.length) : null), [sens, sensSel, data]);
+  const sensCells = useMemo(() => (sensMap ? sensMap.count.reduce((a, v) => a + (v > 0 ? 1 : 0), 0) : 0), [sensMap]);
+  const sensSwatch = `rgb(${SENS_RGB.join(',')})`;
+
   // ------------------------------------------------------------------ puntos con ranking
   const points = useMemo(() => sanitizePoints(geo.points), [geo.points]);
   // Rótulo de clase: la vetada cuenta en la clase extrema de la dirección (así lo define pointEval) y lleva su insignia aparte.
@@ -439,8 +476,8 @@ export default function GeoVisor(props: Props) {
   }, [zoneVec]);
 
   // ------------------------------------------------------------------ imágenes sobre el mapa
-  const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
-  const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
+  const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : []), ...(sens && sensMap ? ['sens'] : [])];
+  const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff' || id === 'sens';
   const layerIds = data ? Object.keys(data.info).map((k) => `l:${k}`) : [];
   const onIds = ['result', ...virtualIds, ...layerIds].filter((id) => (vis[id]?.on ?? defaultOn(id)));
   const onKey = onIds.join('|');
@@ -452,6 +489,7 @@ export default function GeoVisor(props: Props) {
         let deps: Deps, paint: () => Uint32Array;
         if (id === 'result') { deps = [data, ev, om, style, palette, rm]; paint = () => paintResult(ev.pct, ev.cls, data.mask, style, palette, rm); }
         else if (id === 'parcels') { deps = [parcelRes, om]; paint = () => paintParcels(parcelRes!.labels); }
+        else if (id === 'sens') { deps = [sensMap, om, data]; paint = () => paintChange(sensMap!.count, sensMap!.max, data.mask); }
         else if (id === 'diff') { deps = [ev, baseline, om, data, palette, rm.direction]; paint = () => paintDiff(ev.pct, baseline!.pct, data.mask, 1, 30, palette, rm.direction); }
         else {
           const k = id.slice(2), info = data.info[k];
@@ -470,12 +508,12 @@ export default function GeoVisor(props: Props) {
       setImgs(next);
     }, 80);
     return () => clearTimeout(t);
-  }, [data, om, ev, style, onKey, geo.rules, parcelRes, baseline, palette, rm]);
+  }, [data, om, ev, style, onKey, geo.rules, parcelRes, baseline, sensMap, palette, rm]);
 
   const rasters = useMemo<RasterOverlay[]>(() => {
     if (!om) return [];
     return Object.entries(imgs).map(([id, url]) => ({
-      id, url, bounds: om.bounds, opacity: vis[id]?.op ?? (id === 'result' ? 0.9 : 0.85), visible: vis[id]?.on ?? defaultOn(id), z: id === 'result' ? 20 : id === 'diff' ? 22 : id === 'parcels' ? 21 : 10,
+      id, url, bounds: om.bounds, opacity: vis[id]?.op ?? (id === 'result' ? 0.9 : 0.85), visible: vis[id]?.on ?? defaultOn(id), z: id === 'result' ? 20 : id === 'sens' ? 23 : id === 'diff' ? 22 : id === 'parcels' ? 21 : 10,
     }));
   }, [imgs, om, vis]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -572,6 +610,7 @@ export default function GeoVisor(props: Props) {
     points: ranked.map((r) => ({ rank: r.rank, name: r.name, lat: r.lat, lon: r.lon, pct: r.pct, classLabel: r.status === 'ok' ? r.label : '', state: pointState(r, rm.direction) })),
     pointsOrder: rankHeading(rm.direction),
     // Escenarios guardados (solo valores): hoja «Escenarios» si hay alguno.
+    ...(sens && !sensStale ? { sensitivityRows: sensitivityRows(sens.res, rm.names) } : {}),
     ...(scenarios.length ? { scenarioRows: scenarioRows(scenarios, { criteria, layerLabel: (k) => data?.info[k]?.label ?? k }) } : {}),
     ...(zoneStats && zoneVec ? {
       zones: {
@@ -582,7 +621,7 @@ export default function GeoVisor(props: Props) {
         })),
       },
     } : {}),
-  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage, ranked, zoneStats, zoneVec, popExp, extremeName, geo.layers, scenarios]);
+  }), [props.title, props.objective, data, weightResult, expertIds.length, exploring, criteria, geo.rules, weights, rm, stats, effW, coverage, ranked, zoneStats, zoneVec, popExp, extremeName, geo.layers, scenarios, sens, sensStale]);
 
   async function framePng(withBase: boolean): Promise<HTMLCanvasElement> {
     if (!data || !ev || !om || !stats) throw new Error('No hay mapa que exportar.');
@@ -800,7 +839,8 @@ export default function GeoVisor(props: Props) {
   // Leyenda de la capa que queda encima de las demás (diferencia > parcelas > última capa visible), además de la del resultado.
   const extraLegend = useMemo<LayerLegendSpec | null>(() => {
     if (!data) return null;
-    const top = onIds.includes('diff') ? 'diff' : onIds.includes('parcels') ? 'parcels' : [...onIds].reverse().find((id) => id.startsWith('l:'));
+    const top = onIds.includes('sens') ? 'sens' : onIds.includes('diff') ? 'diff' : onIds.includes('parcels') ? 'parcels' : [...onIds].reverse().find((id) => id.startsWith('l:'));
+    if (top === 'sens' && sensMap) return { kind: 'sens', label: 'Celdas que cambian de clase (sensibilidad de pesos)', cases: sensMap.cases, max: sensMap.max };
     if (top === 'diff') return { kind: 'diff', label: `Diferencia con el escenario ${baseline?.label ?? ''}` };
     if (top === 'parcels') return { kind: 'parcels', label: `Parcelas ≥ ${minPatchHa} ha`, color: '#6D28D9' };
     if (!top) return null;
@@ -866,7 +906,7 @@ export default function GeoVisor(props: Props) {
               vecs={vecs} setVecs={setVecs} vis={vis} setVis={setVis} fit={(b) => mapRef.current?.fit(b)} getView={() => mapRef.current?.getBounds() ?? null} palette={palette} direction={rm.direction} draft={draft} setDraft={setDraft} drawing={drawing} setDrawing={setDrawing}
               quota={quota} onQuotaChange={refreshQuota} evaluableHa={stats?.evaluableHa ?? null}
               uploadFor={uploadFor} onCancelUpload={() => setUploadFor(null)} onLayerAdded={(id) => { setUploadFor(null); setFocusId(id); setTab('modelo'); }}
-              virtual={[...(parcelRes ? [{ id: 'parcels', label: `Parcelas ≥ ${minPatchHa} ha`, role: `${parcelRes.parcels.length} parcelas`, swatch: '#6D28D9' }] : []), ...(baseline ? [{ id: 'diff', label: `Diferencia con el escenario ${baseline.label}`, role: palette === 'semaforo' ? 'rojo empeora · verde mejora' : 'naranja empeora · azul mejora', swatch: `linear-gradient(90deg, rgb(${PALETTES[palette].diffNeg.join(',')}), #eee, rgb(${PALETTES[palette].diffPos.join(',')}))` }] : [])]} />
+              virtual={[...(parcelRes ? [{ id: 'parcels', label: `Parcelas ≥ ${minPatchHa} ha`, role: `${parcelRes.parcels.length} parcelas`, swatch: '#6D28D9' }] : []), ...(sens && sensMap ? [{ id: 'sens', label: 'Sensibilidad de pesos: celdas que cambian de clase', role: `${sensMap.cases} ${sensMap.cases === 1 ? 'caso' : 'casos'}`, swatch: sensSwatch }] : []), ...(baseline ? [{ id: 'diff', label: `Diferencia con el escenario ${baseline.label}`, role: palette === 'semaforo' ? 'rojo empeora · verde mejora' : 'naranja empeora · azul mejora', swatch: `linear-gradient(90deg, rgb(${PALETTES[palette].diffNeg.join(',')}), #eee, rgb(${PALETTES[palette].diffPos.join(',')}))` }] : [])]} />
           )}
           {tab === 'modelo' && (
             <GeoModelPanel isPack={!!geo.packId} onUploadFor={(id) => { setFocusId(null); setUploadFor(id); setTab('capas'); }} focusId={focusId} criteria={criteria} weights={weightResult.agg.w} cr={weightResult.agg.cr} nExperts={expertIds.length} layers={data?.info ?? {}} rules={geo.rules}
@@ -876,6 +916,13 @@ export default function GeoVisor(props: Props) {
               minPatchHa={minPatchHa} onMinPatch={(ha) => { setMinPatchHa(ha); commit((g) => ({ ...g, minPatchHa: ha })); }}
               parcels={parcelRes?.parcels ?? null}
               onFlyTo={(col, row) => { if (data) { const [lon, lat] = pixelToLonLat(col, row, data.grid.transform, data.grid.crs); mapRef.current?.flyTo(lat, lon, 12); } }}
+              sensitivity={{
+                result: sens?.res ?? null, stale: sensStale, running: sensRun, ready: !!(data && ev && stats && rules.length > 0), nRules: rules.length,
+                exploring, names: rm.names, sel: sensSel, onSel: setSensSel,
+                mapOn: vis.sens?.on ?? true, onMapOn: (on) => setVis((v) => ({ ...v, sens: { on, op: v.sens?.op ?? 0.85 } })),
+                mapInfo: sensMap ? { cases: sensMap.cases, max: sensMap.max, cells: sensCells } : null, swatch: sensSwatch,
+                onRun: runSensitivity, onCancel: cancelSensitivity, onClear: clearSensitivity,
+              }}
               scenarios={{
                 scenarios, names: rm.names, direction: rm.direction, stats, meanPct, ready: !!(data && ev && stats && rules.length > 0),
                 comparingId: compareId, restoreInfo: scenarioRestoreInfo, undo: undo ? { name: undo.name } : null,
