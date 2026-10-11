@@ -7,9 +7,9 @@ import { describeFn, fnIssue, sortedFn, suitability, type FnSpec } from '@/lib/g
 import type { LayerInfo } from '@/lib/geo/data';
 import type { Criterion, GeoConfig } from '@/lib/types';
 import type { Parcel } from '@/lib/geo/patches';
-import type { ClassStats } from '@/lib/geo/suitability';
 import { DIR_TEXT, resolveModel, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import GeoClassesEditor from './GeoClassesEditor';
+import GeoScenariosPanel, { type ScenariosPanelProps } from './GeoScenariosPanel';
 import { fmtNum, Num } from './GeoBits';
 
 type Rule = GeoConfig['rules'][string];
@@ -46,10 +46,8 @@ type Props = {
   onMinPatch: (ha: number) => void;
   parcels: Parcel[] | null;
   onFlyTo: (col: number, row: number) => void;
-  stats: ClassStats | null;
-  baseline: { label: string; stats: ClassStats } | null;
-  onSaveBaseline: (label: string) => void;
-  onClearBaseline: () => void;
+  /** Escenarios guardados: lista, comparación y restauración (ver GeoScenariosPanel). */
+  scenarios: ScenariosPanelProps;
 };
 
 const FN_LABEL: Record<FnSpec['type'], string> = { steps: 'Por rangos', trapezoid: 'Trapecio (óptimo en el medio)', target: 'Valor objetivo (± tolerancia)', up: 'Más es mejor', down: 'Menos es mejor', classes: 'Por clases' };
@@ -193,7 +191,6 @@ export default function GeoModelPanel(p: Props) {
   const risk = p.setup.direction === 'risk';
   const rm = resolveModel(p.setup);
   const names = rm.names;
-  const sameN = !p.baseline || p.baseline.stats.classes.length === names.length;
   const T = DIR_TEXT[p.setup.direction];
   return (
     <NounCtx.Provider value={T.noun}>
@@ -338,36 +335,7 @@ export default function GeoModelPanel(p: Props) {
         )}
       </section>
 
-      <section className="gv-sec">
-        <header><h4>Comparar escenarios</h4></header>
-        <p className="gv-hint">Guarda el resultado actual, cambia pesos, reglas o umbrales, y mira qué mejoró y qué empeoró (capa «Diferencia»). El escenario guardado vive solo en esta sesión.</p>
-        {!p.baseline ? (
-          <div className="gv-row-acts"><button type="button" className="btn sm" disabled={!p.stats} onClick={() => p.onSaveBaseline('A')}>Guardar el estado actual como escenario A</button></div>
-        ) : (
-          <>
-            <div className="gv-cmp">
-              <span /><b>A</b><b>Ahora</b><b>Δ ha</b>
-              {sameN ? [...names.keys()].reverse().map((i) => {
-                const a = p.baseline!.stats.classes[i].ha, b = p.stats?.classes[i].ha ?? 0, d = b - a;
-                // «Malo» = que crezca la clase peor de la dirección (aptitud: la más baja; riesgo: la más alta) o que
-                // decrezca cualquiera de las otras; el color sigue a eso, no al signo.
-                const worstClass = risk ? names.length - 1 : 0;
-                const bad = i === worstClass ? d > 0 : d < 0;
-                return (
-                  <div className="row" key={i}>
-                    <span>{names[i]}</span><span className="mono">{a.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span><span className="mono">{b.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                    <span className="mono" style={{ color: d === 0 ? undefined : bad ? 'var(--geo-noapta)' : 'var(--geo-alta)' }}>{d > 0 ? '+' : ''}{d.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
-                  </div>
-                );
-              }) : <p className="gv-hint warn" role="status" style={{ gridColumn: '1 / -1' }}>El escenario A tenía otro número de clases ({p.baseline.stats.classes.length}) que el mapa actual ({names.length}): guárdalo de nuevo para comparar.</p>}
-            </div>
-            <div className="gv-row-acts">
-              <button type="button" className="btn sm" onClick={() => p.onSaveBaseline('A')}>Reemplazar A por el estado actual</button>
-              <button type="button" className="btn sm" onClick={p.onClearBaseline}>Quitar la comparación</button>
-            </div>
-          </>
-        )}
-      </section>
+      <GeoScenariosPanel {...p.scenarios} />
     </div>
     </NounCtx.Provider>
   );

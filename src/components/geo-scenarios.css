@@ -1,0 +1,22 @@
+/* Escenarios guardados del geovisor (GeoScenariosPanel). Archivo aparte para no mezclar con globals.css. */
+.gv-sc-new{display:grid;gap:4px}
+.gv-sc-lbl{font-size:12px;color:var(--muted)}
+.gv-sc-newrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gv-sc-newrow input[type="text"]{flex:1 1 140px;min-width:0;font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.gv-sc-newrow .btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.gv-sc-undo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.gv-sc-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.gv-sc{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.gv-sc.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.gv-sc-head{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.gv-sc-name{font-size:13px;overflow-wrap:anywhere}
+.gv-sc-meta{font-size:12px;color:var(--muted)}
+.gv-sc-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.gv-sc-table caption{text-align:left;font-size:12px;color:var(--muted);padding-bottom:4px}
+.gv-sc-table th,.gv-sc-table td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.gv-sc-table thead th{font:600 11px var(--f-mono);color:var(--muted)}
+.gv-sc-table .num{text-align:right}
+.gv-sc-table td small,.gv-sc-table th small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.gv-sc-table .d.good b{color:var(--geo-alta,var(--pass-text))}
+.gv-sc-table .d.bad b{color:var(--geo-noapta,var(--warn-text))}
+.gv-sc-table tr.mean th,.gv-sc-table tr.mean td{border-bottom:0;font-weight:600}

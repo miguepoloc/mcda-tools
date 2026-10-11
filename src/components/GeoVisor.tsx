@@ -47,6 +47,7 @@ import { evaluateLonLat, MAX_POINTS, newPointId, nextPointName, pointState, rank
 import GeoMap, { BASEMAPS, type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoLayersPanel, { type VecItem, type VisState } from './GeoLayersPanel';
 import GeoModelPanel from './GeoModelPanel';
+import { addScenario, buildScenario, cleanName, meanIndex, nextScenarioName, removeScenario, renameScenario, restorePlan, sanitizeScenarios, scenarioRows, scenariosJson } from '@/lib/geo/scenarios';
 import type { LabelMode } from '@/lib/geo/pointLabels';
 import PointFicha from './GeoPointFicha';
 import GeoPointsPanel from './GeoPointsPanel';
@@ -142,7 +143,11 @@ export default function GeoVisor(props: Props) {
   const [imgs, setImgs] = useState<Record<string, string>>({});
   const [tour, setTour] = useState(false);
   const [minPatchHa, setMinPatchHa] = useState(geo.minPatchHa ?? 0);
+  // Comparación activa de un escenario guardado: su índice se recalcula con las capas actuales (no se guarda la grilla).
   const [baseline, setBaseline] = useState<{ label: string; pct: Uint8Array; stats: ClassStats } | null>(null);
+  const [compareId, setCompareId] = useState<string | null>(null);
+  // Estado previo a la última restauración de un escenario, para poder volver.
+  const [undo, setUndo] = useState<{ name: string; rules: GeoConfig['rules']; setup: ClassSetup; exploring: boolean; exploreWeights: number[] | null } | null>(null);
   // El recorrido automático solo cuando el geovisor está a la vista (montado oculto en «Compartir» no debe abrirse).
   const away = !!props.share?.away;
   useEffect(() => { if (!away && !tourSeen()) { const t = setTimeout(() => setTour(true), 900); return () => clearTimeout(t); } }, [away]);
@@ -303,6 +308,71 @@ export default function GeoVisor(props: Props) {
   // Encuadra el área cada vez que cambia la grilla (ejemplo cargado, área nueva…).
   const boundsKey = gridBounds ? [gridBounds.west, gridBounds.south, gridBounds.east, gridBounds.north].map((n) => n.toFixed(4)).join(',') : '';
   useEffect(() => { if (gridBounds) setTimeout(() => mapRef.current?.fit(gridBounds), 60); }, [boundsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ------------------------------------------------------------------ escenarios guardados (geo.scenarios, máx. 5)
+  const scenarios = useMemo(() => sanitizeScenarios(geo.scenarios), [geo.scenarios]);
+  const meanPct = useMemo(() => (data && ev ? meanIndex(ev.pct, data.mask) : null), [data, ev]);
+  useEffect(() => { if (compareId && !scenarios.some((s) => s.id === compareId)) { setCompareId(null); setBaseline(null); } }, [compareId, scenarios]);
+  const setScenarios = useCallback((fn: (list: ReturnType<typeof sanitizeScenarios>) => ReturnType<typeof sanitizeScenarios>) => {
+    commit((g) => {
+      const next = fn(sanitizeScenarios(g.scenarios));
+      const out = { ...g };
+      if (next.length) out.scenarios = next; else delete out.scenarios;
+      return out;
+    });
+  }, [commit]);
+  const saveScenario = (name: string) => {
+    if (!data || !ev || !stats) return;
+    const nm = cleanName(name) || nextScenarioName(scenarios);
+    const sc = buildScenario({
+      id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: nm, date: new Date().toISOString(),
+      setup: dSetup, names: rm.names, explored: exploring,
+      weights: Object.fromEntries(criteria.map((c, i) => [c.id, Math.round((weights[i] ?? 0) * 1e6) / 1e6])),
+      effective: Object.fromEntries(criteria.map((c) => [c.id, Math.round((effW[c.id] ?? 0) * 1e6) / 1e6])),
+      rules: geo.rules, stats, meanPct,
+    });
+    setScenarios((list) => { const r = addScenario(list, sc); return r.ok ? r.list : list; });
+  };
+  const compareScenario = (id: string) => {
+    const s = scenarios.find((x) => x.id === id);
+    if (!s || !data) return;
+    setCompareId(id);
+    setBaseline(null);
+    // Otra dirección del índice: la diferencia por celda no significaría lo mismo; la tabla lo avisa.
+    if (s.direction !== rm.direction) return;
+    const rl: CriterionRule[] = [];
+    criteria.forEach((c) => {
+      const r = s.rules[c.id];
+      if (!r || !data.layers[r.layerKey]) return;
+      rl.push({ key: r.layerKey, weight: s.weights[c.id] ?? 0, fn: r.fn, ...(r.veto ? { veto: r.veto } : {}) });
+    });
+    if (!rl.length) return;
+    const x = evaluateIndex(data.layers, data.mask, rl, s.direction);
+    const st = classStats(classify(x.s, x.veto, s.breaks), x.pct, data.mask, data.grid.haPerPixel, s.breaks.length + 1, s.direction);
+    setBaseline({ label: s.name, pct: x.pct, stats: st });
+    setVis((v) => ({ ...v, diff: { on: true, op: 0.9 } }));
+  };
+  const applyState = (rules: GeoConfig['rules'], su: ClassSetup, expl: boolean, w: number[] | null) => {
+    setSetup(su); setStyle('classes');
+    setExploring(expl); setExploreWeights(expl ? w : null);
+    commit((g) => ({ ...applySetup(g, su), rules }));
+  };
+  const scenarioRestoreInfo = (id: string) => {
+    const s = scenarios.find((x) => x.id === id);
+    return s ? restorePlan(s, criteria.map((c) => c.id), weightResult.agg.w) : null;
+  };
+  const restoreScenario = (id: string) => {
+    const s = scenarios.find((x) => x.id === id);
+    if (!s) return;
+    const plan = restorePlan(s, criteria.map((c) => c.id), weightResult.agg.w);
+    setUndo({ name: s.name, rules: geo.rules, setup, exploring, exploreWeights });
+    applyState(plan.rules, plan.setup, plan.exploring, plan.weights);
+  };
+  const undoRestore = () => {
+    if (!undo) return;
+    applyState(undo.rules, undo.setup, undo.exploring, undo.exploreWeights);
+    setUndo(null);
+  };
 
   // ------------------------------------------------------------------ puntos con ranking
   const points = useMemo(() => sanitizePoints(geo.points), [geo.points]);
@@ -803,9 +873,15 @@ export default function GeoVisor(props: Props) {
               minPatchHa={minPatchHa} onMinPatch={(ha) => { setMinPatchHa(ha); commit((g) => ({ ...g, minPatchHa: ha })); }}
               parcels={parcelRes?.parcels ?? null}
               onFlyTo={(col, row) => { if (data) { const [lon, lat] = pixelToLonLat(col, row, data.grid.transform, data.grid.crs); mapRef.current?.flyTo(lat, lon, 12); } }}
-              stats={stats} baseline={baseline ? { label: baseline.label, stats: baseline.stats } : null}
-              onSaveBaseline={(label) => { if (ev && stats) { setBaseline({ label, pct: ev.pct.slice(), stats }); setVis((v) => ({ ...v, diff: { on: true, op: 0.9 } })); } }}
-              onClearBaseline={() => setBaseline(null)} />
+              scenarios={{
+                scenarios, names: rm.names, direction: rm.direction, stats, meanPct, ready: !!(data && ev && stats && rules.length > 0),
+                comparingId: compareId, restoreInfo: scenarioRestoreInfo, undo: undo ? { name: undo.name } : null,
+                onSave: saveScenario,
+                onRename: (id, nm) => setScenarios((l) => renameScenario(l, id, nm)),
+                onDelete: (id) => { if (compareId === id) { setCompareId(null); setBaseline(null); } setScenarios((l) => removeScenario(l, id)); },
+                onCompare: compareScenario, onStopCompare: () => { setCompareId(null); setBaseline(null); },
+                onRestore: restoreScenario, onUndo: undoRestore, onDismissUndo: () => setUndo(null),
+              }} />
           )}
           {tab === 'puntos' && (
             <GeoPointsPanel
