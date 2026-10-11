@@ -88,7 +88,7 @@ export default function GeoComposeDialog({ initial, avail, basemaps, zoneName, o
   const working = busy === 'png' || busy === 'pdf';
 
   const node = (
-    <div className="gv-cmp-ov" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="gv-cmp-ov" /* clic fuera = cerrar; el teclado cierra con Escape */ onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="gv-cmp" ref={panel} role="dialog" aria-modal="true" aria-labelledby={`${tid}-t`} tabIndex={-1}>
         <div className="gv-cmp-form">
           <h2 id={`${tid}-t`}>Componer mapa para entregar</h2>

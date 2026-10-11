@@ -73,7 +73,7 @@ export default function GeoTour({ steps, open, onClose, onTab }: Props) {
   // Portal a <body>: `.gv-wrap` lleva `transform: translateX(-50%)`, y un ancestro con transform pasa a ser el bloque
   // contenedor de los `position: fixed` — el resaltado y la tarjeta quedarían corridos por el desplazamiento de ese contenedor.
   return createPortal(
-    <div className="gv-tour" role="dialog" aria-label="Recorrido guiado" aria-describedby="gv-tour-text">
+    <div className="gv-tour" role="dialog" aria-modal="false" aria-label="Recorrido guiado" aria-describedby="gv-tour-text">
       {rect && <div className="gv-tour-hole" style={{ left: rect.left - 6, top: rect.top - 6, width: rect.width + 12, height: rect.height + 12 }} />}
       <div className="gv-tour-card" style={{ left, top, width: W }}>
         <div className="mono step">Paso {i + 1} de {steps.length}</div>

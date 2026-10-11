@@ -1,5 +1,6 @@
 'use client';
 
+import { tablistKeys } from '@/lib/tabKeys';
 import { useState } from 'react';
 import { uid } from '@/lib/types';
 import {
@@ -41,8 +42,8 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
 
   return (
     <div className="partA panel">
-      <div className="tabsbar" role="tablist">
-        {TABS.map((t, i) => <button key={t} role="tab" aria-selected={tab === i} onClick={() => setTab(i)}>{i + 1}. {t}</button>)}
+      <div className="tabsbar" role="tablist" aria-label="Etapas de la priorización" onKeyDown={tablistKeys}>
+        {TABS.map((t, i) => <button key={t} type="button" role="tab" aria-selected={tab === i} tabIndex={tab === i ? 0 : -1} onClick={() => setTab(i)}>{i + 1}. {t}</button>)}
       </div>
 
       {tab === 0 && (
@@ -61,7 +62,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
           </div>
           {!readOnly && (
             <form className="acts" onSubmit={(e) => { e.preventDefault(); const v = nuevo.trim(); if (!v) return; set((s) => ({ ...s, cands: [...s.cands, newCand(uid('c'), v)] })); setNuevo(''); }}>
-              <input type="text" value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder="Nuevo criterio candidato…" style={{ flex: 1, minWidth: 200 }} />
+              <input type="text" value={nuevo} onChange={(e) => setNuevo(e.target.value)} aria-label="Nuevo criterio candidato" placeholder="Nuevo criterio candidato…" style={{ flex: 1, minWidth: 200 }} />
               <button className="btn primary" type="submit">Agregar</button>
             </form>
           )}
@@ -164,21 +165,21 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
           )}
           {alive(A).length ? (
             <div className="card tbl">
-              <table>
+              <table aria-label="Criterios candidatos y su evaluación">
                 <thead>
                   <tr>
-                    <th>Criterio</th>
+                    <th scope="col">Criterio</th>
                     {A.mode === 'q'
-                      ? cs.map((c) => <th key={c.key} className="n">{c.label}</th>)
+                      ? cs.map((c) => <th scope="col" key={c.key} className="n">{c.label}</th>)
                       : A.evaluators.map((e) => (
-                        <th key={e.id} className="n">
+                        <th scope="col" key={e.id} className="n">
                           <input type="text" value={e.name} aria-label="Nombre del evaluador" style={{ width: 110, padding: '4px 6px' }}
                             onChange={(ev) => set((s) => ({ ...s, evaluators: s.evaluators.map((x) => (x.id === e.id ? { ...x, name: ev.target.value } : x)) }))} />
                           {A.evaluators.length > 1 && !readOnly && <button type="button" className="btn icon sm" aria-label="Quitar evaluador"
                             onClick={() => set((s) => ({ ...s, evaluators: s.evaluators.filter((x) => x.id !== e.id), cands: s.cands.map((c) => { const se = { ...c.se }; delete se[e.id]; return { ...c, se }; }) }))}>✕</button>}
                         </th>
                       ))}
-                    <th className="n">Ponderación</th>
+                    <th scope="col" className="n">Ponderación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,8 +262,8 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
 
           <h3>Tabla de descarte, con la razón de cada uno</h3>
           <div className="card tbl">
-            <table>
-              <thead><tr><th>Criterio</th><th>Etapa de descarte</th><th>Razón</th></tr></thead>
+            <table aria-label="Criterios descartados, con etapa y razón">
+              <thead><tr><th scope="col">Criterio</th><th scope="col">Etapa de descarte</th><th scope="col">Razón</th></tr></thead>
               <tbody>
                 {A.cands.filter((c) => c.stage !== 'keep').map((c) => (
                   <tr key={c.id}><td>{c.name}</td><td>{c.at === 'ind' ? 'Independencia' : 'Tamizaje'}{c.stage === 'merge' && cand(c.target) ? ` (fusionado con ${cand(c.target)!.name})` : ''}</td><td>{c.reason || <span className="muted">Sin razón</span>}</td></tr>

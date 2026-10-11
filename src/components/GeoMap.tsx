@@ -463,7 +463,7 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     },
   }), [L]);
 
-  return <div ref={host} className="gv-leaflet" role="application" aria-label="Mapa interactivo. Con el mapa enfocado: flechas para moverte, más y menos para acercar, Intro para consultar la idoneidad del punto central." />;
+  return <div ref={host} className="gv-leaflet" role="application" aria-label="Mapa interactivo. Con el mapa enfocado: flechas para moverte, más y menos para acercar, Intro para consultar la idoneidad del punto central. Los puntos y las zonas también están en las pestañas Puntos y Zonas, en forma de lista y de tabla." />;
 });
 
 export default GeoMap;

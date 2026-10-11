@@ -184,7 +184,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | R5 | Aviso de publicación confiable | ✅ | entrada 6 |
 | U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
 | U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
-| U3 | Auditoría WCAG 2.2 AA | ◐ | contraste corregido (entrada 1); auditoría completa no |
+| U3 | Auditoría WCAG 2.2 AA | ◐ | entradas 1 y 20; `docs/AUDITORIA_accesibilidad.md`; falta lector de pantalla real y tabpanels |
 | U4 | Modo presentación | ⬜ | |
 | U5 | Historial de versiones del proyecto | ⬜ | |
 | P1 | Versión y DOI alineados | ✅ | entrada 5 |
@@ -212,3 +212,11 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Decisiones y riesgos del agente:** «confirmar si la clase da nombre a algo publicado» usa `share.isPublic` como proxy (el geovisor no conoce el meta publicado); restaurar pesos solo como «exploración» porque los pesos del panel salen de los juicios; restaurar reemplaza todas las reglas (un criterio nuevo queda sin regla y con peso 0); «Cargar ejemplo» (ProjectWorkspace) reemplaza `geo` completo y borra los escenarios; el diff asume que las capas no cambiaron desde que se guardó (avisa si cambió el área evaluada); cortes con resolución 0,1 %.
 - **Verificación:** `check-geo-classes` ampliado y `check-geo-scenarios` nuevo; typecheck, 1296 verificaciones y `test:excel` en verde (merge con conflicto aditivo en `package.json`, resuelto uniendo los scripts de prueba).
 - **Pendiente (visual):** editor y franja en ancho angosto y oscuro, tabla de comparación, descargas, persistencia real en Supabase.
+
+### 20. Auditoría de accesibilidad WCAG 2.2 AA (U3) — `docs/AUDITORIA_accesibilidad.md`
+- **Qué:** enlace «Saltar al contenido» y `<main>` en el layout; título por página; teclado de pestañas (←→, Inicio, Fin) en Proyecto, Priorización, Geovisor y Citación (`src/lib/tabKeys.ts`); `aria-label` en 25 tablas, `scope` en 82 `<th>`; nombres para controles sin etiqueta (cerrar, peso simulado, veto, nuevo criterio); `aria-valuetext` en el juicio AHP; foco devuelto y Mayús+Tab en dos modales; nombre de zona como botón en la tabla de zonas (antes solo clic en la fila); alternativa textual anunciada en el mapa; `prefers-reduced-motion` global, `forced-colors`, `scroll-padding` para el encabezado fijo, 44 px en táctil.
+- **Contraste:** índigo de la Parte A 4.47:1 → 6.3:1 (claro) y texto del botón primario 2.98:1 → 6.4:1 (oscuro); borde de campos 1.2:1 → ≥ 3:1 (`--field-line`).
+- **Prueba:** `scripts/check-a11y-static.ts` (en `npm test`, antes de `check-integration.ts`): patrones JSX/CSS y 29 pares de contraste.
+- **Decisión del agente (revisable):** `<main>` en el layout raíz cubre todas las páginas con un cambio mínimo pero deja el `<header>` dentro de `main`; el reparto fino queda pendiente.
+- **Pendiente:** tabpanels reales, lector de pantalla (NVDA/VoiceOver), axe/Lighthouse renderizado, 200 % de zoom y 320 px, contraste sobre teselas del mapa. Detalle y severidades en la auditoría.
+- **Verificación:** typecheck, `npm test` y `test:excel`. Sin verificación visual.

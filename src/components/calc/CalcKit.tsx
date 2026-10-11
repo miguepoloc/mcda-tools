@@ -149,7 +149,7 @@ export function CalcMatrix({ mode, corner, rows, cols, cells, digits = 4, colHin
         {caption && <caption className="calc-cap">{caption}</caption>}
         <thead>
           <tr>
-            <th className="calc-corner">{corner ?? ''}</th>
+            <th scope="col" className="calc-corner">{corner ?? ''}</th>
             {cols.map((c, j) => (
               <th key={j} className="n" scope="col">
                 {c}

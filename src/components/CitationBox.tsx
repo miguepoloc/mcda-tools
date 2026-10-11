@@ -1,5 +1,6 @@
 'use client';
 
+import { tablistKeys } from '@/lib/tabKeys';
 import { useState } from 'react';
 import {
   CITATION_DATA,
@@ -106,7 +107,7 @@ export default function CitationBox() {
         </div>
 
         {/* Barra de pestañas de formato */}
-        <div className="cite-tabs-wrap" role="tablist" aria-label="Formatos de citación bibliográfica">
+        <div className="cite-tabs-wrap" role="tablist" aria-label="Formatos de citación bibliográfica" onKeyDown={tablistKeys}>
           {CITATION_FORMATS.map((fmtKey) => {
             const item = CITATION_DATA[fmtKey];
             const isSelected = selectedFormat === fmtKey;

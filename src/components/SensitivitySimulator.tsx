@@ -269,6 +269,8 @@ export default function SensitivitySimulator({
                 min="0"
                 max="1"
                 step="0.01"
+                aria-label={`Peso simulado de ${c.name}`}
+                aria-valuetext={`${pct} %`}
                 value={simW}
                 onChange={(e) => handleWeightChange(i, parseFloat(e.target.value))}
                 style={{
@@ -387,15 +389,15 @@ export default function SensitivitySimulator({
           Comparativa de Posición en el Ranking
         </div>
         <div className="tbl">
-          <table>
+          <table aria-label="Comparativa de posición en el ranking">
             <thead>
               <tr>
-                <th>Alternativa</th>
-                <th className="n">Puesto Base</th>
-                <th className="n">Puntaje Base</th>
-                <th className="n">Puesto Simulado</th>
-                <th className="n">Puntaje Simulado</th>
-                <th className="n">Variación</th>
+                <th scope="col">Alternativa</th>
+                <th scope="col" className="n">Puesto Base</th>
+                <th scope="col" className="n">Puntaje Base</th>
+                <th scope="col" className="n">Puesto Simulado</th>
+                <th scope="col" className="n">Puntaje Simulado</th>
+                <th scope="col" className="n">Variación</th>
               </tr>
             </thead>
             <tbody>

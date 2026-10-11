@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import PublicView from '@/components/PublicView';
 
+export const metadata = { title: 'Resultados públicos · Plataforma MCDA'};
+
 export default async function PublicPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const supabase = await createClient();

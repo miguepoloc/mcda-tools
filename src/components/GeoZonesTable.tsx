@@ -82,8 +82,10 @@ export default function GeoZonesTable({ rows, classNames, indexLabel, heading, s
             const none = r.meanPct === null;
             const sel = r.key === selectedKey;
             return (
-              <tr key={r.key} className={(none ? 'na ' : '') + (sel ? 'sel' : '')} aria-selected={onSelect ? sel : undefined} onClick={onSelect ? () => onSelect(r.key) : undefined}>
-                <th scope="row">{r.name}</th>
+              <tr key={r.key} className={(none ? 'na ' : '') + (sel ? 'sel' : '')} aria-current={sel ? 'true' : undefined} onClick={onSelect ? () => onSelect(r.key) : undefined}>
+                <th scope="row">{onSelect
+                  ? <button type="button" className="gv-zsort" aria-pressed={sel} onClick={(e) => { e.stopPropagation(); onSelect(r.key); }} title="Resaltar la zona en el mapa">{r.name}</button>
+                  : r.name}</th>
                 {none ? (
                   <td className="na-cell" colSpan={2 + classNames.length}>{NO_AREA}</td>
                 ) : (

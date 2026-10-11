@@ -1,5 +1,6 @@
 'use client';
 
+import { tablistKeys } from '@/lib/tabKeys';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hexToken, uid, type Alternative, type Criterion, type ExpertRow, type GeoConfig, type JudgmentRow, type Method, type WeightingMethod, type ProjectRow } from '@/lib/types';
@@ -366,9 +367,9 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         </div>
       </div>
 
-      <div className="tabsbar" role="tablist">
+      <div className="tabsbar" role="tablist" aria-label="Secciones del proyecto" onKeyDown={tablistKeys}>
         {TABS.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => goTab(t)}>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => goTab(t)}>
             {t}
           </button>
         ))}

@@ -6,6 +6,7 @@
  * de un paquete del catálogo (`geo.packId`) o de las capas propias del estudiante (`geo.grid` +
  * `geo.layers`, en Storage). Este componente coordina; las pestañas viven en GeoLayersPanel,
  * GeoModelPanel y GeoExportPanel. */
+import { tablistKeys } from '@/lib/tabKeys';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CRIT_SHEET, sheetResult, type JIndex } from '@/lib/ahp';
@@ -844,12 +845,12 @@ export default function GeoVisor(props: Props) {
           <span className={criteria.length && rulesReady === criteria.length ? 'ok' : ''}><Icon d={criteria.length && rulesReady === criteria.length ? ICONS.check : ICONS.minus} size={12} /> Reglas {rulesReady}/{criteria.length}</span>
           <span className={expertIds.length ? 'ok' : ''}><Icon d={expertIds.length ? ICONS.check : ICONS.minus} size={12} /> Pesos {expertIds.length ? `(${expertIds.length} exp.)` : ''}</span>
         </div>
-        <div className="gv-tabs" role="tablist" aria-label="Secciones del geovisor">
+        <div className="gv-tabs" role="tablist" aria-label="Secciones del geovisor" onKeyDown={tablistKeys}>
           {(['capas', 'modelo', 'puntos', 'zonas', 'exportar'] as Tab[]).map((t) => {
             const meta = { capas: ['Capas', ICONS.layers], modelo: ['Modelo', ICONS.sliders], puntos: ['Puntos', ICONS.pin], zonas: ['Zonas', ICONS.zones], exportar: ['Exportar', ICONS.download] }[t];
             const n = t === 'puntos' ? points.length : 0;
             return (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} title={meta[0]}>
+              <button key={t} type="button" role="tab" aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => setTab(t)} title={meta[0]}>
                 <Icon d={meta[1]} size={18} />
                 <span className="lbl">{meta[0]}{n > 0 && <span className="n" aria-label={` (${n})`}>{n}</span>}</span>
               </button>

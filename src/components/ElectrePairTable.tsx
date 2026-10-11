@@ -25,12 +25,12 @@ export default function ElectrePairTable({ names, result, onlyOutranking = false
       <caption className="sr-only">Cada par de alternativas con su concordancia, su discordancia y si la primera supera a la segunda</caption>
       <thead>
         <tr>
-          <th style={head}>Par (a → b)</th>
-          <th style={{ ...head, textAlign: 'right' }}>c(a, b)</th>
-          <th style={{ ...head, textAlign: 'center' }}>¿c ≥ {cStar.toFixed(2)}?</th>
-          <th style={{ ...head, textAlign: 'right' }}>d(a, b)</th>
-          <th style={{ ...head, textAlign: 'center' }}>¿d ≤ {dStar.toFixed(2)}?</th>
-          <th style={{ ...head, textAlign: 'center' }}>¿a supera a b?</th>
+          <th scope="col" style={head}>Par (a → b)</th>
+          <th scope="col" style={{ ...head, textAlign: 'right' }}>c(a, b)</th>
+          <th scope="col" style={{ ...head, textAlign: 'center' }}>¿c ≥ {cStar.toFixed(2)}?</th>
+          <th scope="col" style={{ ...head, textAlign: 'right' }}>d(a, b)</th>
+          <th scope="col" style={{ ...head, textAlign: 'center' }}>¿d ≤ {dStar.toFixed(2)}?</th>
+          <th scope="col" style={{ ...head, textAlign: 'center' }}>¿a supera a b?</th>
         </tr>
       </thead>
       <tbody>

@@ -89,7 +89,7 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
             {verdict.kind === 'set' && <>No hay ganador único: falla la condición 1 (ventaja aceptable). Conjunto de compromiso: <b>{setNames.join(', ')}</b>.</>}
           </p>
           <div className="tbl">
-            <table>
+            <table aria-label="Condiciones de aceptación de VIKOR">
               <tbody>
                 <tr>
                   <td><b>Condición 1, ventaja aceptable</b><br /><span className="muted" style={{ fontSize: 12.5 }}>Q(2º) − Q(1º) ≥ DQ = 1/(m − 1), con m = {verdict.m} alternativas</span></td>
@@ -138,9 +138,9 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
           </p>
 
           <div className="tbl">
-            <table>
+            <table aria-label="Valores S, R y Q por alternativa">
               <thead>
-                <tr><th className="n">v</th>{names.map((n) => <th key={n} className="n">Q {n}</th>)}<th>Ranking (1º primero)</th><th>Veredicto</th></tr>
+                <tr><th scope="col" className="n">v</th>{names.map((n) => <th scope="col" key={n} className="n">Q {n}</th>)}<th scope="col">Ranking (1º primero)</th><th scope="col">Veredicto</th></tr>
               </thead>
               <tbody>
                 {rows.map((row) => {

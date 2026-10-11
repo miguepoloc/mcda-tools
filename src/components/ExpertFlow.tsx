@@ -69,7 +69,7 @@ export default function ExpertFlow({ token }: { token: string }) {
             <span className="muted">Si necesitas corregir algo, pídele al estudiante que reabra tu formulario. Abajo puedes ver lo que respondiste.</span></div>
         ) : (
           <div className="card">
-            <h3>Cómo responder</h3>
+            <h2 style={{ fontSize: 16 }}>Cómo responder</h2>
             <p className="muted" style={{ maxWidth: '70ch', marginTop: 6 }}>
               Verás pares de elementos. Mueve el control hacia el que consideres mejor o más importante; entre más lejos, más fuerte es tu preferencia
               (1 = igual, 3 = moderada, 5 = fuerte, 7 = muy fuerte, 9 = extrema). Tus respuestas se guardan solas. Puedes cerrar la página y volver con este mismo enlace.

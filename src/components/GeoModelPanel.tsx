@@ -297,7 +297,7 @@ export default function GeoModelPanel(p: Props) {
                     {rule.veto && (
                       <div className="gv-veto">
                         <span>si valor</span>
-                        <select value={rule.veto.op} onChange={(e) => p.onRule(c.id, { ...rule, veto: { ...rule.veto!, op: e.target.value as '<' | '>' | '<=' | '>=' } })}>
+                        <select aria-label={`Operador del veto de ${c.name}`} value={rule.veto.op} onChange={(e) => p.onRule(c.id, { ...rule, veto: { ...rule.veto!, op: e.target.value as '<' | '>' | '<=' | '>=' } })}>
                           {['<', '<=', '>', '>='].map((o) => <option key={o} value={o}>{o}</option>)}
                         </select>
                         <Num label="Valor del veto" value={rule.veto.value} onChange={(n) => p.onRule(c.id, { ...rule, veto: { ...rule.veto!, value: n } })} />

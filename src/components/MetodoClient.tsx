@@ -246,7 +246,7 @@ export default function MetodoClient({ loggedIn, userEmail }: { loggedIn: boolea
         <h3 id="cmp-h">Los 7 métodos, lado a lado</h3>
         <p className="muted">Qué necesita cada uno, qué entrega y cuándo conviene.</p>
         <div className="tbl" tabIndex={0} role="region" aria-label="Tabla comparativa de los siete métodos (se desplaza horizontalmente)">
-          <table className="cmp">
+          <table aria-label="Comparativa de los siete métodos" className="cmp">
             <thead>
               <tr>
                 <th scope="col">Método</th>

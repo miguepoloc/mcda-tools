@@ -158,8 +158,8 @@ export default async function TutorialPage() {
               <span className="no">5</span>
               <h3>Mini-tutorial: ¿dónde instalar una finca de paneles solares?</h3>
               <p>Empieza con «En blanco» y estos criterios y archivos (todos gratuitos):</p>
-              <div className="tbl"><table>
-                <thead><tr><th>Criterio</th><th>Archivo</th><th>De dónde</th><th>Regla</th></tr></thead>
+              <div className="tbl"><table aria-label="Criterios, archivos, fuente y regla del mini-tutorial">
+                <thead><tr><th scope="col">Criterio</th><th scope="col">Archivo</th><th scope="col">De dónde</th><th scope="col">Regla</th></tr></thead>
                 <tbody>
                   <tr><td>Radiación solar</td><td>GeoTIFF de GHI (kWh/m²/día)</td><td>Global Solar Atlas (globalsolaratlas.info → Data download)</td><td>Más es mejor: 0 hasta 4.5, 1 desde 6</td></tr>
                   <tr><td>Pendiente</td><td>GeoTIFF de pendiente (°)</td><td>DEM SRTM/Copernicus → QGIS «Pendiente»</td><td>Menos es mejor: 1 hasta 5°, 0 desde 15°; veto ≥ 20°</td></tr>
