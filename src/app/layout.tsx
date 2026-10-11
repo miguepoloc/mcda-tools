@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        {/* WCAG 2.4.1: primer elemento enfocable; lleva directo al contenido, sin recorrer el encabezado. */}
+        <a className="skip-link" href="#contenido">Saltar al contenido</a>
+        <main id="contenido" tabIndex={-1}>{children}</main>
+      </body>
     </html>
   );
 }

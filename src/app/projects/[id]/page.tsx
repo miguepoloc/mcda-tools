@@ -6,6 +6,8 @@ import type { ExpertRow, JudgmentRow, ProjectRow } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+export const metadata = { title: 'Proyecto · Plataforma MCDA'};
+
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();

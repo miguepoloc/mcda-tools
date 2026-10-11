@@ -99,6 +99,8 @@ function Table({ caption, children, className }: { caption: string; children: Re
  * (`admin_*`) comprueba el rol en la base, esta página solo pinta lo que ellas devuelven.
  * Ya NO es «solo agregados»: usuarios, proyectos abandonados y los historiales identifican individuos a
  * propósito (aprobado explícitamente, ver README § Historial de cambios). */
+export const metadata = { title: 'Administración · Plataforma MCDA'};
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; filtro?: string; limite?: string }> }) {
   const sp = await searchParams;
   const tab: AdminTab = ADMIN_TABS.some((t) => t.id === sp.tab) ? (sp.tab as AdminTab) : 'resumen';

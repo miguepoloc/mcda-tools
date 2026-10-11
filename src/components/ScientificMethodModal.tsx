@@ -559,15 +559,18 @@ export default function ScientificMethodModal({
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  // Foco al abrir y de vuelta al botón que abrió el diálogo al cerrarlo (WCAG 2.4.3).
   useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
+    return () => { if (previous?.isConnected) previous.focus?.(); };
   }, []);
 
   useEffect(() => {
@@ -701,13 +704,14 @@ export default function ScientificMethodModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Cerrar"
             style={{
               background: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid var(--line)',
               color: 'var(--muted)',
               fontSize: 16,
-              width: 32,
-              height: 32,
+              width: 44,
+              height: 44,
               borderRadius: 6,
               cursor: 'pointer',
               display: 'flex',

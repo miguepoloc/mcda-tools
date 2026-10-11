@@ -113,13 +113,13 @@ export default async function CitarPage() {
             </p>
 
             <div className="tbl">
-              <table>
+              <table aria-label="Los siete métodos: familia, referencia clásica y cuándo usarlo">
                 <thead>
                   <tr>
-                    <th>Método</th>
-                    <th>Familia</th>
-                    <th>Referencia Clásica sugerida</th>
-                    <th>¿Cuándo usarlo?</th>
+                    <th scope="col">Método</th>
+                    <th scope="col">Familia</th>
+                    <th scope="col">Referencia Clásica sugerida</th>
+                    <th scope="col">¿Cuándo usarlo?</th>
                   </tr>
                 </thead>
                 <tbody>

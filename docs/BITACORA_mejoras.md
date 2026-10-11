@@ -184,7 +184,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | R5 | Aviso de publicación confiable | ✅ | entrada 6 |
 | U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
 | U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
-| U3 | Auditoría WCAG 2.2 AA | ◐ | contraste corregido (entrada 1); auditoría completa no |
+| U3 | Auditoría WCAG 2.2 AA | ◐ | entradas 1 y 23; `docs/AUDITORIA_accesibilidad.md`; falta lector de pantalla real y tabpanels |
 | U4 | Modo presentación | ⬜ | |
 | U5 | Historial de versiones del proyecto | ⬜ | |
 | P1 | Versión y DOI alineados | ✅ | entrada 5 |
@@ -240,3 +240,11 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Pulido (B):** (1) «Cargar ejemplo» avisa «Reemplaza criterios, mapa y escenarios guardados»; (2) el recuadro de «Resultado» usa la rampa del modelo de clases (`modelRampCss`) y la lámina PNG marca los cortes reales (0, cortes, 100 · idoneidad/riesgo) en vez de un «50» fijo, omitiendo marcas que se encimarían; (3) el recorrido guiado incluye un paso en la pestaña «Puntos» (`GeoTour` acepta todas las pestañas).
 - **Verificación:** `scripts/check-geo-layerstyle.ts` nuevo (registrado antes de `check-integration.ts`); typecheck, `npm test` y `test:excel` en verde.
 - **Riesgos / pendiente (visual):** editor en ancho angosto y oscuro; que `input[type=color]` se vea bien en Safari; rampas invertidas y su leyenda; grosor/borde de referencias en pantalla y en la composición; ticks del PNG con 6–8 clases (se omiten las encimadas); que visibilidad/opacidad persistan al recargar. Al cambiar el color de una referencia desde «Estilo» se guarda en `layers[k].ref` (mismo origen que el lápiz).
+
+### 23. Auditoría de accesibilidad WCAG 2.2 AA (U3) — `docs/AUDITORIA_accesibilidad.md`
+- **Qué:** enlace «Saltar al contenido» y `<main>` en el layout; título por página; teclado de pestañas (←→, Inicio, Fin) en Proyecto, Priorización, Geovisor y Citación (`src/lib/tabKeys.ts`); `aria-label` en 25 tablas, `scope` en 82 `<th>`; nombres para controles sin etiqueta (cerrar, peso simulado, veto, nuevo criterio); `aria-valuetext` en el juicio AHP; foco devuelto y Mayús+Tab en dos modales; nombre de zona como botón en la tabla de zonas (antes solo clic en la fila); alternativa textual anunciada en el mapa; `prefers-reduced-motion` global, `forced-colors`, `scroll-padding` para el encabezado fijo, 44 px en táctil.
+- **Contraste:** índigo de la Parte A 4.47:1 → 6.3:1 (claro) y texto del botón primario 2.98:1 → 6.4:1 (oscuro); borde de campos 1.2:1 → ≥ 3:1 (`--field-line`).
+- **Prueba:** `scripts/check-a11y-static.ts` (en `npm test`, antes de `check-integration.ts`): patrones JSX/CSS y 29 pares de contraste.
+- **Decisión del agente (revisable):** `<main>` en el layout raíz cubre todas las páginas con un cambio mínimo pero deja el `<header>` dentro de `main`; el reparto fino queda pendiente.
+- **Pendiente:** tabpanels reales, lector de pantalla (NVDA/VoiceOver), axe/Lighthouse renderizado, 200 % de zoom y 320 px, contraste sobre teselas del mapa. Detalle y severidades en la auditoría.
+- **Verificación:** typecheck, `npm test` y `test:excel`. Sin verificación visual.

@@ -125,6 +125,7 @@ export default function JudgmentEditor({ criteria, alternatives, method = 'ahp',
               <input
                 type="range" min={-8} max={8} step={1} value={val ?? 0} disabled={readOnly}
                 aria-label={`${items[i].name} contra ${items[j].name}`}
+                aria-valuetext={phrase(items, i, j, val)}
                 onChange={(e) => change(i, j, Number(e.target.value))}
               />
               <div className="ticks" aria-hidden="true">

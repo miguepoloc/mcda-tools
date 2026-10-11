@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 
 /** «Mi cuenta»: datos básicos y las dos acciones del propio usuario sobre su cuenta — desactivarla (pausa
  * reversible) o eliminarla con todos sus datos (irreversible). Protegida por middleware (`/cuenta`). */
+export const metadata = { title: 'Mi cuenta · Plataforma MCDA'};
+
 export default async function CuentaPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

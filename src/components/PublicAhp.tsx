@@ -23,8 +23,8 @@ export default function PublicAhp({ ahp }: { ahp: AhpSummary }) {
         <span className="pill neutral">{ahp.method === 'eigenvector' ? 'eigenvector de Saaty' : 'promedio de columnas'}</span>
       </div>
       <div className="tbl">
-        <table>
-          <thead><tr><th>Criterio</th><th className="n">Peso</th>{ahp.uncertainty && <><th className="n">− Δ</th><th className="n">+ Δ</th></>}</tr></thead>
+        <table aria-label="Peso de cada criterio">
+          <thead><tr><th scope="col">Criterio</th><th scope="col" className="n">Peso</th>{ahp.uncertainty && <><th scope="col" className="n">− Δ</th><th scope="col" className="n">+ Δ</th></>}</tr></thead>
           <tbody>
             {ahp.names.map((name, i) => (
               <tr key={name + i}>
@@ -42,8 +42,8 @@ export default function PublicAhp({ ahp }: { ahp: AhpSummary }) {
       <details>
         <summary>Matriz de comparaciones (media geométrica de los expertos)</summary>
         <div className="tbl" style={{ marginTop: 8 }}>
-          <table>
-            <thead><tr><th></th>{ahp.names.map((_, j) => <th key={j} className="n">{short(j)}</th>)}</tr></thead>
+          <table aria-label="Matriz de comparaciones por pares">
+            <thead><tr><th scope="col"></th>{ahp.names.map((_, j) => <th scope="col" key={j} className="n">{short(j)}</th>)}</tr></thead>
             <tbody>{ahp.matrix.map((row, i) => <tr key={i}><td>{short(i)}</td>{row.map((x, j) => <td key={j} className="n">{fmt(x)}</td>)}</tr>)}</tbody>
           </table>
         </div>
@@ -52,8 +52,8 @@ export default function PublicAhp({ ahp }: { ahp: AhpSummary }) {
       <details>
         <summary>Cada experto: consistencia y pesos</summary>
         <div className="tbl" style={{ marginTop: 8 }}>
-          <table>
-            <thead><tr><th>Experto</th><th className="n">CR</th>{ahp.names.map((_, j) => <th key={j} className="n">{short(j)}</th>)}</tr></thead>
+          <table aria-label="Consistencia y pesos por experto">
+            <thead><tr><th scope="col">Experto</th><th scope="col" className="n">CR</th>{ahp.names.map((_, j) => <th scope="col" key={j} className="n">{short(j)}</th>)}</tr></thead>
             <tbody>
               {ahp.experts.map((e) => (
                 <tr key={e.label}><td>{e.label}</td><td className="n" style={{ color: e.cr >= 0.1 ? 'var(--warn)' : undefined }}>{e.cr.toFixed(3)}{e.cr >= 0.1 ? ' ✗' : ''}</td>{e.weights.map((w, j) => <td key={j} className="n">{pct(w, 0)}</td>)}</tr>

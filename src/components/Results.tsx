@@ -169,11 +169,11 @@ function quantViewFor(
   };
 }
 
-function Table({ names, M, f }: { names: string[]; M: number[][]; f: (x: number) => string }) {
+function Table({ names, M, f, label }: { names: string[]; M: number[][]; f: (x: number) => string; label: string }) {
   return (
     <div className="tbl" style={{ marginTop: 8 }}>
-      <table>
-        <thead><tr><th></th>{names.map((x) => <th key={x} className="n">{x}</th>)}</tr></thead>
+      <table aria-label={label}>
+        <thead><tr><th scope="col"><span className="sr-only">Alternativa</span></th>{names.map((x) => <th scope="col" key={x} className="n">{x}</th>)}</tr></thead>
         <tbody>{M.map((r, i) => <tr key={i}><td>{names[i]}</td>{r.map((x, j) => <td key={j} className="n">{f(x)}</td>)}</tr>)}</tbody>
       </table>
     </div>
@@ -638,8 +638,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
               <div className="card">
                 <h3>Tabla de síntesis</h3>
                 <div className="tbl" style={{ marginTop: 8 }}>
-                  <table>
-                    <thead><tr><th>Alternativa</th>{criteria.map((c) => <th key={c.id} className="n">{c.name}</th>)}<th className="n">Global</th><th className="n">Rank</th></tr></thead>
+                  <table aria-label="Síntesis: prioridad por criterio, global y posición">
+                    <thead><tr><th scope="col">Alternativa</th>{criteria.map((c) => <th scope="col" key={c.id} className="n">{c.name}</th>)}<th scope="col" className="n">Global</th><th scope="col" className="n">Rank</th></tr></thead>
                     <tbody>
                       <tr><td className="muted">Peso del criterio</td>{syn.wr.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}<td /><td /></tr>
                       {syn.order.map((idx) => {
@@ -721,17 +721,17 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                 <summary>Ver matriz de decisión y pesos usados</summary>
                 <h4>{objective ? `Peso de cada criterio (${WEIGHTING_SHORT[weighting]}, calculado de esta matriz)` : 'Peso de cada criterio (de la hoja Criterios)'}</h4>
                 <div className="tbl" style={{ marginTop: 8 }}>
-                  <table>
-                    <thead><tr><th></th>{criteria.map((c) => <th key={c.id} className="n">{withUnit(c)}</th>)}</tr></thead>
+                  <table aria-label="Peso de cada criterio">
+                    <thead><tr><th scope="col"></th>{criteria.map((c) => <th scope="col" key={c.id} className="n">{withUnit(c)}</th>)}</tr></thead>
                     <tbody><tr><td className="muted">Peso</td>{critWeights.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}</tr></tbody>
                   </table>
                 </div>
                 <h4>Matriz de decisión (valores tal cual se ingresaron)</h4>
                 <div className="tbl" style={{ marginTop: 8 }}>
-                  <table>
-                    <thead><tr><th></th>{criteria.map((c) => {
+                  <table aria-label="Matriz de decisión con los valores ingresados">
+                    <thead><tr><th scope="col"></th>{criteria.map((c) => {
                       const k = getKind(dmRaw, c.id), t = getTarget(dmRaw, c.id);
-                      return <th key={c.id} className="n">{withUnit(c)} · {k === 'max' ? 'beneficio' : k === 'min' ? 'costo' : t ? `objetivo ${t.value}${t.tol ? ` ± ${t.tol}` : ''}` : 'objetivo (falta el valor)'}</th>;
+                      return <th scope="col" key={c.id} className="n">{withUnit(c)} · {k === 'max' ? 'beneficio' : k === 'min' ? 'costo' : t ? `objetivo ${t.value}${t.tol ? ` ± ${t.tol}` : ''}` : 'objetivo (falta el valor)'}</th>;
                     })}</tr></thead>
                     <tbody>
                       {alternatives.map((a) => (
@@ -776,20 +776,20 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Posición por método (1 = mejor)</h3>
               <div className="tbl">
-                <table>
+                <table aria-label="Posición de cada alternativa por método">
                   <thead>
                     <tr>
-                      <th></th>
+                      <th scope="col"></th>
                       {compareViews.map((m) => (
-                        <th key={m.key} className="n">
+                        <th scope="col" key={m.key} className="n">
                           <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 99, background: m.color, marginRight: 5 }} />{m.label}
                         </th>
                       ))}
                       {/* ELECTRE no ordena: va al final, con su propia lectura (ver la nota bajo la tabla) */}
-                      <th className="n" title="ELECTRE no da posiciones: muestra a cuántas alternativas supera cada una (↑) y por cuántas es superada (↓)">
+                      <th scope="col" className="n" title="ELECTRE no da posiciones: muestra a cuántas alternativas supera cada una (↑) y por cuántas es superada (↓)">
                         <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 99, background: 'var(--m-electre)', marginRight: 5 }} />ELECTRE
                       </th>
-                      <th className="n">Consenso</th>
+                      <th scope="col" className="n">Consenso</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -958,8 +958,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
             </div>
             <GroupDiagnostics items={items} result={r} method={wm} />
             <details><summary>Ver procedimiento</summary>
-              <h4>Matriz agregada (media geométrica)</h4><Table names={items.map((x) => x.name)} M={aggMatrix(items, r.maps)} f={fmt} />
-              <h4>Matriz normalizada</h4><Table names={items.map((x) => x.name)} M={r.agg.N} f={(x) => x.toFixed(4)} />
+              <h4>Matriz agregada (media geométrica)</h4><Table label="Matriz agregada (media geométrica)" names={items.map((x) => x.name)} M={aggMatrix(items, r.maps)} f={fmt} />
+              <h4>Matriz normalizada</h4><Table label="Matriz normalizada" names={items.map((x) => x.name)} M={r.agg.N} f={(x) => x.toFixed(4)} />
             </details>
           </>
         )}

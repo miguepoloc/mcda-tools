@@ -305,15 +305,18 @@ export default function ExecutiveReportModal({
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  // Foco al abrir y de vuelta al botón que abrió el diálogo al cerrarlo (WCAG 2.4.3).
   useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
+    return () => { if (previous?.isConnected) previous.focus?.(); };
   }, []);
 
   // Encabezado de página impreso: el título del proyecto va en el margen superior de cada hoja (Chrome/Edge; el resto lo ignora).
@@ -542,14 +545,14 @@ export default function ExecutiveReportModal({
 
           {/* Ponderación de criterios */}
           <Sec no={secNo('weights')} title={`Ponderación de Criterios (${criteria.length})`}>
-            <table className={'rpt-table' + (criteria.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table aria-label="Ponderación de criterios" className={'rpt-table' + (criteria.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={THEAD_TR}>
-                  <th style={TH}>Criterio</th>
+                  <th scope="col" style={TH}>Criterio</th>
                   {/* AHP compara por pares, no lee valores: «maximizar/minimizar» no existe en su método. */}
-                  {showMatrix && <th style={TH}>Regla de decisión</th>}
-                  <th style={THR}>Peso (w_j)</th>
-                  <th style={THR}>Porcentaje</th>
+                  {showMatrix && <th scope="col" style={TH}>Regla de decisión</th>}
+                  <th scope="col" style={THR}>Peso (w_j)</th>
+                  <th scope="col" style={THR}>Porcentaje</th>
                 </tr>
               </thead>
               <tbody>
@@ -616,13 +619,13 @@ export default function ExecutiveReportModal({
           {/* AHP: consistencia de los juicios (CR), lo que en los métodos de matriz no existe */}
           {isAhp && ahp && (
             <Sec no={secNo('consistency')} title="Consistencia de los Juicios (CR)">
-              <table className={'rpt-table' + (ahp.altSheets.length <= 12 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table aria-label="Consistencia de los juicios por matriz" className={'rpt-table' + (ahp.altSheets.length <= 12 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={THEAD_TR}>
-                    <th style={TH}>Matriz de comparación</th>
-                    <th style={THR}>Juicios</th>
-                    <th style={THR}>CR</th>
-                    <th style={TH}>Estado</th>
+                    <th scope="col" style={TH}>Matriz de comparación</th>
+                    <th scope="col" style={THR}>Juicios</th>
+                    <th scope="col" style={THR}>CR</th>
+                    <th scope="col" style={TH}>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,12 +670,12 @@ export default function ExecutiveReportModal({
           {isAhp && ahp && ahp.local.length > 0 && (
             <Sec no={secNo('local')} title="Prioridades Locales por Criterio">
               <div className="rpt-scroll" style={{ overflowX: 'auto' }}>
-                <table className={'rpt-table' + (alternatives.length <= 12 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <table aria-label="Prioridades locales por criterio" className={'rpt-table' + (alternatives.length <= 12 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={THEAD_TR}>
-                      <th style={{ padding: '6px 8px' }}>Alternativa</th>
+                      <th scope="col" style={{ padding: '6px 8px' }}>Alternativa</th>
                       {criteria.map((c, j) => (
-                        <th key={c.id} style={{ padding: '6px 8px', textAlign: 'right' }}>
+                        <th scope="col" key={c.id} style={{ padding: '6px 8px', textAlign: 'right' }}>
                           {c.name}
                           <div style={{ fontWeight: 400, color: '#475569', ...MONO }}>w = {(weights[j] ?? 0).toFixed(3)}</div>
                         </th>
@@ -707,12 +710,12 @@ export default function ExecutiveReportModal({
           {showMatrix && (
             <Sec no={secNo('matrix')} title={isFuzzy ? 'Matriz de Decisión Lingüística' : 'Matriz de Decisión Cuantitativa'}>
               <div className="rpt-scroll" style={{ overflowX: 'auto' }}>
-                <table className={'rpt-table' + (alternatives.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <table aria-label="Matriz de decisión" className={'rpt-table' + (alternatives.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={THEAD_TR}>
-                      <th style={{ padding: '6px 8px' }}>Alternativa</th>
+                      <th scope="col" style={{ padding: '6px 8px' }}>Alternativa</th>
                       {criteria.map((c) => (
-                        <th key={c.id} style={{ padding: '6px 8px', textAlign: 'right' }}>
+                        <th scope="col" key={c.id} style={{ padding: '6px 8px', textAlign: 'right' }}>
                           {c.name}
                           {c.unit?.trim() && <div style={{ fontWeight: 400, color: '#475569' }}>({c.unit.trim()})</div>}
                         </th>
@@ -779,13 +782,13 @@ export default function ExecutiveReportModal({
           {/* Orden de mérito (ranking final) */}
           {!electre && (
             <Sec no={secNo('ranking')} title="Orden de Mérito y Síntesis Final">
-              <table className={'rpt-table' + (rankingRows.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table aria-label="Orden de mérito y síntesis final" className={'rpt-table' + (rankingRows.length <= 14 ? ' rpt-keep' : '')} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={THEAD_TR}>
-                    <th style={{ ...TH, width: 80 }}>Posición</th>
-                    <th style={TH}>Alternativa</th>
-                    <th style={THR}>{score.label}</th>
-                    <th style={{ ...TH, textAlign: 'center' }}>Lectura</th>
+                    <th scope="col" style={{ ...TH, width: 80 }}>Posición</th>
+                    <th scope="col" style={TH}>Alternativa</th>
+                    <th scope="col" style={THR}>{score.label}</th>
+                    <th scope="col" style={{ ...TH, textAlign: 'center' }}>Lectura</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -904,9 +907,9 @@ export default function ExecutiveReportModal({
               ...(isAhp ? [] : [{ head: `Cálculo de los pesos · ${wRef.label} (${wRef.cite})`, steps: WEIGHTING_SPECS[wm].steps }]),
               { head: `Cálculo del resultado · ${methodLabel}`, steps: methodDoc.steps },
             ].map((blk) => (
-              <table key={blk.head} className="rpt-table rpt-keep" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, marginBottom: 8 }}>
+              <table key={blk.head} aria-label={blk.head} className="rpt-table rpt-keep" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, marginBottom: 8 }}>
                 <thead>
-                  <tr style={THEAD_TR}><th colSpan={2} style={{ padding: '5px 8px' }}>{blk.head}</th></tr>
+                  <tr style={THEAD_TR}><th scope="col" colSpan={2} style={{ padding: '5px 8px' }}>{blk.head}</th></tr>
                 </thead>
                 <tbody>
                   {blk.steps.map((st) => (

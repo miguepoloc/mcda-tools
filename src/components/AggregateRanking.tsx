@@ -28,8 +28,8 @@ export default function AggregateRanking({ names, methods, electreExcluded, comp
         ))}
       </div>
       <div className="tbl" style={{ marginTop: 10 }}>
-        <table>
-          <thead><tr><th>Puesto</th><th>Alternativa</th><th className="n">{rule === 'borda' ? 'Puntos Borda' : 'Victorias − derrotas'}</th></tr></thead>
+        <table aria-label="Orden agregado de las alternativas">
+          <thead><tr><th scope="col">Puesto</th><th scope="col">Alternativa</th><th scope="col" className="n">{rule === 'borda' ? 'Puntos Borda' : 'Victorias − derrotas'}</th></tr></thead>
           <tbody>
             {res.rows.map((r) => (
               <tr key={r.index}>

@@ -35,9 +35,9 @@ export default function GroupDiagnostics({ items, result, method = DEFAULT_WEIGH
           : <span className="pill neutral">Consenso: hace falta más de un experto con respuestas en esta hoja</span>}
       </div>
       <div className="tbl" style={{ marginTop: 8 }}>
-        <table>
+        <table aria-label="Consistencia y consenso por hoja">
           <thead>
-            <tr><th>Elemento</th><th className="n">Peso</th><th className="n">− Δ</th><th className="n">+ Δ</th><th className="n">P(1.º)</th></tr>
+            <tr><th scope="col">Elemento</th><th scope="col" className="n">Peso</th><th scope="col" className="n">− Δ</th><th scope="col" className="n">+ Δ</th><th scope="col" className="n">P(1.º)</th></tr>
           </thead>
           <tbody>
             {items.map((it, i) => (

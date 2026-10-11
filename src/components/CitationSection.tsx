@@ -31,7 +31,7 @@ export default function CitationSection({ showFullIntro = true }: CitationSectio
         <div className="cite-principles-grid">
           <div className="cite-principle-card">
             <div className="cite-principle-num">1</div>
-            <h4>Reproducibilidad</h4>
+            <h3>Reproducibilidad</h3>
             <p>
               Mencionar la versión exacta (<code className="mono">v{APP_VERSION}</code>) y el DOI persistente permite que pares evaluadores, jurados o lectores recalculen y verifiquen tus matrices con los mismos parámetros numéricos.
             </p>
@@ -39,7 +39,7 @@ export default function CitationSection({ showFullIntro = true }: CitationSectio
 
           <div className="cite-principle-card">
             <div className="cite-principle-num">2</div>
-            <h4>Doble Atribución</h4>
+            <h3>Doble Atribución</h3>
             <p>
               En la sección de metodología cita <strong>ambas fuentes</strong>: la literatura teórica fundacional del método elegido (ej. Saaty 1980 para AHP, Hwang & Yoon 1981 para TOPSIS) y la herramienta computacional <code className="mono">mcda-tools</code>.
             </p>
@@ -47,7 +47,7 @@ export default function CitationSection({ showFullIntro = true }: CitationSectio
 
           <div className="cite-principle-card">
             <div className="cite-principle-num">3</div>
-            <h4>DOI de Versión vs. Concepto</h4>
+            <h3>DOI de Versión vs. Concepto</h3>
             <p>
               El DOI <code className="mono">{APP_DOI}</code> identifica con precisión el código de la versión <code className="mono">{APP_RELEASE_TAG}</code> en el archivo global de Zenodo (CERN), garantizando su preservación a largo plazo.
             </p>

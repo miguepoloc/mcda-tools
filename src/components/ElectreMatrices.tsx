@@ -15,8 +15,8 @@ export default function ElectreMatrices({ names, result, mode = 'screen', headin
 
   const Grid = ({ cell }: { cell: (i: number, k: number) => { text: string; ok: boolean | null; title: string } }) => (
     <div className="tbl" style={{ marginTop: 8 }}>
-      <table className="em">
-        <thead><tr><th><span className="sr-only">Fila supera a columna</span></th>{names.map((x) => <th key={x} className="n">{x}</th>)}</tr></thead>
+      <table aria-label="Matriz de relaciones entre alternativas" className="em">
+        <thead><tr><th scope="col"><span className="sr-only">Fila supera a columna</span></th>{names.map((x) => <th scope="col" key={x} className="n">{x}</th>)}</tr></thead>
         <tbody>
           {names.map((row, i) => (
             <tr key={row}>
