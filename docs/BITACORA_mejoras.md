@@ -145,3 +145,52 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Firma:** `publishSig` sin cambios (el desglose depende de pesos, reglas, capas y área, que ya firman, y de `puntos`).
 - **Verificación:** `check-geo-points` y `check-geo-publish` ampliadas; typecheck, `npm test` y `test:excel` en verde.
 - **Pendiente (visual):** mirar `/p/<token>` con puntos publicados y la nota de «100 primeros puestos». Los criterios sin dato publican `suit/weight/contrib` en `null` («no vota»).
+
+## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
+
+**19 de 40 mejoras hechas** (9 de 16 hallazgos H cerrados del todo, 3 parcialmente). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+
+| Código | Propuesta | Estado | Dónde / nota |
+| --- | --- | --- | --- |
+| G1 | Dirección del índice (aptitud/riesgo) | ✅ | entrada 8 |
+| G2 | Clases editables, cuantiles/Jenks | ✅ | entrada 8 (2–8 clases) |
+| G3 | Editor de estilo por capa (paletas, opacidad, borde) | ⬜ | |
+| G4 | Leyendas plegables | ✅ | entrada 6 |
+| G5 | Un solo rótulo de área | ✅ | entrada 6 |
+| G6 | Vectores sin rasterizar | ◐ | polígonos «Referencia» sí (entrada 12); simbología de puntos/líneas de entrada no |
+| G7 | Papel «Referencia» | ◐ | dibujado sí; mostrarlo en la vista pública no (R4) |
+| G8 | Etiquetas, atributos al clic, búsqueda, categorías | ◐ | etiquetas de puntos del usuario sí; atributos de capas no |
+| G9 | Resumen por polígonos (zonal) | ✅ | entrada 12 |
+| G10 | Exposición por población | ✅ | entrada 12 (población al centroide) |
+| G11 | Regla de distancias y áreas | ⬜ | |
+| G12 | Dibujo de geometrías | ⬜ | fuera de v1 por plan |
+| G13 | Escenarios con nombre guardados | ⬜ | H7 sigue abierto |
+| G14 | Gestión de capas | ◐ | duplicados y borrado confirmado sí; renombrar/reordenar/agrupar no |
+| G15 | Sensibilidad espacial de pesos | ⬜ | |
+| M1 | Orden agregado Borda/Copeland | ✅ | entrada 7 |
+| M2 | PROMETHEE con 6 funciones y umbrales | ⬜ | |
+| M3 | ELECTRE TRI | ⬜ | esfuerzo alto |
+| M4 | Umbral crítico de cada peso | ✅ | entrada 7 |
+| M5 | Subcriterios (2 niveles) | ⬜ | esfuerzo alto; contradice límite R10 declarado |
+| M6 | AIP vs AIJ | ⬜ | |
+| E1 | Guía de consistencia | ✅ | entrada 3 |
+| E2 | Seguimiento del panel (estado, fecha límite) | ⬜ | |
+| E3 | Comentario por juicio | ⬜ | |
+| E4 | Rondas Delphi | ⬜ | esfuerzo alto |
+| R1 | Composición de mapa para entregar | ✅ | entradas 14 y 16 |
+| R2 | Informe ejecutivo PDF de mapas | ✅ | entrada 14 |
+| R3 | Párrafo de metodología es/en | ✅ | entrada 7 |
+| R4 | Vista pública configurable / iframe | ◐ | puntos y zonas opcionales sí; referencia e iframe no |
+| R5 | Aviso de publicación confiable | ✅ | entrada 6 |
+| U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
+| U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
+| U3 | Auditoría WCAG 2.2 AA | ◐ | contraste corregido (entrada 1); auditoría completa no |
+| U4 | Modo presentación | ⬜ | |
+| U5 | Historial de versiones del proyecto | ⬜ | |
+| P1 | Versión y DOI alineados | ✅ | entrada 5 |
+| P2 | Reportar un problema | ✅ | entrada 5 |
+| P3 | Casos de referencia abiertos | ⬜ | |
+| P4 | Instancia demo / despliegue reproducible | ⬜ | R6 del plan |
+| P5 | API documentada | ⬜ | esfuerzo alto |
+
+**Fuera de la propuesta, hechos por revisión visual del docente:** header del Geovisor, pestañas del panel con aspecto de pestañas, rampa continua por clases, lista de puntos con ficha en línea y nombres en el mapa, Exportar/Compartir separados con QR, tabla de ranking en la lámina, desglose por criterio en puntos públicos.
