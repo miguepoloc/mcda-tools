@@ -8,6 +8,8 @@ import {
   classify, classStats, areaStats, evaluateGrid, evaluateIndex, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA, MASK_VALID, type CriterionRule,
 } from '../src/lib/geo/suitability.ts';
 
+import { classStrip, cutFromPct, fmtCut, rangeText, stepCut, stripAlt, stripTicks, validateCut } from '../src/lib/geo/classStrip.ts';
+
 let fails = 0;
 const ok = (c: boolean, n: string, extra = '') => { console.log((c ? 'OK   ' : 'FALLA') + ' ' + n + (extra ? ' ' + extra : '')); if (!c) fails++; };
 const eq = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
@@ -89,6 +91,30 @@ ok(css.classes[0].ha >= css.veto.ha, 'aptitud: las vetadas cuentan en la clase m
 // --- etiquetas
 const mm = resolveClassModel({ classes: { alta: 0.7, media: 0.45 }, direction: 'risk' });
 ok(classLabel(mm, CLASS_VETO) === 'Condición crítica' && classLabel(m0, CLASS_VETO) === 'Vetada' && classLabel(m0, 0) === 'Exclusión' && classLabel(m0, 3) === 'Alta aptitud', 'classLabel');
+
+// --- franja, textos de rango y validación de cortes del editor
+{
+  ok(fmtCut(0.64) === '64' && fmtCut(0.645) === '64.5' && fmtCut(0.7) === '70' && cutFromPct(64) === 0.64 && cutFromPct(43.7) === 0.437, 'fmtCut / cutFromPct (hasta un decimal de %)');
+  ok(rangeText(0.64, 1, true) === 'de 64 a 100' && rangeText(0.48, 0.64, false) === 'de 48 a menos de 64', 'rangeText: «de 64 a 100» / «de 48 a menos de 64»');
+  const segs = classStrip([0.48, 0.64], ['No apta', 'Moderada', 'Alta aptitud']);
+  ok(segs.length === 3 && eq(segs.map((x) => x.width), [48, 16, 36]) && Math.abs(segs.reduce((a, x) => a + x.width, 0) - 100) < 1e-9, 'franja: anchos proporcionales que suman 100');
+  ok(segs[2].text === 'de 64 a 100' && segs[0].text === 'de 0 a menos de 48', 'franja: texto de cada clase');
+  const alt = stripAlt(segs);
+  ok(alt.indexOf('Alta aptitud, de 64 a 100') < alt.indexOf('No apta, de 0 a menos de 48'), 'texto alternativo: de la clase más alta a la más baja', alt);
+  ok(classStrip([0.5, 0.5], ['a', 'b', 'c'])[1].width === 0, 'franja: dos cortes iguales dejan una clase de ancho 0');
+  ok(stripTicks([0.48, 0.64]).map((t) => t.label).join() === '48,64', 'rótulos de cortes');
+  ok(stripTicks([0.48, 0.5, 0.97]).map((t) => t.label).join() === '48', 'rótulos: omite el que queda a < 6 puntos del anterior o del extremo');
+  // validación
+  const br = [0.3, 0.5, 0.8];
+  const v1 = validateCut(br, 1, 60);
+  ok(v1.ok && v1.value === 0.6, 'validateCut: valor válido entre vecinos');
+  const bad = (k: number, pct: number) => { const r = validateCut(br, k, pct); return r.ok ? '' : r.message; };
+  ok(/mayor que el anterior \(30\)/.test(bad(1, 30)) && /mayor que el anterior/.test(bad(1, 10)), 'validateCut: no pasa del corte anterior');
+  ok(/menor que el siguiente \(80\)/.test(bad(1, 80)) && bad(1, 79.9) === '', 'validateCut: no pasa del corte siguiente');
+  ok(/entre 0 y 100/.test(bad(0, 0)) && /entre 0 y 100/.test(bad(2, 100)) && /entre 0 y 100/.test(bad(0, -5)), 'validateCut: fuera de 0–100');
+  ok(/número/.test(bad(0, NaN)), 'validateCut: no numérico');
+  ok(stepCut(64, 1, false) === 65 && stepCut(64, -1, true) === 59 && stepCut(64.3, 1, true) === 69.3, 'stepCut: ±1 y ±5 con Mayús');
+}
 
 console.log(fails === 0 ? '\nTodo OK (check-geo-classes)' : `\n${fails} fallas`);
 process.exit(fails ? 1 : 0);

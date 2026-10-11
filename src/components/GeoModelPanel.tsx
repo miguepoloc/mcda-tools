@@ -29,6 +29,9 @@ type Props = {
   editHex: Record<number, string>;
   onCut: (mode: Exclude<CutMode, 'manual'>) => void;
   canCut: boolean;
+  /** Vista actual del mapa y si el proyecto está publicado (el editor de clases los usa para sus avisos). */
+  viewStyle: 'continuous' | 'classes';
+  published: boolean;
   exploring: boolean;
   exploreWeights: number[] | null;
   onExplore: (on: boolean, w?: number[] | null) => void;
@@ -313,7 +316,7 @@ export default function GeoModelPanel(p: Props) {
         {p.criteria.length === 0 && <p className="gv-hint">Define primero los criterios en la pestaña «Proyecto».</p>}
       </section>
 
-      <GeoClassesEditor setup={p.setup} onSetup={p.onSetup} hex={p.editHex} onCut={p.onCut} canCut={p.canCut} />
+      <GeoClassesEditor setup={p.setup} onSetup={p.onSetup} hex={p.editHex} onCut={p.onCut} canCut={p.canCut} viewStyle={p.viewStyle} published={p.published} />
 
       <section className="gv-sec">
         <header><h4>{p.setup.direction === 'risk' ? 'Zonas contiguas' : 'Parcelas contiguas'}</h4></header>

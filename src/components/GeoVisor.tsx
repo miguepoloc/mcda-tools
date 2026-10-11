@@ -798,7 +798,7 @@ export default function GeoVisor(props: Props) {
           {tab === 'modelo' && (
             <GeoModelPanel isPack={!!geo.packId} onUploadFor={(id) => { setFocusId(null); setUploadFor(id); setTab('capas'); }} focusId={focusId} criteria={criteria} weights={weightResult.agg.w} cr={weightResult.agg.cr} nExperts={expertIds.length} layers={data?.info ?? {}} rules={geo.rules}
               onRule={(id, rule) => commit((c) => { const r = { ...c.rules }; if (rule) r[id] = rule; else delete r[id]; return { ...c, rules: r }; })}
-              setup={setup} onSetup={onSetup} editHex={editHex} onCut={recut} canCut={!!ix}
+              setup={setup} onSetup={onSetup} editHex={editHex} onCut={recut} canCut={!!ix} viewStyle={style} published={!!props.share?.isPublic}
               exploring={exploring} exploreWeights={exploreWeights} onExplore={(on, w) => { setExploring(on); setExploreWeights(w ?? null); }}
               minPatchHa={minPatchHa} onMinPatch={(ha) => { setMinPatchHa(ha); commit((g) => ({ ...g, minPatchHa: ha })); }}
               parcels={parcelRes?.parcels ?? null}
