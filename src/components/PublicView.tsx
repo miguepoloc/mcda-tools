@@ -8,6 +8,8 @@ import Topbar from './Topbar';
 import dynamic from 'next/dynamic';
 import type { PublicGeo } from './PublicGeoView';
 import PublicAhp from './PublicAhp';
+import { MethodChip } from './MethodBadge';
+import './share.css';
 import { CRIT_SHEET, indexJudgments, sheetResult } from '@/lib/ahp';
 import { ahpSummary, type AhpSummary } from '@/lib/geo/ahpSummary';
 
@@ -82,7 +84,8 @@ export default function PublicView({ token, loggedIn, userEmail }: { token: stri
       </Topbar>
       <div className="panel">
         <header>
-          <div className="eyebrow">Resultados {(data.project.method ?? 'ahp').toUpperCase()}</div>
+          <div className="eyebrow">Resultados</div>
+          <div style={{ margin: '6px 0' }}><MethodChip method={data.project.method ?? 'ahp'} /></div>
           <h1 style={{ fontSize: 30 }}>{data.project.title}</h1>
           {data.project.objective && <p className="muted" style={{ maxWidth: '70ch' }}><b>Objetivo:</b> {data.project.objective}</p>}
         </header>

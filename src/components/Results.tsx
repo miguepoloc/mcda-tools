@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import ElectreGraph from './ElectreGraph';
 import ElectreMatrices from './ElectreMatrices';
 import { withUnit } from '@/lib/units';
@@ -78,6 +78,8 @@ type Props = {
   onGoProject?: () => void;
   /** Parte A (priorización de criterios) guardada. Solo el dueño la tiene: `public_get` no la expone, así que en la vista pública falta. */
   prio?: PrioState;
+  /** Solo dueño: acceso extra en la parte alta (p. ej. el botón «Compartir este resultado»). */
+  headerExtra?: ReactNode;
 };
 
 const METHOD_LABEL: Record<Method, string> = {
@@ -178,7 +180,7 @@ function Table({ names, M, f }: { names: string[]; M: number[][]; f: (x: number)
   );
 }
 
-export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onGoExperts, onGoProject, prio }: Props) {
+export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onGoExperts, onGoProject, prio, headerExtra }: Props) {
   const [showReportModal, setShowReportModal] = useState(false);
   const idx = useMemo(() => indexJudgments(judgments), [judgments]);
   // Con CRITIC/Entropía los pesos salen de la matriz de decisión: los juicios guardados de una fase anterior (AHP) NO cuentan para nada
@@ -543,29 +545,32 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 2 }}>
         {mode === 'single' ? (
           <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>Síntesis y Ranking de Resultados</h2>
+            <h2 style={{ margin: 0, fontSize: 20 }}>Resultados · {METHOD_LABEL[method]}</h2>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: 13 }}>
-              Ponderación por {WEIGHTING_SHORT[weighting]} · Algoritmo de ranking {METHOD_LABEL[method]} · <a href="#desglose">Ir al desglose de cálculo paso a paso ↓</a>
+              Síntesis y ranking · Ponderación por {WEIGHTING_SHORT[weighting]} · <a href="#desglose">Ir al desglose de cálculo paso a paso ↓</a>
             </p>
           </div>
         ) : (
           <div>
-            <h2 style={{ margin: 0, fontSize: 20 }}>Comparativa de los {compareViews.length + 1} métodos</h2>
+            <h2 style={{ margin: 0, fontSize: 20 }}>Comparativa · {compareViews.length + 1} métodos</h2>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: 13 }}>
-              Mismos datos y los mismos pesos de criterio ({weighting === 'ahp' ? 'AHP, de los juicios de los expertos' : `${WEIGHTING_SHORT[weighting]}, calculados de la matriz de decisión`}) — el ranking de cada algoritmo, lado a lado.
+              Tu proyecto usa {METHOD_LABEL[method]}. Mismos datos y los mismos pesos de criterio ({weighting === 'ahp' ? 'AHP, de los juicios de los expertos' : `${WEIGHTING_SHORT[weighting]}, calculados de la matriz de decisión`}) — el ranking de cada algoritmo, lado a lado.
             </p>
           </div>
         )}
-        {mode === 'single' && (
-          <button
-            type="button"
-            className="btn sm primary"
-            onClick={() => setShowReportModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
-          >
-            📄 Generar Informe Ejecutivo (PDF)
-          </button>
-        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {headerExtra}
+          {mode === 'single' && (
+            <button
+              type="button"
+              className="btn sm primary"
+              onClick={() => setShowReportModal(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            >
+              📄 Generar Informe Ejecutivo (PDF)
+            </button>
+          )}
+        </div>
       </div>
 
       {objective && method !== 'ahp' && (weighting === 'critic' || weighting === 'entropy') && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { hexToken, uid, type Alternative, type Criterion, type ExpertRow, type GeoConfig, type JudgmentRow, type Method, type WeightingMethod, type ProjectRow } from '@/lib/types';
 import { indexJudgments, type JMap } from '@/lib/ahp';
@@ -25,6 +25,8 @@ import { seedExampleExpert } from '@/lib/geo/exampleExpert';
 import Results, { accentStyleFor } from './Results';
 import ScientificMethodModal, { type MethodKey } from './ScientificMethodModal';
 import QrModal from './QrModal';
+import { MethodBadgeMenu } from './MethodBadge';
+import './share.css';
 
 type Props = { initialProject: ProjectRow; initialExperts: ExpertRow[]; initialJudgments: JudgmentRow[] };
 type Patch = Partial<Pick<ProjectRow, 'title' | 'objective' | 'method' | 'weighting_method' | 'criteria' | 'alternatives' | 'decision_matrix' | 'prioritization' | 'is_public' | 'public_token' | 'open_token' | 'open_enabled' | 'geo'>>;
@@ -318,6 +320,11 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
       await downloadPrioExcel(studyExport(), `${fileBase()}_priorizacion.xlsx`);
     } catch (e) { setMsg('No se pudo generar el Excel de priorización: ' + (e instanceof Error ? e.message : '')); }
   }
+  /** Atajo de la insignia: el método se cambia en la pestaña Proyecto (tarjetas de método, sin confirmación: no borra la matriz). */
+  const goChangeMethod = () => {
+    goTab('Proyecto');
+    setTimeout(() => document.getElementById('metodo-mcda')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+  };
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setMsg('Enlace copiado'); } catch { setMsg('Copia el enlace manualmente'); } };
 
   const editingExpert = experts.find((e) => e.id === editing);
@@ -330,6 +337,11 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
         <div>
           <div className="eyebrow">Proyecto en edición</div>
           <h1 style={{ fontSize: 28, letterSpacing: '-0.01em' }}>{project.title}</h1>
+          <div style={{ marginTop: 8 }}>
+            {project.kind === 'spatial'
+              ? <span className="sh-chip" style={{ '--sh-color': 'var(--geo-accent)' } as CSSProperties}><span className="sh-dot" aria-hidden="true" /><span>Tipo: Mapa de aptitud</span><span className="sh-fam">· AHP + SIG</span></span>
+              : <MethodBadgeMenu method={project.method} onChangeMethod={goChangeMethod} />}
+          </div>
         </div>
         <div className="acts">
           <span className="savest" aria-live="polite" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -382,7 +394,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
               </a>
             </div>
 
-            <div className="methods-cards-grid" role="group" aria-label="Método de decisión multicriterio">
+            <div id="metodo-mcda" className="methods-cards-grid" role="group" aria-label="Método de decisión multicriterio">
               {METHOD_OPTIONS.map((m) => {
                 const isSelected = project.method === m.key;
                 return (

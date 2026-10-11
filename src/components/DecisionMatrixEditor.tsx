@@ -1,10 +1,11 @@
 'use client';
 
+import { MethodChip } from './MethodBadge';
 import WeightBars from './WeightBars';
 import { useState, type ClipboardEvent } from 'react';
 import { missingUnits, withUnit } from '@/lib/units';
 import ReorderList from './ReorderList';
-import type { Alternative, Criterion, DecisionMatrix, MatrixKind, TargetSpec } from '@/lib/types';
+import type { Alternative, Criterion, DecisionMatrix, MatrixKind, Method, TargetSpec } from '@/lib/types';
 import { getCell, getKind, getTarget, targetDistance } from '@/lib/topsis';
 import { LINGUISTIC_LABELS, type LinguisticLabel } from '@/lib/fuzzy_topsis';
 import { isBlockPaste, parsePastedBlock, type PasteResult } from '@/lib/paste-matrix';
@@ -99,7 +100,10 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
   return (
     <div className="panel">
       <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
-        <div className="eyebrow">Lo que estás decidiendo</div>
+        <div className="acts" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="eyebrow">Lo que estás decidiendo</div>
+          {method && <MethodChip method={method as Method} />}
+        </div>
         {objective?.trim()
           ? <p style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 600, maxWidth: '110ch' }}>{objective}</p>
           : (
