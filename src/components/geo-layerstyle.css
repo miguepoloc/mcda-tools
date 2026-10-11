@@ -1,0 +1,14 @@
+/* Editor de estilo por capa (G3). Solo variables del tema: sirve en claro y en oscuro. */
+.gv-lstyle{display:grid;gap:10px;padding:10px;margin:2px 0 6px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.gv-lstyle .gv-field{display:grid;gap:4px;font-size:12px}
+.gv-lstyle .gv-field>span{color:var(--muted);font-weight:600}
+.gv-lstyle select{width:100%}
+.gv-lstyle input[type=range]{width:100%;accent-color:var(--accent)}
+.gv-lstyle input[type=color]{width:44px;height:32px;padding:2px;border:1px solid var(--line);border-radius:6px;background:transparent;cursor:pointer}
+.gv-lstyle-pair{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.gv-lstyle-color{width:auto}
+.gv-lstyle-ramp{height:12px;border-radius:6px;border:1px solid var(--line)}
+.gv-lstyle-prev{display:flex;align-items:center;height:34px}
+.gv-lstyle-prev i{display:block;width:100%;height:26px;border-radius:6px}
+.gv-lstyle .gv-check{display:flex;gap:6px;align-items:center;font-size:12.5px}
+@media (pointer:coarse){.gv-lstyle input[type=color]{width:56px;height:44px}}

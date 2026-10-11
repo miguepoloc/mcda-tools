@@ -5,14 +5,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-export type TourStep = { sel: string; tab?: 'capas' | 'modelo' | 'exportar'; title: string; text: string };
+export type TourTab = 'capas' | 'modelo' | 'puntos' | 'zonas' | 'exportar';
+export type TourStep = { sel: string; tab?: TourTab; title: string; text: string };
 
 const KEY = 'mcda-gv-tour-v1';
 
 export function tourSeen(): boolean { try { return localStorage.getItem(KEY) === '1'; } catch { return true; } }
 function markSeen() { try { localStorage.setItem(KEY, '1'); } catch { /* sin storage */ } }
 
-type Props = { steps: TourStep[]; open: boolean; onClose: () => void; onTab: (t: 'capas' | 'modelo' | 'exportar') => void };
+type Props = { steps: TourStep[]; open: boolean; onClose: () => void; onTab: (t: TourTab) => void };
 
 export default function GeoTour({ steps, open, onClose, onTab }: Props) {
   const [i, setI] = useState(0);

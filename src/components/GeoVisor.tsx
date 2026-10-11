@@ -15,6 +15,7 @@ import { buildMask, fromPack, mergeExtraLayers, type GeoData, type LayerInfo } f
 import { buildOverlayMap, gather, type OverlayMap } from '@/lib/geo/overlay';
 import { loadPack } from '@/lib/geo/pack';
 import { PALETTES, classHexOf, paintCriterion, paintDiff, paintFlag, paintParcels, paintRaw, modelRampColor, modelRampCss, modelRampHex, paintResult, type PaletteKey } from '@/lib/geo/paint';
+import { mergeVis, patchStyle, resetLook, styleRampCss, styleRgb, styleStops, vectorLook, visFromStyles } from '@/lib/geo/layerStyle';
 import { DIR_TEXT, applySetup, classLabel, classRange, classSigValue, publishClassSig, resolveModel, setupFromGeo, type ClassSetup, type CutMode } from '@/lib/geo/classes';
 import { normalizeBreaks } from '@/lib/geo/classes';
 import { histogram, jenksBreaks, quantileBreaks } from '@/lib/geo/cuts';
@@ -90,6 +91,7 @@ const TOUR: TourStep[] = [
   { sel: '.gv-side-body', tab: 'modelo', title: 'Pesos y reglas', text: 'Aquí ves los pesos del panel y, por cada criterio, eliges la capa y la regla que la traduce a idoneidad (0 a 1), con vista previa. El mapa cambia en vivo.' },
   { sel: '.gv-leaflet', title: 'El mapa', text: 'Muévete y acerca como en cualquier mapa. Haz clic en un punto para ver su % de idoneidad, su clase y cuánto aporta cada criterio.' },
   { sel: '.gv-hud-tr', title: 'Mapa base y estilo', text: 'Cambia el mapa base (satélite, calles, relieve, océano) y muestra el resultado continuo o por clases.' },
+  { sel: '.gv-side-body', tab: 'puntos', title: 'Puntos con ranking', text: 'En «Puntos» agregas ubicaciones candidatas (haciendo clic en el mapa, con coordenadas o importando un archivo) y el geovisor las ordena por idoneidad o riesgo, con su ficha por criterio. Puedes mostrar sus nombres sobre el mapa.' },
   { sel: '.gv-side-body', tab: 'exportar', title: 'Exportar', text: 'Solo descargas, en grupos: para tu informe (lámina PNG/PDF, informe ejecutivo, Excel), para QGIS o Google Earth (GeoTIFF + .qml, KMZ), más formatos y un .zip con todo. Para publicar con enlace y QR usa la pestaña «Compartir» del proyecto.' },
 ];
 type Deps = unknown[];
@@ -117,7 +119,8 @@ export default function GeoVisor(props: Props) {
   const [style, setStyle] = useState<'continuous' | 'classes'>('continuous');
   const [palette, setPalette] = usePalette();
   const [layerErrs, setLayerErrs] = useState<string[]>([]);
-  const [vis, setVis] = useState<VisState>({});
+  // Visibilidad y opacidad por capa: arrancan de lo guardado en `geo.styles` y se guardan de vuelta (G3).
+  const [vis, setVis] = useState<VisState>(() => visFromStyles(geo.styles));
   const [vecs, setVecs] = useState<VecItem[]>([]);
   const [selected, setSelected] = useState<{ col: number; row: number } | null>(null);
   // Puntos con ranking: modo «Agregar punto» (explícito), punto resaltado (tabla <-> mapa) y aviso del último intento.
@@ -176,6 +179,21 @@ export default function GeoVisor(props: Props) {
     geoRef.current = next;
     props.onChangeGeo(next, true);
   }, [props]);
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  // Estilo por capa (G3): un campo a la vez; `undefined` lo quita y, si no queda nada, `geo.styles` desaparece.
+  const setLayerStyle = useCallback((id: string, patch: Partial<Record<string, unknown>>) => commitRef.current((g) => {
+    const n = patchStyle(g.styles, id, patch);
+    const o = { ...g };
+    if (n) o.styles = n; else delete o.styles;
+    return o;
+  }), []);
+  const resetLayerStyle = useCallback((id: string) => commitRef.current((g) => {
+    const n = resetLook(g.styles, id);
+    const o = { ...g };
+    if (n) o.styles = n; else delete o.styles;
+    return o;
+  }), []);
   // Editar las clases cambia el mapa solo en la vista «por clases»: si el usuario estaba en «Continuo» (rampa sin
   // cortes) no vería ningún efecto. Se pasa a la vista por clases al editar, para que el cambio se vea.
   const onSetup = useCallback((s: ClassSetup) => { setSetup(s); setStyle('classes'); commit((g) => applySetup(g, s)); }, [commit]);
@@ -442,6 +460,21 @@ export default function GeoVisor(props: Props) {
   const virtualIds = [...(parcelRes ? ['parcels'] : []), ...(baseline ? ['diff'] : [])];
   const defaultOn = (id: string) => id === 'result' || id === 'parcels' || id === 'diff';
   const layerIds = data ? Object.keys(data.info).map((k) => `l:${k}`) : [];
+  // Guarda visibilidad y opacidad en `geo.styles` (con debounce; solo de capas que existen y que el usuario tocó).
+  const liveIds = [...layerIds, ...vecs.map((v) => `v:${v.id}`), 'result'].join('|');
+  useEffect(() => {
+    const live = new Set(liveIds.split('|'));
+    const mine = Object.fromEntries(Object.entries(vis).filter(([id]) => live.has(id)));
+    if (mergeVis(geoRef.current.styles, mine) === geoRef.current.styles) return;
+    const t = setTimeout(() => commitRef.current((g) => {
+      const n = mergeVis(g.styles, mine);
+      if (n === g.styles) return g;
+      const o = { ...g };
+      if (n) o.styles = n; else delete o.styles;
+      return o;
+    }), 600);
+    return () => clearTimeout(t);
+  }, [vis, liveIds]);
   const onIds = ['result', ...virtualIds, ...layerIds].filter((id) => (vis[id]?.on ?? defaultOn(id)));
   const onKey = onIds.join('|');
   useEffect(() => {
@@ -456,10 +489,12 @@ export default function GeoVisor(props: Props) {
         else {
           const k = id.slice(2), info = data.info[k];
           const rule = Object.values(geo.rules).find((r) => r.layerKey === k);
-          deps = [data, om, rule?.fn, palette, rm.direction];
-          paint = () => (info.role === 'exclusion' ? paintFlag(data.layers[k], [127, 140, 141])
-            : info.role === 'area' ? paintFlag(data.layers[k], [132, 204, 22])
-              : rule ? paintCriterion(data.layers[k], data.mask, rule.fn, palette, rm.direction) : paintRaw(data.layers[k], info.min, info.max));
+          const st = geo.styles?.[id];
+          const stops = styleStops(st);
+          deps = [data, om, rule?.fn, palette, rm.direction, `${st?.ramp ?? ''}|${st?.rev ?? ''}|${st?.color ?? ''}`];
+          paint = () => (info.role === 'exclusion' ? paintFlag(data.layers[k], styleRgb(st, [127, 140, 141]))
+            : info.role === 'area' ? paintFlag(data.layers[k], styleRgb(st, [132, 204, 22]))
+              : rule ? paintCriterion(data.layers[k], data.mask, rule.fn, palette, rm.direction, stops) : paintRaw(data.layers[k], info.min, info.max, stops));
         }
         const hit = paintCache.current.get(id);
         if (hit && sameDeps(hit.deps, deps)) { next[id] = hit.url; continue; }
@@ -470,7 +505,7 @@ export default function GeoVisor(props: Props) {
       setImgs(next);
     }, 80);
     return () => clearTimeout(t);
-  }, [data, om, ev, style, onKey, geo.rules, parcelRes, baseline, palette, rm]);
+  }, [data, om, ev, style, onKey, geo.rules, geo.styles, parcelRes, baseline, palette, rm]);
 
   const rasters = useMemo<RasterOverlay[]>(() => {
     if (!om) return [];
@@ -497,10 +532,16 @@ export default function GeoVisor(props: Props) {
 
   const vectors = useMemo<VectorOverlay[]>(() => vecs.map((v) => {
     const meta = v.ref ? geo.layers?.[v.id]?.ref : undefined;
-    if (!v.ref) return { id: v.id, fc: v.fc, color: v.color, visible: vis[`v:${v.id}`]?.on ?? false };
+    const st = geo.styles?.[`v:${v.id}`];
+    if (!v.ref) {
+      const lk = vectorLook(st, { color: v.color });
+      return { id: v.id, fc: v.fc, color: lk.stroke, fillColor: lk.fill, weight: lk.weight, fillOpacity: lk.fillOpacity, visible: vis[`v:${v.id}`]?.on ?? false };
+    }
     const nf = meta?.labels ? meta.nameField : undefined;
+    const lk = vectorLook(st, { color: meta?.color ?? v.color, weight: meta?.weight ?? 2, fillOpacity: 0 });
     const base: VectorOverlay = {
-      id: v.id, fc: v.fc, color: meta?.color ?? v.color, visible: vis[`v:${v.id}`]?.on ?? true, weight: meta?.weight ?? 2, fillOpacity: 0,
+      id: v.id, fc: v.fc, color: lk.stroke, fillColor: lk.fill, visible: vis[`v:${v.id}`]?.on ?? true, weight: lk.weight, fillOpacity: lk.fillOpacity,
+      ...(st?.fillOp !== undefined ? { fillOpacityFilled: st.fillOp } : {}),
       ...(nf ? { labels: v.fc.features.map((f) => { const t = f.properties?.[nf]; return t === undefined || t === null || t === '' ? null : String(t); }) } : {}),
     };
     // Coroplético: la capa de zonas elegida se rellena con el color del índice medio de cada zona (gris = sin área evaluada).
@@ -509,7 +550,7 @@ export default function GeoVisor(props: Props) {
       base.labels = zoneStats.map((z) => `${z.name} · ${z.meanPct === null ? 'sin área evaluada' : Math.round(z.meanPct)}`);
     }
     return base;
-  }), [vecs, vis, geo.layers, choro, zoneStats, zoneVec, palette, rm.direction]);
+  }), [vecs, vis, geo.layers, geo.styles, choro, zoneStats, zoneVec, palette, rm.direction]);
 
   // ------------------------------------------------------------------ punto consultado
   const point = useMemo(() => (selected && data && ev ? pointView(evaluateOnePoint(data, rules, { breaks: rm.breaks, direction: rm.direction }, selected), rm) : null), [selected, data, ev, rules, rm]);
@@ -624,7 +665,24 @@ export default function GeoVisor(props: Props) {
       for (let k = 0; k <= 10; k++) { const [r, g, b] = modelRampColor(k / 10, rm, palette); grad.addColorStop(k / 10, `rgb(${r},${g},${b})`); }
       ctx.fillStyle = grad; ctx.fillRect(gx, gy, gw, 10 * f);
       ctx.fillStyle = '#E2E8F0'; ctx.font = `500 ${10 * f}px system-ui, sans-serif`;
-      ctx.fillText('0', gx, gy + 22 * f); ctx.fillText('50', gx + gw / 2 - 6 * f, gy + 22 * f); ctx.fillText(`100 (${T.noun})`, gx + gw - 74 * f, gy + 22 * f);
+      // Marcas en los cortes REALES del modelo de clases (no un «50» fijo): 0, cada corte y 100 («100 (idoneidad|riesgo)» al final).
+      // Se omite la marca que quedaría pegada a la anterior o a los extremos para que no se encimen.
+      const endText = `100 (${T.noun})`;
+      const endW = ctx.measureText(endText).width;
+      ctx.textAlign = 'left'; ctx.fillText('0', gx, gy + 22 * f);
+      ctx.textAlign = 'right'; ctx.fillText(endText, gx + gw, gy + 22 * f);
+      ctx.textAlign = 'center';
+      let lastX = gx + 12 * f;
+      for (const br of rm.breaks) {
+        const x = gx + gw * br;
+        const txt = String(Math.round(br * 100));
+        const half = ctx.measureText(txt).width / 2;
+        if (x - half < lastX + 4 * f || x + half > gx + gw - endW - 4 * f) continue;
+        ctx.fillRect(x - 0.5 * f, gy + 10 * f, f, 4 * f);
+        ctx.fillText(txt, x, gy + 22 * f);
+        lastX = x + half;
+      }
+      ctx.textAlign = 'start';
     }
     rows.forEach(([c, txt], i) => {
       const y0 = H - lh - 4 * f + (rampH + i * 20) * f;
@@ -667,7 +725,11 @@ export default function GeoVisor(props: Props) {
       bounds: om.bounds,
       result: o.result ? toCanvas(om, paintResult(ev.pct, ev.cls, data.mask, o.style, palette, rm)) : null,
       basemap: { url: bm.url, attr: bm.attr, maxZoom: bm.maxZoom, subdomains: bm.subdomains },
-      references: refVecs.map((v) => ({ id: v.id, name: geo.layers?.[v.id]?.label ?? v.name, fc: v.fc, color: geo.layers?.[v.id]?.ref?.color ?? v.color, weight: geo.layers?.[v.id]?.ref?.weight ?? 2 })),
+      references: refVecs.map((v) => {
+        // Mismo estilo que en pantalla (G3): color y grosor de la referencia, con el borde elegido si lo hay.
+        const lk = vectorLook(geo.styles?.[`v:${v.id}`], { color: geo.layers?.[v.id]?.ref?.color ?? v.color, weight: geo.layers?.[v.id]?.ref?.weight ?? 2, fillOpacity: 0 });
+        return { id: v.id, name: geo.layers?.[v.id]?.label ?? v.name, fc: v.fc, color: lk.stroke, weight: lk.weight };
+      }),
       zones: zoneVec && zoneStats ? {
         name: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, fc: zoneVec.fc,
         fills: zoneStats.map((z) => (z.meanPct === null ? '#9CA3AF' : `rgb(${modelRampColor(z.meanPct / 100, rm, palette).join(',')})`)),
@@ -806,11 +868,13 @@ export default function GeoVisor(props: Props) {
     if (!top) return null;
     const k = top.slice(2), info = data.info[k];
     if (!info) return null;
-    if (info.role === 'exclusion') return { kind: 'flag', label: info.label, color: '#7F8C8D', what: 'Zona de exclusión: no entra al cálculo' };
-    if (info.role === 'area') return { kind: 'flag', label: info.label, color: '#84CC16', what: 'Área de estudio: solo aquí se calcula' };
-    if (Object.values(geo.rules).some((r) => r.layerKey === k)) return { kind: 'criterion', label: `Idoneidad parcial · ${info.label}` };
-    return { kind: 'raw', label: info.label, unit: info.unit, min: info.min, max: info.max };
-  }, [data, onKey, baseline, minPatchHa, geo.rules]); // eslint-disable-line react-hooks/exhaustive-deps
+    const st = geo.styles?.[top];
+    const custom = styleStops(st) ? styleRampCss(st, '') : undefined;
+    if (info.role === 'exclusion') return { kind: 'flag', label: info.label, color: st?.color ?? '#7F8C8D', what: 'Zona de exclusión: no entra al cálculo' };
+    if (info.role === 'area') return { kind: 'flag', label: info.label, color: st?.color ?? '#84CC16', what: 'Área de estudio: solo aquí se calcula' };
+    if (Object.values(geo.rules).some((r) => r.layerKey === k)) return { kind: 'criterion', label: `Idoneidad parcial · ${info.label}`, ...(custom ? { rampCss: custom } : {}) };
+    return { kind: 'raw', label: info.label, unit: info.unit, min: info.min, max: info.max, ...(custom ? { rampCss: custom } : {}) };
+  }, [data, onKey, baseline, minPatchHa, geo.rules, geo.styles]); // eslint-disable-line react-hooks/exhaustive-deps
   const resultOn = onIds.includes('result');
 
   // Cortes calculados sobre la distribución del índice. Se CONGELAN en `breaks` (no se recalculan solos al cambiar
@@ -865,6 +929,7 @@ export default function GeoVisor(props: Props) {
             <GeoLayersPanel geo={geo} data={data} criteria={criteria} commit={commit} cache={cache} sb={supabase} ownerId={props.ownerId} projectId={props.projectId}
               vecs={vecs} setVecs={setVecs} vis={vis} setVis={setVis} fit={(b) => mapRef.current?.fit(b)} getView={() => mapRef.current?.getBounds() ?? null} palette={palette} direction={rm.direction} draft={draft} setDraft={setDraft} drawing={drawing} setDrawing={setDrawing}
               quota={quota} onQuotaChange={refreshQuota} evaluableHa={stats?.evaluableHa ?? null}
+              styles={geo.styles} onStyle={setLayerStyle} onResetStyle={resetLayerStyle} resultCss={modelRampCss(rm, palette)}
               uploadFor={uploadFor} onCancelUpload={() => setUploadFor(null)} onLayerAdded={(id) => { setUploadFor(null); setFocusId(id); setTab('modelo'); }}
               virtual={[...(parcelRes ? [{ id: 'parcels', label: `Parcelas ≥ ${minPatchHa} ha`, role: `${parcelRes.parcels.length} parcelas`, swatch: '#6D28D9' }] : []), ...(baseline ? [{ id: 'diff', label: `Diferencia con el escenario ${baseline.label}`, role: palette === 'semaforo' ? 'rojo empeora · verde mejora' : 'naranja empeora · azul mejora', swatch: `linear-gradient(90deg, rgb(${PALETTES[palette].diffNeg.join(',')}), #eee, rgb(${PALETTES[palette].diffPos.join(',')}))` }] : [])]} />
           )}

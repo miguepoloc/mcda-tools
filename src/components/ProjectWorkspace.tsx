@@ -538,7 +538,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
                     {examples.map((ex) => (
                       <div className="gv-ex-row" key={ex.id}>
                         <div><b>{ex.label}</b>{ex.source === 'catalog' && <em className="gv-tag">del curso</em>}<p>{ex.blurb}</p></div>
-                        <button type="button" className={'btn sm' + (pendDel === 'ex' + ex.id ? ' danger' : '')} onClick={() => twoClick('ex' + ex.id, () => applyExample(ex.id))}>{pendDel === 'ex' + ex.id ? '¿Seguro? Reemplaza tus criterios' : 'Cargar ejemplo'}</button>
+                        <button type="button" className={'btn sm' + (pendDel === 'ex' + ex.id ? ' danger' : '')} onClick={() => twoClick('ex' + ex.id, () => applyExample(ex.id))}>{pendDel === 'ex' + ex.id ? '¿Seguro? Reemplaza criterios, mapa y escenarios guardados' : 'Cargar ejemplo'}</button>
                       </div>
                     ))}
                   </div>

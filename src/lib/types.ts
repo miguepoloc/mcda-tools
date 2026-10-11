@@ -118,6 +118,15 @@ export type GeoScenario = {
   };
 };
 
+/** Estilo de una capa del geovisor (G3), en `geo.styles[<id de capa>]`; todo opcional. `id`: `result`, `l:<clave>` o `v:<clave>`.
+ * `on`/`op` = visibilidad y opacidad; `ramp`/`rev` = rampa de color de capas ráster de entrada; `color` = color plano
+ * (exclusión/área) o relleno (vector); `border`/`weight` = contorno; `fillOp` = opacidad del relleno de un vector. */
+export type GeoLayerStyle = {
+  on?: boolean; op?: number;
+  ramp?: 'viridis' | 'azules' | 'grises' | 'calida'; rev?: boolean;
+  color?: string; border?: string; weight?: number; fillOp?: number;
+};
+
 export type GeoConfig = {
   packId?: string;
   grid?: GeoGrid;
@@ -146,6 +155,8 @@ export type GeoConfig = {
   publicZones?: boolean;
   /** Escenarios con nombre guardados (máx. 5, ver `lib/geo/scenarios.ts`). Solo del propietario: no se publican. */
   scenarios?: GeoScenario[];
+  /** Estilo por capa (color, rampa, opacidad, grosor, borde, visibilidad). Ausente = el de siempre. Ver `lib/geo/layerStyle.ts`. */
+  styles?: Record<string, GeoLayerStyle>;
 };
 
 export type ProjectRow = {
