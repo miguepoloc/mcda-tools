@@ -1,0 +1,30 @@
+/* Regla del Geovisor (G11). Colores solo con las variables del tema (claro/oscuro). */
+.gm-root{position:absolute;z-index:1000;left:10px;top:84px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:min(320px,calc(100% - 20px));max-height:calc(100% - 130px);pointer-events:none}
+.gm-root>*{pointer-events:auto}
+.gm-panel{display:flex;flex-direction:column;gap:8px;width:100%;overflow:auto;background:color-mix(in srgb,var(--surface) 96%,transparent);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+.gm-hint,.gm-note{margin:0;color:var(--muted);font-size:11.5px;line-height:1.4}
+.gm-result{font-weight:600;line-height:1.4;border-left:3px solid var(--accent);padding:2px 0 2px 8px}
+.gm-cursor{margin:0;font-size:11.5px;color:var(--muted)}
+.gm-actions{display:flex;flex-wrap:wrap;gap:6px}
+.gm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.gm-list li{display:grid;grid-template-columns:22px 1fr auto 26px;gap:6px;align-items:center;padding:3px 6px;border-bottom:1px solid var(--line);font-size:11.5px}
+.gm-list li:last-child{border-bottom:0}
+.gm-list .gm-closing{grid-template-columns:22px 1fr auto;color:var(--muted)}
+.gm-n{font-weight:700;text-align:center}
+.gm-d{color:var(--muted);white-space:nowrap}
+.gm-x{appearance:none;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:6px;font:700 15px/1 var(--f-body);width:26px;height:26px;cursor:pointer}
+.gm-x:hover,.gm-x:focus-visible{border-color:var(--line);color:var(--ink)}
+.gm-coords{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
+.gm-coords label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+.gm-coords input{width:100%;min-width:0}
+.gm-coords .btn{grid-column:1 / -1}
+.gm-err{margin:0;color:var(--ink);font-size:11.5px;border-left:3px solid currentColor;padding-left:8px}
+.gm-btn:focus-visible,.gm-x:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:640px){
+  .gm-root{top:78px}
+  .gm-actions .btn,.gm-coords .btn{min-height:44px}
+  .gm-x{width:44px;height:44px}
+  .gm-list li{grid-template-columns:22px 1fr auto 44px}
+}
+@media (prefers-reduced-motion:no-preference){.gm-panel{animation:gm-in .12s ease-out}}
+@keyframes gm-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
