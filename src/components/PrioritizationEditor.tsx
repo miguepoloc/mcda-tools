@@ -43,9 +43,10 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
   return (
     <div className="partA panel">
       <div className="tabsbar" role="tablist" aria-label="Etapas de la priorización" onKeyDown={tablistKeys}>
-        {TABS.map((t, i) => <button key={t} type="button" role="tab" aria-selected={tab === i} tabIndex={tab === i ? 0 : -1} onClick={() => setTab(i)}>{i + 1}. {t}</button>)}
+        {TABS.map((t, i) => <button key={t} type="button" role="tab" id={`pe-tab-${i}`} aria-controls={tab === i ? 'pe-panel' : undefined} aria-selected={tab === i} tabIndex={tab === i ? 0 : -1} onClick={() => setTab(i)}>{i + 1}. {t}</button>)}
       </div>
 
+      <div className="panel" role="tabpanel" id="pe-panel" aria-labelledby={`pe-tab-${tab}`}>
       {tab === 0 && (
         <>
           <p className="muted">Anota todo lo que podría importar al elegir, sin filtrar todavía. La guía del curso sugiere entre 5 y 15 candidatos.</p>
@@ -187,7 +188,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
                     const m = mean(A, c);
                     return (
                       <tr key={c.id}>
-                        <td>{c.name}</td>
+                        <th scope="row">{c.name}</th>
                         {cs.map((x) => (
                           <td key={x.key} className="n">
                             <input type="number" min={1} max={5} step={0.1} inputMode="decimal" aria-label={`${c.name}, ${x.label}`}
@@ -266,13 +267,13 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
               <thead><tr><th scope="col">Criterio</th><th scope="col">Etapa de descarte</th><th scope="col">Razón</th></tr></thead>
               <tbody>
                 {A.cands.filter((c) => c.stage !== 'keep').map((c) => (
-                  <tr key={c.id}><td>{c.name}</td><td>{c.at === 'ind' ? 'Independencia' : 'Tamizaje'}{c.stage === 'merge' && cand(c.target) ? ` (fusionado con ${cand(c.target)!.name})` : ''}</td><td>{c.reason || <span className="muted">Sin razón</span>}</td></tr>
+                  <tr key={c.id}><th scope="row">{c.name}</th><td>{c.at === 'ind' ? 'Independencia' : 'Tamizaje'}{c.stage === 'merge' && cand(c.target) ? ` (fusionado con ${cand(c.target)!.name})` : ''}</td><td>{c.reason || <span className="muted">Sin razón</span>}</td></tr>
                 ))}
                 {no.map((c, i) => {
                   const m = mean(A, c);
                   return (
                     <tr key={c.id}>
-                      <td>{c.name}{i === 0 && m != null && last && (mean(A, last) ?? 0) - m <= 0.5 && <> <span className="tag">en el límite</span></>}</td>
+                      <th scope="row">{c.name}{i === 0 && m != null && last && (mean(A, last) ?? 0) - m <= 0.5 && <> <span className="tag">en el límite</span></>}</th>
                       <td>Panel de importancia ({m == null ? 'sin calificar' : f2(m)})</td>
                       <td><input type="text" value={c.cutReason} placeholder="Razón del descarte" aria-label={`Razón para ${c.name}`} onChange={(e) => setC(c.id, { cutReason: e.target.value })} /></td>
                     </tr>
@@ -294,6 +295,7 @@ export default function PrioritizationEditor({ state: A, criteriaCount, onChange
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

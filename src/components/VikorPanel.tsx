@@ -92,12 +92,12 @@ export default function VikorPanel({ criteria, alternatives, dm, weights, synth,
             <table aria-label="Condiciones de aceptación de VIKOR">
               <tbody>
                 <tr>
-                  <td><b>Condición 1, ventaja aceptable</b><br /><span className="muted" style={{ fontSize: 12.5 }}>Q(2º) − Q(1º) ≥ DQ = 1/(m − 1), con m = {verdict.m} alternativas</span></td>
+                  <th scope="row"><b>Condición 1, ventaja aceptable</b><br /><span className="muted" style={{ fontSize: 12.5 }}>Q(2º) − Q(1º) ≥ DQ = 1/(m − 1), con m = {verdict.m} alternativas</span></th>
                   <td className="n mono">{verdict.deltaQ.toFixed(3)} {verdict.c1 ? '≥' : '<'} {verdict.dq.toFixed(3)}</td>
                   <td className="n" style={{ color: verdict.c1 ? 'var(--pass)' : 'var(--warn)', fontWeight: 700 }}>{verdict.c1 ? '✓ se cumple' : '✗ no se cumple'}</td>
                 </tr>
                 <tr>
-                  <td><b>Condición 2, estabilidad</b><br /><span className="muted" style={{ fontSize: 12.5 }}>El 1º por Q también es el mejor en S y/o en R</span></td>
+                  <th scope="row"><b>Condición 2, estabilidad</b><br /><span className="muted" style={{ fontSize: 12.5 }}>El 1º por Q también es el mejor en S y/o en R</span></th>
                   <td className="n mono">mejor S: {verdict.bestS.map((i) => names[i]).join(', ')}<br />mejor R: {verdict.bestR.map((i) => names[i]).join(', ')}</td>
                   <td className="n" style={{ color: verdict.c2 ? 'var(--pass)' : 'var(--warn)', fontWeight: 700 }}>{verdict.c2 ? '✓ se cumple' : '✗ no se cumple'}</td>
                 </tr>

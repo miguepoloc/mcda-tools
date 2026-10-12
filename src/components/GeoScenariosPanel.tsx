@@ -56,7 +56,7 @@ export default function GeoScenariosPanel(p: ScenariosPanelProps) {
 
   return (
     <section className="gv-sec" aria-labelledby="gv-sc-h">
-      <header><h4 id="gv-sc-h">Comparar escenarios</h4><span className="gv-cr" aria-label={`${p.scenarios.length} de ${MAX_SCENARIOS} escenarios guardados`}>{p.scenarios.length}/{MAX_SCENARIOS}</span></header>
+      <header><h3 id="gv-sc-h">Comparar escenarios</h3><span className="gv-cr" aria-label={`${p.scenarios.length} de ${MAX_SCENARIOS} escenarios guardados`}>{p.scenarios.length}/{MAX_SCENARIOS}</span></header>
       <p className="gv-hint">Guarda el estado actual con un nombre, cambia pesos, reglas o clases, y compara: qué mejoró y qué empeoró (tabla y capa «Diferencia»). Los escenarios se guardan con el proyecto y no se publican.</p>
 
       {p.undo && (

@@ -127,7 +127,7 @@ export default async function CitarPage() {
                     const g = METHOD_GUIDE[mk];
                     return (
                       <tr key={mk}>
-                        <td><strong>{g.label}</strong></td>
+                        <th scope="row"><strong>{g.label}</strong></th>
                         <td><span className="cite-tab-badge">{g.family}</span></td>
                         <td style={{ fontSize: 13, lineHeight: 1.4 }}>
                           {mk === 'ahp' && 'Saaty, T. L. (1980). The Analytic Hierarchy Process. McGraw-Hill.'}

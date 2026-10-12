@@ -200,7 +200,7 @@ export default function GeoModelPanel(p: Props) {
     <div className="gv-sec-stack">
       <section className="gv-sec">
         <header>
-          <h4>Pesos</h4>
+          <h3>Pesos</h3>
           {p.nExperts > 0
             ? <span className={'gv-cr' + (crBad ? ' bad' : '')}>CR {p.cr.toFixed(3)}{crBad ? ' · revisar' : ''}</span>
             : <span className="gv-cr bad">sin juicios</span>}
@@ -237,7 +237,7 @@ export default function GeoModelPanel(p: Props) {
       </section>
 
       <section className="gv-sec">
-        <header><h4>Reglas de {T.noun}</h4></header>
+        <header><h3>Reglas de {T.noun}</h3></header>
         <p className="gv-hint">Cómo se traduce el valor de cada capa (una distancia, una temperatura, una profundidad…) a {risk ? 'un riesgo de 0 (bajo) a 1 (máximo)' : 'una idoneidad de 0 (mala) a 1 (óptima)'}.</p>
         {p.isPack && <p className="gv-hint">Este proyecto parte de un <b>paquete de datos del curso</b>: sus mapas son de solo lectura y no se modifican. Si agregas un criterio nuevo, <b>sube tu propio mapa</b> con el botón «Subir el mapa de este criterio»: se ajusta a la misma grilla del paquete y queda guardado en tu cuenta.</p>}
         {!p.isPack && layerEntries.length === 0 && p.criteria.length > 0 && <p className="gv-hint">Cada criterio necesita un mapa. Usa <b>«Subir el mapa de este criterio»</b> en cada uno, o carga primero tus archivos en la pestaña «Capas».</p>}
@@ -319,7 +319,7 @@ export default function GeoModelPanel(p: Props) {
       <GeoClassesEditor setup={p.setup} onSetup={p.onSetup} hex={p.editHex} onCut={p.onCut} canCut={p.canCut} viewStyle={p.viewStyle} published={p.published} />
 
       <section className="gv-sec">
-        <header><h4>{p.setup.direction === 'risk' ? 'Zonas contiguas' : 'Parcelas contiguas'}</h4></header>
+        <header><h3>{p.setup.direction === 'risk' ? 'Zonas contiguas' : 'Parcelas contiguas'}</h3></header>
         <p className="gv-hint">Muchos proyectos (una finca solar, un cultivo) necesitan un área mínima de un solo cuerpo. Aquí se buscan los grupos de celdas de la clase más alta («<b>{names[names.length - 1]}</b>») que se tocan y suman al menos ese tamaño.</p>
         <div className="gv-class-row" style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto' }}>
           <span>Área mínima de {risk ? 'la zona' : 'la parcela'}</span>

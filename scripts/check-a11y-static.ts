@@ -212,6 +212,72 @@ for (const f of tsx) {
 }
 if (fails === b4) ok('tablists con navegación por flechas');
 
+// ---- Pendientes cerrados en la segunda pasada (errores de campo, tabpanels, th de fila, avisos, encabezados) ----
+const bA = fails;
+// 1. Pestañas: todo archivo con role="tab" declara un role="tabpanel" y aria-controls. Para pestañas cuyos paneles son
+//    render condicional basta un solo panel con aria-labelledby que cambie con la pestaña activa.
+for (const f of tsx) {
+  const src = strip(readFileSync(f, 'utf8'));
+  const m = /role=["']tab["']/.exec(src);
+  if (!m) continue;
+  if (!/role=["']tabpanel["']/.test(src)) fail('tab-sin-panel', f, lineOf(src, m.index), 'role="tab" sin role="tabpanel" en el archivo');
+  if (!/aria-controls=/.test(src)) fail('tab-sin-controls', f, lineOf(src, m.index), 'role="tab" sin aria-controls');
+  if (!/aria-labelledby=/.test(src)) fail('panel-sin-labelledby', f, lineOf(src, m.index), 'tabpanel sin aria-labelledby');
+}
+if (fails === bA) ok('pestañas con tabpanel, aria-controls y aria-labelledby');
+
+// 2. Formularios clave: el error del campo se vincula (aria-invalid + aria-describedby) y se anuncia (role="alert").
+const bB = fails;
+for (const rel of ['app/login/page.tsx', 'components/NewProject.tsx', 'components/DecisionMatrixEditor.tsx', 'components/GeoClassesEditor.tsx', 'components/GeoPointsPanel.tsx']) {
+  const f = join(ROOT, rel);
+  const src = strip(readFileSync(f, 'utf8'));
+  if (!/aria-invalid=/.test(src)) fail('error-sin-invalid', f, 1, 'formulario clave sin aria-invalid en sus campos');
+  if (!/aria-describedby=/.test(src)) fail('error-sin-describedby', f, 1, 'formulario clave sin aria-describedby hacia el mensaje de error');
+  if (!/role=["']alert["']|aria-live=/.test(src)) fail('error-sin-live', f, 1, 'formulario clave sin role="alert" ni aria-live');
+}
+if (fails === bB) ok('formularios clave: aria-invalid + aria-describedby + región viva');
+
+// 3. Avisos temporales: ningún mensaje se borra solo antes de 5 s (2.2.1); el toast se pausa y tiene región viva montada.
+const bC = fails;
+for (const f of tsx) {
+  const src = strip(readFileSync(f, 'utf8'));
+  for (const m of src.matchAll(/setTimeout\(\s*\(\)\s*=>\s*set(?:Toast\w*|Msg|Copied\w*|Flash\w*|Notice\w*)\(\s*(?:null|''|""|false)\s*\)\s*,\s*(\d+)\s*\)/g)) {
+    if (Number(m[1]) < 5000) fail('aviso-corto', f, lineOf(src, m.index!), `aviso que se borra solo a los ${m[1]} ms (mínimo 5000)`);
+  }
+}
+const smmFile = join(ROOT, 'components/ScientificMethodModal.tsx');
+const smm = strip(readFileSync(smmFile, 'utf8'));
+if (!/toastPaused/.test(smm) || !/<div className="sr-only" role="status" aria-live="polite">/.test(smm)) {
+  fail('toast', smmFile, 1, 'el toast debe pausarse con el puntero y tener región viva siempre montada');
+}
+if (/setTimeout\(\(\) => setToastMsg\(null\), (?:\d{1,3}|[1-4]\d{3})\)/.test(smm)) fail('toast', smmFile, 1, 'el toast dura menos de 5 s');
+if (fails === bC) ok('avisos temporales: ≥ 5 s, pausa con el puntero y región viva montada');
+
+// 4. Primera celda de fila = <th scope="row"> en tablas de datos (nombre de alternativa/criterio).
+const bD = fails;
+for (const f of tsx) {
+  const src = strip(readFileSync(f, 'utf8'));
+  for (const m of src.matchAll(/<tr\b[^>]*>\s*<td\b([^>]*)>/g)) {
+    if (/colSpan=|className="[^"]*\b(n|mono|na-cell)\b/.test(m[1])) continue;
+    fail('fila-sin-th', f, lineOf(src, m.index!), 'primera celda de la fila es <td>: usa <th scope="row">');
+  }
+}
+if (!/tbody th\[scope=row\]/.test(global)) fail('fila-sin-th', join(ROOT, 'app/globals.css'), 1, 'falta el estilo de tbody th[scope=row]');
+if (fails === bD) ok('tablas: primera celda de fila como <th scope="row">');
+
+// 5. Encabezados: ningún archivo salta de nivel (h5 sin h4).
+const bE = fails;
+for (const f of tsx) {
+  const src = strip(readFileSync(f, 'utf8'));
+  const hs = [...src.matchAll(/<h([1-6])\b/g)].map((m) => ({ n: Number(m[1]), at: m.index! }));
+  if (!hs.length) continue;
+  const levels = new Set(hs.map((h) => h.n));
+  for (const h of hs) {
+    if (h.n >= 5 && !levels.has(h.n - 1)) fail('encabezado-salto', f, lineOf(src, h.at), `<h${h.n}> sin <h${h.n - 1}> en el archivo`);
+  }
+}
+if (fails === bE) ok('encabezados sin saltos evidentes por archivo');
+
 // Contraste (texto normal 4.5:1; componentes de interfaz 3:1) de los pares de tokens más usados.
 function lum(hex: string) {
   const n = parseInt(hex.slice(1), 16);

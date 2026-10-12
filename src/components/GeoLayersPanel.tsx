@@ -394,7 +394,7 @@ export default function GeoLayersPanel(p: Props) {
         />
       )}
       <section className="gv-sec">
-        <header><h4>1 · Área de estudio</h4></header>
+        <header><h3>1 · Área de estudio</h3></header>
         {isPack && data && (
           <p className="gv-hint">Paquete del curso: <b>{data.grid.width}×{data.grid.height}</b> celdas de <b>{data.grid.resM} m</b> (extensión de la grilla: {(data.grid.width * data.grid.height * data.grid.haPerPixel).toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha{p.evaluableHa != null ? <>; <b>área evaluada: {p.evaluableHa.toLocaleString('es-CO', { maximumFractionDigits: 0 })} ha</b></> : null}). El área y sus mapas son de solo lectura, pero <b>puedes añadir tus propios mapas</b> (paso 2): se recortan y alinean solos a esta misma grilla.</p>
         )}
@@ -446,7 +446,7 @@ export default function GeoLayersPanel(p: Props) {
 
       {(!isPack || data) && (
         <section className="gv-sec">
-          <header><h4>2 · Añadir mapas</h4></header>
+          <header><h3>2 · Añadir mapas</h3></header>
           <details className="gv-help">
             <summary>❓ ¿Qué pasa cuando subo un mapa? · Qué guarda la app</summary>
             <div className="gv-help-body">
@@ -556,7 +556,7 @@ export default function GeoLayersPanel(p: Props) {
       )}
 
       <section className="gv-sec">
-        <header><h4>{isPack ? '2' : '3'} · Capas del proyecto</h4></header>
+        <header><h3>{isPack ? '2' : '3'} · Capas del proyecto</h3></header>
         {p.quota && (
           <div className={'gv-quota' + (p.quota.used_bytes > p.quota.quota_bytes ? ' over' : '')} title="Espacio de mapas de tu cuenta (todos tus proyectos)">
             <span className="bar"><span style={{ width: `${Math.min(100, (p.quota.used_bytes / Math.max(1, p.quota.quota_bytes)) * 100)}%` }} /></span>

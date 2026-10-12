@@ -96,7 +96,7 @@ function NewProjectForm({ userId }: { userId: string }) {
     if (kind === 'spatial') return createSpatial();
 
     const finalTitle = title.trim() || (useIotCase ? IOT_PALMOR_TITLE : '');
-    if (!finalTitle) return;
+    if (!finalTitle) { setMsg('Escribe un título para el proyecto.'); titleRef.current?.focus(); return; }
     setBusy(true);
     setMsg('');
     const criteria = useIotCase
@@ -139,7 +139,7 @@ function NewProjectForm({ userId }: { userId: string }) {
   async function createSpatial() {
     const ex = start === 'blank' ? null : examples.find((e) => e.id === start) ?? null;
     const finalTitle = title.trim() || ex?.title || '';
-    if (!finalTitle) return;
+    if (!finalTitle) { setMsg('Escribe un título para el proyecto.'); titleRef.current?.focus(); return; }
     setBusy(true);
     setMsg('');
     const criteria = ex ? ex.criteria : [1, 2, 3].map((i) => ({ id: uid('k'), name: 'Criterio ' + i, hint: '', src: null }));
@@ -214,6 +214,8 @@ function NewProjectForm({ userId }: { userId: string }) {
             ref={titleRef}
             type="text"
             required={kind === 'decision' || start === 'blank'}
+            aria-invalid={!!msg && !title.trim() ? true : undefined}
+            aria-describedby={msg ? 'np-err' : undefined}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={kind === 'spatial' ? 'Ej.: Zonas aptas para una boya de monitoreo' : 'Ej.: Estrategia de adaptación ASR'}
@@ -310,7 +312,7 @@ function NewProjectForm({ userId }: { userId: string }) {
             )}
           </div>
         )}
-        {msg && <p className="err" role="alert">{msg}</p>}
+        {msg && <p className="err" id="np-err" role="alert">{msg}</p>}
         <div className="acts">
           <button className="btn primary" type="submit" disabled={busy}>
             {busy ? 'Creando…' : 'Crear proyecto'}
@@ -340,6 +342,8 @@ function NewProjectForm({ userId }: { userId: string }) {
             ref={file}
             type="file"
             accept=".xlsx,.json,application/json"
+            aria-invalid={impMsg ? true : undefined}
+            aria-describedby={impMsg ? 'np-imp-err' : undefined}
             disabled={busy}
             onChange={(e) => {
               dropFiles(e.target.files);
@@ -347,7 +351,7 @@ function NewProjectForm({ userId }: { userId: string }) {
             }}
           />
         </label>
-        {impMsg && <p className="err" role="alert">{impMsg}</p>}
+        {impMsg && <p className="err" id="np-imp-err" role="alert">{impMsg}</p>}
       </div>
       {imported && (
         <div className="card form" role="status">

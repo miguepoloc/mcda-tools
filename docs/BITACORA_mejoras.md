@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**24 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 25). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**24 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 27). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -184,7 +184,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | R5 | Aviso de publicación confiable | ✅ | entrada 6 |
 | U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
 | U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
-| U3 | Auditoría WCAG 2.2 AA | ◐ | entradas 1 y 23; `docs/AUDITORIA_accesibilidad.md`; falta lector de pantalla real y tabpanels |
+| U3 | Auditoría WCAG 2.2 AA | ◐ | entradas 1, 23 y 27; `docs/AUDITORIA_accesibilidad.md`; sin nada crítico en código, falta lector de pantalla real, zoom/reflujo y contraste sobre el mapa (verificación renderizada) |
 | U4 | Modo presentación | ⬜ | |
 | U5 | Historial de versiones del proyecto | ⬜ | |
 | P1 | Versión y DOI alineados | ✅ | entrada 5 |
@@ -276,3 +276,16 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Verificación:** `scripts/check-geo-refline.ts` (registrado antes de `check-integration.ts`); typecheck, `npm test` y `test:excel`. No se ejecutó `next build` ni `next dev`.
 - **Riesgos / decisiones:** (1) una referencia con muchas líneas pesa más en memoria y en la descarga al abrir el proyecto (tope de 300 000 vértices); (2) la tolerancia del clic es de 10 px, y con varias capas superpuestas se muestran hasta 6 entidades, puntos y líneas primero; (3) un elemento «colección» con polígonos y líneas se parte en dos elementos; (4) los atributos viven en el `.geojson.gz` del dueño, que ya era privado por RLS del bucket.
 - **Pendiente (visual):** subir un shapefile de vías/ríos real y ver que se dibuja, su grosor/color en G3, composición PNG y la vista pública; ficha con atributos en ancho angosto y modo oscuro; clic cerca de líneas en móvil; recarga de un proyecto con una referencia antigua; etiquetas sobre líneas.
+
+### 27. Accesibilidad, segunda pasada (U3): errores de campo, tabpanels, filas, avisos y encabezados
+- **Errores de campo:** `aria-invalid` + `aria-describedby` hacia el mensaje (que sigue con `role="alert"`) en login/registro (correo y contraseña), Nuevo proyecto (título; ahora un título vacío da mensaje y foco en vez de no hacer nada; archivo a importar), matriz de decisión (unidad faltante y valor objetivo faltante apuntan a su aviso; la vista previa del pegado es región `aria-live`) e importación de puntos (botón y lista de avisos). El editor de clases ya lo tenía.
+- **Tabpanels:** `role="tabpanel"` con `aria-labelledby` y `aria-controls` en la pestaña activa en ProjectWorkspace (un solo panel envuelve el contenido condicional), PrioritizationEditor y GeoVisor (el panel es el contenedor `gv-side-body` que ya existía: cambio de atributos, sin tocar capas/refLayer). Citación ya lo tenía.
+- **Tablas:** la primera celda de fila pasa a `<th scope="row">` en Resultados (síntesis, matrices, comparativa, pesos), AHP público, priorización (descarte), diagnóstico de grupo, simulador de sensibilidad, condiciones VIKOR, pares ELECTRE, informe ejecutivo, Geovisor admin, admin, tutorial y citar. CSS global `tbody th[scope=row]` para que se vean igual que antes (hereda color y fuente del contexto, también `row-winner`).
+- **Clases no solo por color:** se revisó y la mayoría ya cumplía (leyendas con nombre y rango, lista y ficha de puntos con la clase en texto, tabla de zonas con el número, marcadores sin índice con borde discontinuo). No se añadió patrón al lienzo del mapa; queda pendiente (ver auditoría).
+- **Avisos:** el toast de «Método científico» dura 7 s (antes 2,8 s), se pausa con el puntero, y la región `aria-live` está siempre montada (antes aparecía con su texto y podía no anunciarse); «copiado» en Citación y Metodología dura 6 s; el fallo de copiar de Metodología no se borra solo.
+- **Encabezados:** paneles del Geovisor (h4→h3) y su lista de puntos (h5→h4), vista pública (h4→h2), análisis AHP público (h4→h2), desglose ELECTRE (h5→h4).
+- **Prueba:** `scripts/check-a11y-static.ts` suma 5 grupos (pestañas con panel, errores vinculados en 5 formularios, avisos ≥ 5 s y toast pausable, `th` de fila, h5 sin h4); 12 grupos en total.
+- **Verificación:** typecheck, `npm test` y `test:excel` en verde; sin `next build`/`next dev`. Sin verificación visual.
+- **Riesgos / decisiones:** (1) el `<div role="tabpanel">` nuevo en ProjectWorkspace es un bloque más en el árbol: revisar que el Geovisor (centrado con `left:50%`) y los paneles no cambien de margen. (2) `<th scope="row">` hereda el color del contexto: en el informe ejecutivo se confía en el color del contenedor. (3) La tabla de zonas y las listas conservan el color como apoyo, no como única señal.
+- **Pendiente (visual):** pestañas y Geovisor con teclado/lector; tablas con la primera columna ahora `th` (alineación y negrita, fila ganadora); toast con el puntero encima; login con error (foco y lectura); Nuevo proyecto sin título.
+

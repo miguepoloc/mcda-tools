@@ -31,6 +31,12 @@ Severidad: **A** = bloquea a un usuario (teclado/lector) · **M** = degrada la t
 | 18 | 2.4.11 | Encabezado fijo podía tapar el elemento enfocado | M | `html{scroll-padding-top:84px}` |
 | 19 | 2.5.8 | Objetivos táctiles de pestañas, menú y ítems de navegación < 44 px en táctil | B | `@media (pointer:coarse)` a 44 px (el resto ya estaba cubierto en el diseño anterior) |
 
+| 20 | 3.3.1, 3.3.3, 4.1.2 | Errores de campo solo con `role="alert"` general, sin vincular al campo | M | `aria-invalid` + `aria-describedby` al mensaje en login/registro, Nuevo proyecto (título vacío ahora avisa y enfoca), matriz de decisión (unidad y valor objetivo), importación de puntos; el editor de clases ya lo tenía |
+| 21 | 1.3.1, 4.1.2 | `role="tab"` sin `tabpanel`/`aria-controls` en Proyecto, Priorización y Geovisor | M | `role="tabpanel"` con `aria-labelledby` (un panel que sigue a la pestaña activa) y `aria-controls` en la pestaña activa; en el Geovisor el panel es el contenedor `gv-side-body` existente |
+| 22 | 1.3.1 | Primera celda de fila como `<td>` en tablas de resultados | B | `<th scope="row">` en Resultados, AHP público, priorización, diagnóstico de grupo, simulador, VIKOR, ELECTRE, informe ejecutivo, admin, tutorial y citar; CSS `tbody th[scope=row]` |
+| 23 | 2.2.1, 4.1.3 | Toast de «Método científico» de 2,8 s, sin pausa y con región viva que aparecía con el texto; avisos de «copiado» de 2,5–4 s | B | 7 s, pausa con el puntero, región `aria-live` siempre montada; «copiado» 6 s y el fallo de copiar no se borra solo |
+| 24 | 1.3.1 | Saltos de encabezado en paneles del Geovisor (h1→h4/h5), vista pública y desglose ELECTRE | B | h4→h3 / h5→h4 en el Geovisor, h2 en vista pública y AHP público, h4 en el desglose ELECTRE |
+
 Ya estaba bien (verificado, sin cambios): diálogos de confirmación/QR/composición/informe con focus trap, Escape y retorno
 del foco; menú de usuario y popover de compartir con Escape y `aria-expanded`; reordenar con teclado (2.5.7);
 etiquetas `label/htmlFor` y `autocomplete` en login y registro; `role="alert"`/`aria-live` en errores y estados de
@@ -43,16 +49,13 @@ advertencia/éxito del primer pase de contraste.
 | # | Criterio | Hallazgo | Sev. | Nota |
 | --- | --- | --- | --- | --- |
 | 1 | 1.3.1 | El `<header class="topbar">` queda dentro de `<main>` (se montó en el layout para cubrir todas las páginas con un cambio mínimo): pierde el landmark `banner` | B | Para corregir: mover `<main>` a cada página después del `Topbar`. Toca ~17 archivos |
-| 2 | 1.3.1, 4.1.2 | `role="tab"` sin `tabpanel`/`aria-controls` en Proyecto, Priorización y Geovisor (los paneles son render condicional) | M | Requiere envolver cada panel con `role="tabpanel"` + `aria-labelledby`; en GeoVisor es un refactor grande |
-| 3 | 1.3.1 | Primera celda de fila como `<td>` (nombre de alternativa) en varias tablas de resultados, no `<th scope="row">` | B | Cambia el estilo `.tbl th`; revisar a la vez |
-| 4 | 1.3.1 | Jerarquía de encabezados: muchos componentes arrancan en h3/h4 y asumen un h2 que la página no siempre tiene (Geovisor h1→h3, Results h2→h4) | B | Es una decisión de estructura por pantalla |
-| 5 | 1.4.1 | Mapa: la capa de resultado distingue clases solo con color en el lienzo; la alternativa es la leyenda con texto y la tabla de zonas, pero el color no tiene patrón | M | Valorar rampa con patrón o ya se cubre con zonas/puntos. Revisión con simulador de daltonismo |
+| 4 | 1.3.1 | Jerarquía de encabezados: quedan saltos de un nivel (Resultados h2→h4 en algunos bloques, lista de puntos h2→h4 en la vista pública) | B | Los saltos evidentes ya se corrigieron (n.º 24); el resto es decisión de estructura por pantalla |
+| 5 | 1.4.1 | Mapa: la capa de resultado distingue clases solo con color en el lienzo. Verificado: leyendas con nombre y rango, lista/ficha de puntos con la clase en texto, tabla de zonas con el número y marcadores sin índice con borde discontinuo; sin patrón en el lienzo | M | La paleta «Daltonismo» (viridis) mitiga; valorar trama por clase solo si el docente lo pide. Revisión con simulador de daltonismo |
 | 6 | 1.4.3 | Contraste del texto sobre el mapa base (etiquetas de punto, tooltips sobre teselas) no verificable estáticamente | M | Revisar en pantalla con teselas claras y satélite |
 | 7 | 1.4.4, 1.4.10 | Zoom 200 % y reflujo a 320 px no verificados | M | Probar: tablas anchas (matriz de decisión, ELECTRE) tienen región con `tabIndex` desplazable en algunas, no en todas |
 | 8 | 2.4.7 | Foco visible sobre colores `--m-*` de método y sobre el mapa no medido | B | Revisar en pantalla |
-| 9 | 3.3.x | Los errores de campo del servidor usan `role="alert"` general; no hay `aria-describedby` campo-error ni `aria-invalid` | B | Aplicable en login/registro y NewProject |
-| 10 | 2.2.1 | `GeoTour` y avisos temporales (`#toast`, toast del modal) desaparecen solos: duración fija | B | Revisar si ≥ 5 s y si se pueden pausar |
 | 11 | — | Lector de pantalla real (NVDA/VoiceOver) y Lighthouse/axe sin correr | M | La verificación estática no sustituye esto |
+| 12 | 2.2.1 | `GeoTour` no avanza solo (verificado: solo el arranque a los 0,9 s) | B | Sin acción; revisar en pantalla |
 
 ## A revisar visualmente
 
@@ -63,6 +66,10 @@ advertencia/éxito del primer pase de contraste.
 5. Tabla de zonas: aspecto del nombre como botón (usa la clase `.gv-zsort`) y el resaltado de la zona en el mapa.
 6. Cierre de «Método científico» y «Informe ejecutivo»: el foco vuelve al botón que los abrió.
 7. Con «reducir movimiento» del sistema activado: sin transiciones ni saltos de hover.
+8. Tablas con la primera columna ahora `th` (resultados, VIKOR, ELECTRE, informe): alineación, negrita y fila ganadora.
+9. Login con error (lectura del mensaje con campo inválido) y «Nuevo proyecto» sin título.
+10. Toast de «Método científico»: pausa con el puntero y duración de 7 s.
+11. Panel del Geovisor y pestañas del proyecto: sin cambio de márgenes tras envolver el contenido en `tabpanel`.
 
 ## Prueba automática
 
@@ -73,3 +80,7 @@ sin nombre, `<img>` sin `alt`, campo sin etiqueta, `<table>` sin título, `<th>`
 global de movimiento reducido, del enlace de salto, de `<main>`, de título por página y 29 pares de contraste de
 tokens (4.5:1 texto, 3:1 componentes). Excepción documentada: contenedores con foco solo programático
 (`.modal`, `main`, `.wz-q`, `.rec-name`).
+
+Segunda pasada: `check-a11y-static.ts` agrega pestañas con `tabpanel`/`aria-controls`, formularios clave con
+`aria-invalid` + `aria-describedby` + región viva, avisos temporales ≥ 5 s con el toast pausable y región viva
+montada, primera celda de fila como `<th scope="row">` y ningún `h5` sin `h4` en el archivo.

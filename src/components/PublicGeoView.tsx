@@ -115,7 +115,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
         <aside className="gv-side">
           <div className="gv-side-body">
             <section className="gv-sec">
-              <header><h4>Pesos de los criterios</h4>{meta.nExperts > 0 && <span className={'gv-cr' + (meta.cr >= 0.1 ? ' bad' : '')}>CR {meta.cr.toFixed(3)}{meta.cr >= 0.1 ? ' · inconsistente' : ''}</span>}</header>
+              <header><h2>Pesos de los criterios</h2>{meta.nExperts > 0 && <span className={'gv-cr' + (meta.cr >= 0.1 ? ' bad' : '')}>CR {meta.cr.toFixed(3)}{meta.cr >= 0.1 ? ' · inconsistente' : ''}</span>}</header>
               <p className="gv-hint">{meta.weightsOrigin}{meta.nExperts > 0 ? ` · ${meta.nExperts} experto(s)` : ''}</p>
               {meta.weights.map((w) => (
                 <div className="gv-wbar" key={w.name}>
@@ -126,7 +126,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
             </section>
             {meta.ahp && <PublicAhp ahp={meta.ahp} />}
             <section className="gv-sec">
-              <header><h4>Superficie por clase</h4></header>
+              <header><h2>Superficie por clase</h2></header>
               <div className="gv-stats" style={{ display: 'block' }}>
                 <div className="bars">
                   {rows.map(({ code: c, name, ha, pct }) => (
@@ -154,7 +154,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
             )}
             {pubZones && (
               <section className="gv-sec">
-                <header><h4>Resumen por zonas</h4><span className="gv-badge ok">{pubZones.rows.length}</span></header>
+                <header><h2>Resumen por zonas</h2><span className="gv-badge ok">{pubZones.rows.length}</span></header>
                 <GeoZonesTable
                   rows={pubZones.rows.map((r, i) => ({
                     key: String(i), name: r.name, meanPct: r.meanPct, ha: r.ha, classPct: r.classPct, points: r.points ?? null,
@@ -168,7 +168,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
             )}
             {pubRefs && (
               <section className="gv-sec">
-                <header><h4>Capas de referencia</h4></header>
+                <header><h2>Capas de referencia</h2></header>
                 <div className="gv-pubrefs">
                   {pubRefs.map((r, i) => (
                     <label key={i}>

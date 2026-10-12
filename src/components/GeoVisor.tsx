@@ -995,14 +995,14 @@ export default function GeoVisor(props: Props) {
             const meta = { capas: ['Capas', ICONS.layers], modelo: ['Modelo', ICONS.sliders], puntos: ['Puntos', ICONS.pin], zonas: ['Zonas', ICONS.zones], exportar: ['Exportar', ICONS.download] }[t];
             const n = t === 'puntos' ? points.length : 0;
             return (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => setTab(t)} title={meta[0]}>
+              <button key={t} type="button" role="tab" id={`gv-tab-${t}`} aria-controls={tab === t ? 'gv-tabpanel' : undefined} aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => setTab(t)} title={meta[0]}>
                 <Icon d={meta[1]} size={18} />
                 <span className="lbl">{meta[0]}{n > 0 && <span className="n" aria-label={` (${n})`}>{n}</span>}</span>
               </button>
             );
           })}
         </div>
-        <div className="gv-side-body">
+        <div className="gv-side-body" role="tabpanel" id="gv-tabpanel" aria-labelledby={`gv-tab-${tab}`}>
           {lost > 0 && (
             <div className="banner" role="alert"><span>{lost} capa(s) no se pudieron recuperar (se añadieron en una sesión sin guardar o no se pudieron descargar). Los criterios que dependen de ellas no entran al mapa hasta que las vuelvas a subir.{layerErrs.length > 0 && <> Detalle: {layerErrs.join(' · ')}</>}</span></div>
           )}
@@ -1224,7 +1224,7 @@ function ExportGroups({ groups, run, disabled }: { groups: ExportGroup[]; run: P
         </details>
       ) : (
         <section className="gx-group" key={g.id} aria-labelledby={`gx-${g.id}`}>
-          <h4 id={`gx-${g.id}`} className="gx-title">{g.title}</h4>
+          <h3 id={`gx-${g.id}`} className="gx-title">{g.title}</h3>
           <div className="gx-items">{g.items.map(row)}</div>
         </section>
       ))}

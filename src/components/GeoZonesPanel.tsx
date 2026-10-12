@@ -43,7 +43,7 @@ export default function GeoZonesPanel(p: Props) {
     return (
       <div className="gv-sec-stack">
         <section className="gv-sec">
-          <header><h4>Resumen por zonas</h4></header>
+          <header><h3>Resumen por zonas</h3></header>
           <p className="gv-hint">Para saber <b>qué sector tiene más {p.direction === 'risk' ? 'riesgo' : 'idoneidad'}</b> hace falta una capa de polígonos (comunas, barrios, sectores). Súbela en la pestaña «Capas» y márcala como <b>Referencia</b>: se guarda tal cual, se dibuja sobre el mapa y no entra al modelo.</p>
           <div className="gv-row-acts"><button type="button" className="btn sm" onClick={p.onGoLayers}>Ir a «Capas»</button></div>
         </section>
@@ -54,7 +54,7 @@ export default function GeoZonesPanel(p: Props) {
   return (
     <div className="gv-sec-stack">
       <section className="gv-sec">
-        <header><h4>Resumen por zonas</h4></header>
+        <header><h3>Resumen por zonas</h3></header>
         <label className="gv-field"><span>Capa de zonas</span>
           <select value={p.sel?.layer ?? ''} onChange={(e) => {
             const key = e.target.value;
@@ -106,7 +106,7 @@ export default function GeoZonesPanel(p: Props) {
 
       {layer && p.ready && p.rows && (
         <section className="gv-sec">
-          <header><h4>{p.rows.length} zonas · {T.noun}</h4></header>
+          <header><h3>{p.rows.length} zonas · {T.noun}</h3></header>
           {without > 0 && <p className="gv-hint warn" role="status">{without} zona{without === 1 ? '' : 's'} sin área evaluada (quedan fuera del área de estudio, en exclusión o más pequeñas que una celda): aparecen al final, sin índice.</p>}
           <label className="gv-check"><input type="checkbox" checked={p.choropleth} onChange={(e) => p.onChoropleth(e.target.checked)} /> Colorear el mapa por {indexLabel.toLowerCase()} de cada zona</label>
           {p.choropleth && <div className="gv-zramp" aria-hidden="true"><span>0</span><i style={{ background: p.rampCss }} /><span>100</span></div>}

@@ -37,7 +37,7 @@ export default function GeoCatalogPanel(p: Props) {
 
   return (
     <section className="gv-sec">
-      <header><h4>Catálogo del curso</h4><span className="gv-badge ok">docente</span></header>
+      <header><h3>Catálogo del curso</h3><span className="gv-badge ok">docente</span></header>
       <p className="gv-hint">Publica este proyecto como paquete: sus capas ya alineadas quedan en un almacén <b>público</b> del curso y los estudiantes lo eligen al crear un mapa. Usa solo datos que puedas compartir (cita la fuente).</p>
       <label className="gv-field"><span>Identificador (minúsculas y guiones)</span><input type="text" value={id} onChange={(e) => setId(e.target.value.toLowerCase())} />
         {!idOk && <small className="gv-hint warn">Solo a-z, 0-9 y guiones (2 a 41 caracteres).</small>}</label>

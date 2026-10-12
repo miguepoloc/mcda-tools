@@ -416,9 +416,9 @@ export default function SensitivitySimulator({
 
                 return (
                   <tr key={alt.id} style={{ background: sRank === 1 ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : undefined }}>
-                    <td style={{ fontWeight: sRank === 1 ? 700 : 500, color: sRank === 1 ? 'var(--ink)' : undefined }}>
-                      {alt.name} {sRank === 1 && '👑'}
-                    </td>
+                    <th scope="row" style={{ fontWeight: sRank === 1 ? 700 : 500, color: sRank === 1 ? 'var(--ink)' : undefined }}>
+                      {alt.name} {sRank === 1 && <span aria-label="primer lugar">👑</span>}
+                    </th>
                     <td className="n" style={{ fontFamily: 'var(--f-mono)' }}>#{bRank}</td>
                     <td className="n" style={{ fontFamily: 'var(--f-mono)', color: 'var(--muted)' }}>
                       {bRow ? bRow.score.toFixed(4) : '—'}

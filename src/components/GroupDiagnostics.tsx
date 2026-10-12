@@ -42,7 +42,7 @@ export default function GroupDiagnostics({ items, result, method = DEFAULT_WEIGH
           <tbody>
             {items.map((it, i) => (
               <tr key={it.id}>
-                <td>{it.name}</td>
+                <th scope="row">{it.name}</th>
                 <td className="n">{pct(mc.w[i])}</td>
                 <td className="n">{pct(mc.minus[i])}</td>
                 <td className="n">{pct(mc.plus[i])}</td>

@@ -73,7 +73,7 @@ export default function GeoPointsList({ rows, heading, criticalLabel, selectedKe
   return (
     <section className="gv-plist" aria-labelledby={`${uid}-h`}>
       <div className="gv-plist-h">
-        <h5 id={`${uid}-h`}>Ranking de puntos</h5>
+        <h4 id={`${uid}-h`}>Ranking de puntos</h4>
         <span className="gv-badge ok">{rows.length}</span>
         <span className="gv-plist-sub">{heading}</span>
       </div>
