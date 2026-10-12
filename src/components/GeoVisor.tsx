@@ -41,6 +41,7 @@ import { createPortal } from 'react-dom';
 import GeoCatalogPanel from './GeoCatalogPanel';
 import { exportGroups, refShareRows, type ExportGroup, type ExportKey, type ExportSpec } from '@/lib/geo/share';
 import './geo-share.css';
+import GeoMeasure, { type GeoMeasureHandle } from './GeoMeasure';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
   classStats, classify, CLASS_EXCLUDED, CLASS_VETO, coverageStats, evaluateIndex, type ClassStats, type CriterionRule,
@@ -610,7 +611,11 @@ export default function GeoVisor(props: Props) {
   const [refHits, setRefHits] = useState<RefHit[]>([]);
   const vecsRef = useRef(vecs); vecsRef.current = vecs;
   const visRef = useRef(vis); visRef.current = vis;
+  // Regla (G11): mientras está activa, los clics del mapa miden en vez de consultar un punto.
+  const measureRef = useRef<GeoMeasureHandle>(null);
+  const [measureOv, setMeasureOv] = useState<VectorOverlay | null>(null);
   const onMapClick = useCallback((lat: number, lon: number, zoom?: number) => {
+    if (measureRef.current?.click(lat, lon)) return;
     if (!addMode) {
       const layers = vecsRef.current.filter((v) => v.ref && (visRef.current[`v:${v.id}`]?.on ?? true))
         .map((v) => ({ id: v.id, name: geoRef.current.layers?.[v.id]?.label ?? v.name, fc: v.fc, nameField: geoRef.current.layers?.[v.id]?.ref?.nameField }));
@@ -640,7 +645,9 @@ export default function GeoVisor(props: Props) {
 
   const onMove = useCallback((lat: number, lon: number) => {
     if (coordRef.current) coordRef.current.textContent = `${lat.toFixed(5)}°, ${lon.toFixed(5)}°`;
+    measureRef.current?.move(lat, lon);
   }, []);
+  const mapVectors = useMemo(() => (measureOv ? [...vectors, measureOv] : vectors), [vectors, measureOv]);
 
   // ------------------------------------------------------------------ exportación
   const base = slug(props.title);
@@ -1084,7 +1091,7 @@ export default function GeoVisor(props: Props) {
 
       <section className="gv-main">
         <div className="gv-stage">
-          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={vectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} labels={showNames ? { mode: nameMode } : null} onLabelsTrimmed={setNamesTrimmed} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
+          <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={mapVectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} labels={showNames ? { mode: nameMode } : null} onLabelsTrimmed={setNamesTrimmed} addMode={addMode} onPointClick={setSelPoint} draft={draft} drawing={drawing}
             initialBounds={gridBounds} onClick={onMapClick} onMove={onMove} onMarkerClick={onMarkerClick}
             onDrawn={(b) => { setDraft(b); setDrawing(false); }} />
 
@@ -1097,6 +1104,7 @@ export default function GeoVisor(props: Props) {
           </div>
 
           <div className="gv-coords mono"><span ref={coordRef}>—</span></div>
+          <GeoMeasure ref={measureRef} onOverlay={setMeasureOv} onActiveChange={(on) => { if (on) setAddMode(false); }} />
 
           {addMode && (
             <div className="gv-addbar" role="status">

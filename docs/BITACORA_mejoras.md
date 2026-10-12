@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**24 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 27). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**25 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 28). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -162,7 +162,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | G8 | Etiquetas, atributos al clic, búsqueda, categorías | ◐ | etiquetas de puntos del usuario sí; atributos de las referencias al clic, solo para el dueño (entrada 26); búsqueda y categorías no |
 | G9 | Resumen por polígonos (zonal) | ✅ | entrada 12 |
 | G10 | Exposición por población | ✅ | entrada 12 (población al centroide) |
-| G11 | Regla de distancias y áreas | ⬜ | |
+| G11 | Regla de distancias y áreas | ✅ | entrada 28 (distancia haversine, área elipsoidal WGS84, lista de vértices accesible) |
 | G12 | Dibujo de geometrías | ⬜ | fuera de v1 por plan |
 | G13 | Escenarios con nombre guardados | ✅ | entrada 19 (H7 cerrado) |
 | G14 | Gestión de capas | ◐ | duplicados y borrado confirmado sí; renombrar/reordenar/agrupar no |
@@ -288,4 +288,13 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Verificación:** typecheck, `npm test` y `test:excel` en verde; sin `next build`/`next dev`. Sin verificación visual.
 - **Riesgos / decisiones:** (1) el `<div role="tabpanel">` nuevo en ProjectWorkspace es un bloque más en el árbol: revisar que el Geovisor (centrado con `left:50%`) y los paneles no cambien de margen. (2) `<th scope="row">` hereda el color del contexto: en el informe ejecutivo se confía en el color del contenedor. (3) La tabla de zonas y las listas conservan el color como apoyo, no como única señal.
 - **Pendiente (visual):** pestañas y Geovisor con teclado/lector; tablas con la primera columna ahora `th` (alineación y negrita, fila ganadora); toast con el puntero encima; login con error (foco y lectura); Nuevo proyecto sin título.
+
+### 28. Regla de distancias y áreas en el Geovisor (G11)
+- **Qué:** botón «Regla» sobre el mapa (esquina superior izquierda, bajo el zoom). Activo, cada clic añade un vértice; el panel muestra en vivo el número de vértices, el último tramo (parcial) y el total, y la lista de vértices con coordenadas, tramo y acumulado. «Cerrar polígono» (desde 3 vértices) calcula área y perímetro; «Deshacer» quita el último vértice (o reabre un polígono cerrado), «Limpiar» borra todo y «Salir»/Escape cierra la herramienta y quita el dibujo. Mientras está activa, los clics del mapa miden en vez de consultar un punto, y se apaga el modo «Agregar punto».
+- **Geodesia:** distancias por haversine (R medio 6 371 008,8 m); áreas sobre el elipsoide WGS84 con proyección cilíndrica equivalente (latitud autálica) tras densificar cada lado como círculo máximo (≤ 10 km). Nada se calcula en grados planos. Unidades: m / km y m² / ha / km² (la principal según tamaño y las tres en el texto del resultado).
+- **Accesibilidad:** botón con `aria-label`, `aria-pressed`; resultado en región `role="status"` `aria-live="polite"` (el tramo «hasta el cursor» va fuera de ella para no anunciar cada movimiento); lista `<ol>` de vértices con botón «Quitar»; alta de vértices por coordenadas (sin ratón) con error vinculado; con el mapa enfocado, Intro añade un vértice en el centro (ya existente en GeoMap); Escape sale y devuelve el foco al botón; objetivos de 44 px en pantallas angostas.
+- **Código:** `src/lib/geo/measure.ts` (puro), `src/components/GeoMeasure.tsx` + `geo-measure.css`; en `GeoVisor.tsx` solo el montaje, el reenvío de clic/movimiento y una capa vectorial extra (`__measure`) para el dibujo. No se tocó `GeoMap`, ni paneles, ni datos guardados: la medición no se persiste.
+- **Verificación:** `scripts/check-geo-measure.ts` (registrado antes de `check-integration.ts`): 1° de latitud ≈ 111,19 km, 1°×1° en el ecuador ≈ 12 308 km², antimeridiano, orientación, reductor (deshacer, cerrar, tope de 500 vértices, duplicados), formato y frases del resultado; typecheck, `npm test` y `test:excel`. No se ejecutó `next build` ni `next dev`.
+- **Riesgos / decisiones:** (1) los lados son arcos geodésicos: un «rectángulo» grande dibujado con 4 vértices se abomba hacia el polo y mide ~1 % más que uno sobre los paralelos (a escala de parcela es despreciable); (2) un polígono que rodea un polo no se mide bien; (3) la medición no se guarda ni se exporta (solo sale en el PNG del mapa, porque es una capa vectorial más); (4) el área de un polígono con lados cruzados es neta y se avisa; (5) mientras mide, el clic sobre un punto del ranking sigue seleccionándolo.
+- **Pendiente (visual):** botón y panel en claro/oscuro, ancho de 320 px y sobre satélite (amarillo del trazo); superposición con zoom de Leaflet y con la barra «Agregar punto»; la lista con 20+ vértices; teclado real (Tab, Intro en el mapa, Escape) y lector de pantalla con el aviso del resultado.
 
