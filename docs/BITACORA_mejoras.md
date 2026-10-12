@@ -248,3 +248,9 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Decisión del agente (revisable):** `<main>` en el layout raíz cubre todas las páginas con un cambio mínimo pero deja el `<header>` dentro de `main`; el reparto fino queda pendiente.
 - **Pendiente:** tabpanels reales, lector de pantalla (NVDA/VoiceOver), axe/Lighthouse renderizado, 200 % de zoom y 320 px, contraste sobre teselas del mapa. Detalle y severidades en la auditoría.
 - **Verificación:** typecheck, `npm test` y `test:excel`. Sin verificación visual.
+
+### 24. Opciones excluyentes como tarjetas (radios)
+- **Qué:** los radios de «Un valor alto significa…» (editor de clases y Nuevo mapa) y de «Qué calcular con el vector» pasan de círculos sueltos a tarjetas seleccionables con punto relleno, borde y fondo de acento al elegir, foco visible y reducción de movimiento.
+- **Por qué:** el docente pidió radios más legibles; la selección ya no depende solo del color (punto relleno + borde) y el área clicable crece a ≥44 px.
+- **Cómo:** solo CSS al final de `globals.css` (`.gv-dir`, `.gv-modes`) con `:has(:checked)`; el `<input type="radio">` nativo se conserva (teclado y lectores de pantalla). Sin cambios de lógica.
+- **Pendiente (visual):** claro/oscuro y ancho angosto.

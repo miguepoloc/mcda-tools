@@ -1697,3 +1697,20 @@ html{scroll-padding-top:84px}
 :root{--field-line:#7B8BA1;--pa:#4F46E5}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--field-line:#64748B;--pa:#818CF8;--pa-ink:#0B0F17}}
 :root[data-theme="dark"]{--field-line:#64748B;--pa:#818CF8;--pa-ink:#0B0F17}
+
+/* Opciones excluyentes (radio) como tarjetas: el radio nativo sigue ahí (teclado, lectores), solo cambia su aspecto.
+   Selección = borde + fondo de acento + punto; foco = anillo; no depende solo del color (punto relleno). */
+.gv-dir,.gv-modes{--opt-r:10px}
+.gv-dir label,.gv-modes label{position:relative;display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:var(--opt-r);background:var(--surface);color:var(--ink);cursor:pointer;transition:border-color .15s,background-color .15s,box-shadow .15s}
+.gv-dir{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:8px 10px 10px}
+.gv-dir label{min-height:44px;font-weight:600}
+.gv-dir input[type="radio"],.gv-modes input[type="radio"]{appearance:none;-webkit-appearance:none;flex:none;width:18px;height:18px;margin:0;border:2px solid var(--muted);border-radius:50%;background:transparent;display:grid;place-content:center;cursor:pointer;transition:border-color .15s}
+.gv-dir input[type="radio"]::before,.gv-modes input[type="radio"]::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent,var(--ink));transform:scale(0);transition:transform .15s}
+.gv-dir input[type="radio"]:checked,.gv-modes input[type="radio"]:checked{border-color:var(--accent,var(--ink))}
+.gv-dir input[type="radio"]:checked::before,.gv-modes input[type="radio"]:checked::before{transform:scale(1)}
+.gv-dir label:hover,.gv-modes label:hover{border-color:var(--muted)}
+.gv-dir label:has(input:checked),.gv-modes label:has(input:checked){border-color:var(--accent,var(--ink));background:var(--accent-soft,var(--surface2));box-shadow:0 0 0 1px var(--accent,var(--ink)) inset}
+.gv-dir label:has(input:focus-visible),.gv-modes label:has(input:focus-visible){outline:2px solid var(--accent,var(--ink));outline-offset:2px}
+.gv-modes label.off{opacity:.5;cursor:not-allowed}.gv-modes label.off input{cursor:not-allowed}
+.gv-modes{gap:6px}
+@media (prefers-reduced-motion:reduce){.gv-dir label,.gv-modes label,.gv-dir input,.gv-modes input,.gv-dir input::before,.gv-modes input::before{transition:none}}

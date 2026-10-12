@@ -295,13 +295,13 @@ function NewProjectForm({ userId }: { userId: string }) {
               {start === 'blank' ? 'Empiezas con 3 criterios genéricos y un mapa mundial vacío. Después subes tus capas en el Geovisor.' : examples.find((e) => e.id === start)?.blurb}
             </p>
             {start === 'blank' && (
-              <fieldset style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', marginTop: 10 }}>
+              <fieldset className="gv-modes" style={{ marginTop: 10 }}>
                 <legend className="lbl" style={{ padding: '0 4px' }}>Un valor alto del índice significa…</legend>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                <label>
                   <input type="radio" name="direction" checked={direction === 'suitability'} onChange={() => setDirection('suitability')} />
                   <span><b>Más apto (mejor)</b> — mapa de aptitud: dónde conviene ubicar algo.</span>
                 </label>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', marginTop: 4 }}>
+                <label>
                   <input type="radio" name="direction" checked={direction === 'risk'} onChange={() => setDirection('risk')} />
                   <span><b>Más riesgo (peor)</b> — mapa de riesgo: dónde es más probable un daño.</span>
                 </label>
