@@ -1,0 +1,142 @@
+/* =====================================================================================================
+   Modo presentación (U4): letra grande, contraste ≥ 7:1, bordes y foco gruesos y sin textos secundarios,
+   para proyectar en el aula o ante un jurado. Se activa con data-present="1" en <html> (src/lib/present.ts,
+   conmutador en el Topbar; el script de arranque del layout lo aplica antes del primer pintado).
+   Este archivo se importa DESPUÉS de globals.css: gana por orden con igual especificidad y por especificidad
+   donde globals.css usa :root:not([data-theme="light"]) o [data-theme="dark"].
+
+   Estructura (scripts/check-a11y-static.ts lee los bloques marcados «present:*» y calcula los contrastes):
+     1. Tokens claro  2. Tokens oscuro (por preferencia del sistema)  3. Tokens oscuro (data-theme="dark")
+     4. Escala (zoom) y tipografía  5. Controles, bordes y foco  6. Ocultar lo secundario
+     7. Geovisor: mapa, leyendas y etiquetas  8. Cotas de viewport bajo zoom
+   ===================================================================================================== */
+
+/* ---- 1. present:light — texto ≥ 7:1 sobre fondo, superficies y fondos suaves ---- */
+:root[data-present="1"]{
+  --bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F1F5F9;--ink:#020617;--muted:#334155;--line:#64748B;--field-line:#475569;
+  --pa:#312E81;--pa-soft:#F5F7FF;--pa-ink:#FFFFFF;
+  --pb:#0C4A6E;--pb-soft:#F0F9FF;--pb-ink:#FFFFFF;
+  --pass:#047857;--pass-soft:#F0FDF4;--warn:#B45309;--warn-soft:#FFFBEB;
+  --warn-text:#78350F;--on-warn-text:#FFFFFF;--pass-text:#064E3B;--warn-t:#78350F;--pass-t:#064E3B;--warn-ink:#FFFFFF;
+  --mt-ahp:#4C1D95;--mt-topsis:#164E63;--mt-vikor:#064E3B;--mt-promethee:#881337;--mt-electre:#78350F;--mt-saw:#7C2D12;--mt-fuzzy:#134E4A;
+  --geo-accent-soft:#F7FBEA;
+}
+:root[data-present="1"] .gv-wrap{--gv-accent-strong:#365314;--gv-warn-ink:#78350F;--gv-focus:#1E3A8A;--gv-ok-bg:#14532D;--gv-ok-fg:#FFFFFF}
+:root[data-present="1"] .gv-tour{--gv-focus:#1E3A8A}
+
+/* ---- 2. present:dark — oscuro por preferencia del sistema (si no se forzó el tema claro) ---- */
+@media (prefers-color-scheme:dark){
+  :root[data-present="1"]:not([data-theme="light"]){
+    --bg:#000000;--surface:#0B1220;--surface2:#162032;--ink:#FFFFFF;--muted:#CBD5E1;--line:#94A3B8;--field-line:#94A3B8;
+    --pa:#C7D2FE;--pa-soft:#1E1B4B;--pa-ink:#000000;
+    --pb:#67E8F9;--pb-soft:#082F49;--pb-ink:#000000;
+    --pass:#6EE7B7;--pass-soft:#022C22;--warn:#FDE68A;--warn-soft:#2A1203;
+    --warn-text:#FDE68A;--on-warn-text:#000000;--pass-text:#6EE7B7;--warn-t:#FDE68A;--pass-t:#6EE7B7;--warn-ink:#000000;
+    --mt-ahp:#DDD6FE;--mt-topsis:#67E8F9;--mt-vikor:#6EE7B7;--mt-promethee:#FECDD3;--mt-electre:#FDE68A;--mt-saw:#FED7AA;--mt-fuzzy:#99F6E4;
+    --geo-accent-soft:#1A2E05;
+  }
+  :root[data-present="1"]:not([data-theme="light"]) .gv-wrap{--gv-accent-strong:#BEF264;--gv-warn-ink:#FDE68A;--gv-focus:#BEF264;--gv-ok-bg:#6EE7B7;--gv-ok-fg:#000000}
+  :root[data-present="1"]:not([data-theme="light"]) .gv-tour{--gv-focus:#BEF264}
+}
+
+/* ---- 3. present:dark-forced — oscuro forzado con data-theme="dark" (mismos valores que el bloque 2) ---- */
+:root[data-present="1"][data-theme="dark"]{
+  --bg:#000000;--surface:#0B1220;--surface2:#162032;--ink:#FFFFFF;--muted:#CBD5E1;--line:#94A3B8;--field-line:#94A3B8;
+  --pa:#C7D2FE;--pa-soft:#1E1B4B;--pa-ink:#000000;
+  --pb:#67E8F9;--pb-soft:#082F49;--pb-ink:#000000;
+  --pass:#6EE7B7;--pass-soft:#022C22;--warn:#FDE68A;--warn-soft:#2A1203;
+  --warn-text:#FDE68A;--on-warn-text:#000000;--pass-text:#6EE7B7;--warn-t:#FDE68A;--pass-t:#6EE7B7;--warn-ink:#000000;
+  --mt-ahp:#DDD6FE;--mt-topsis:#67E8F9;--mt-vikor:#6EE7B7;--mt-promethee:#FECDD3;--mt-electre:#FDE68A;--mt-saw:#FED7AA;--mt-fuzzy:#99F6E4;
+  --geo-accent-soft:#1A2E05;
+}
+:root[data-present="1"][data-theme="dark"] .gv-wrap{--gv-accent-strong:#BEF264;--gv-warn-ink:#FDE68A;--gv-focus:#BEF264;--gv-ok-bg:#6EE7B7;--gv-ok-fg:#000000}
+:root[data-present="1"][data-theme="dark"] .gv-tour{--gv-focus:#BEF264}
+
+/* ---- 4. Escala y tipografía ----
+   --pz es el factor de zoom por ancho de ventana (las media queries miran la ventana real, no la ampliada, así que
+   el zoom baja en pantallas angostas para no forzar el diseño móvil). El texto base llega a ~125 % en todos los
+   anchos: lo que no cubre el zoom lo completa font-size (15 px × 1.25 / --pz). A ≤ 699 px no hay zoom (nada se
+   desborda a 320 px): solo cambia la letra y la altura de los controles. */
+:root[data-present="1"]{--pz:1.25}
+@media (max-width:1199px){:root[data-present="1"]{--pz:1.15}}
+@media (max-width:999px){:root[data-present="1"]{--pz:1.1}}
+@media (max-width:699px){:root[data-present="1"]{--pz:1}}
+:root[data-present="1"] body{zoom:var(--pz);font-size:calc(15px * 1.25 / var(--pz));line-height:1.6}
+:root[data-present="1"]{scroll-padding-top:calc(84px * var(--pz))}
+:root[data-present="1"] h2{font-size:28px}
+:root[data-present="1"] h3{font-size:19px}
+:root[data-present="1"] .muted,:root[data-present="1"] .obj,:root[data-present="1"] .count,:root[data-present="1"] .read{font-size:max(1em,14px)}
+:root[data-present="1"] .eyebrow{font-size:13px}
+
+/* ---- 5. Controles, bordes y foco ---- */
+:root[data-present="1"] .btn,:root[data-present="1"] .btn.sm{min-height:44px;font-weight:700}
+:root[data-present="1"] input[type=text],:root[data-present="1"] input[type=number],:root[data-present="1"] input[type=password],
+:root[data-present="1"] input[type=email],:root[data-present="1"] select,:root[data-present="1"] textarea{min-height:44px;font-size:max(1em,16px)}
+:root[data-present="1"] input[type=checkbox],:root[data-present="1"] input[type=radio]{min-width:24px;min-height:24px}
+:root[data-present="1"] .btn,:root[data-present="1"] .card,:root[data-present="1"] input[type=text],:root[data-present="1"] input[type=number],
+:root[data-present="1"] input[type=password],:root[data-present="1"] input[type=email],:root[data-present="1"] select,:root[data-present="1"] textarea,
+:root[data-present="1"] .seg,:root[data-present="1"] .banner,:root[data-present="1"] .store,:root[data-present="1"] .umenu-btn,
+:root[data-present="1"] .gv-tabs button,:root[data-present="1"] .gv-legend,:root[data-present="1"] .gv-chips,:root[data-present="1"] .gv-fit{border-width:2px}
+:root[data-present="1"] .present-toggle.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* Foco: el doble de grueso (2 → 4 px) con separación del control. */
+:root[data-present="1"] :focus-visible{outline:4px solid var(--accent);outline-offset:3px}
+:root[data-present="1"] .gv-wrap :focus-visible,:root[data-present="1"] .gv-tour :focus-visible{outline:4px solid var(--gv-focus);outline-offset:3px}
+:root[data-present="1"] input:focus,:root[data-present="1"] select:focus,:root[data-present="1"] textarea:focus{
+  border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 45%,transparent)}
+:root[data-present="1"] .umenu-item:focus-visible,:root[data-present="1"] .gv-prow-btn:focus-visible{outline-offset:-4px}
+@media (forced-colors:active){
+  :root[data-present="1"] :focus-visible{outline:4px solid Highlight}
+}
+
+/* ---- 6. Ocultar lo secundario ----
+   Solo textos de ayuda que no cambian lo que se ve ni advierten de nada: pistas (.gv-hint sin .warn, sin role ni id,
+   porque esos se leen por aria-describedby o son estados), notas al pie del panel de puntos, el aviso de la rueda
+   del ratón y el tooltip flotante. Los avisos (.warn, role=alert/status) se conservan. */
+:root[data-present="1"] .gv-hint:not(.warn):not([role]):not([id]),
+:root[data-present="1"] .gv-pf-note,
+:root[data-present="1"] .gv-wheelhint,
+:root[data-present="1"] #tip{display:none !important}
+
+/* ---- 7. Geovisor: mapa, leyendas y etiquetas ----
+   El mapa (.gv-stage) se queda SIN zoom neto (zoom 1/--pz contra el del body): Leaflet calcula posiciones con
+   getBoundingClientRect/clientWidth y el zoom CSS de un ancestro lo desajusta. Por eso sus textos (leyenda, etiquetas
+   de puntos, controles) se agrandan aquí con tamaños explícitos, no con el zoom. */
+:root[data-present="1"] .gv-stage{zoom:calc(1 / var(--pz))}
+:root[data-present="1"] .gv-embed.gv-wrap{zoom:calc(1 / var(--pz))}
+:root[data-present="1"] .gv-embed .emb-stage{zoom:1}
+:root[data-present="1"] .gv-legend{font-size:15px;padding:12px 14px;line-height:1.35}
+:root[data-present="1"] .gv-legend b{font-size:15px}
+:root[data-present="1"] .gv-legend i{width:16px;height:16px}
+:root[data-present="1"] .gv-legend .row i{margin-top:1px}
+:root[data-present="1"] .gv-legend .ramp{height:14px}
+:root[data-present="1"] .gv-legend .ramp-wrap .tick{height:20px;width:3px;margin-left:-1.5px;top:-3px}
+:root[data-present="1"] .gv-legend .cuts{height:18px;font-size:13px;color:var(--ink)}
+:root[data-present="1"] .gv-legend .ends{font-size:13px;color:var(--ink)}
+:root[data-present="1"] .gv-legend .sub{font-size:13px;color:var(--ink)}
+:root[data-present="1"] .gv-legend-more{font-size:15px}
+:root[data-present="1"] .gv-legends{max-width:min(380px,calc(100% - 20px))}
+:root[data-present="1"] .gv-chips button,:root[data-present="1"] .gv-fit{font-size:14px;min-height:40px}
+:root[data-present="1"] .gv-coords{font-size:13px;color:var(--ink)}
+:root[data-present="1"] .gv-toast{font-size:15px}
+:root[data-present="1"] .gv-plabel{font:700 14px/24px system-ui,sans-serif;height:24px;max-width:220px;top:-12px;background:#000000;border:2px solid #FFFFFF}
+:root[data-present="1"] .gv-leaflet .leaflet-control-zoom a{width:40px;height:40px;line-height:40px;font-size:22px;color:#000000;border-width:2px}
+:root[data-present="1"] .gv-leaflet .leaflet-control-attribution{font-size:12px}
+:root[data-present="1"] .gv-shell{grid-template-columns:340px minmax(0,1fr)}
+@media (max-width:1000px){:root[data-present="1"] .gv-shell{grid-template-columns:1fr}}
+/* Resultados y tablas: etiquetas de barras y celdas con tamaño legible a distancia. */
+:root[data-present="1"] table{font-size:max(1em,14px)}
+:root[data-present="1"] .cbar .nm,:root[data-present="1"] .wbar .nm,:root[data-present="1"] .srow .nm,:root[data-present="1"] .lg{font-size:max(1em,14px)}
+:root[data-present="1"] .part .s,:root[data-present="1"] .ni .s{font-size:12.5px}
+
+/* ---- 8. Cotas de viewport bajo zoom ----
+   Con zoom en el body, vw/vh/dvh se miden ya ampliados en algunos motores: dividir por --pz da una cota que, en el
+   peor caso, queda más chica (los contenedores hacen scroll), nunca más grande que la pantalla. */
+:root[data-present="1"] .gv-wrap{left:0;transform:none;width:auto;max-width:calc(1560px / var(--pz));margin-inline:auto}
+:root[data-present="1"] .wrap:has(.gv-wrap){max-width:none}
+:root[data-present="1"] .gv-embed.gv-wrap{max-width:none;margin:0}
+:root[data-present="1"] .gv-side{max-height:calc((100vh - 132px) / var(--pz))}
+:root[data-present="1"] .modal{max-height:calc((100dvh - 40px) / var(--pz))}
+:root[data-present="1"] .gv-cmp{max-height:calc(94vh / var(--pz))}
+:root[data-present="1"] .gv-ztable-wrap{max-height:min(calc(60vh / var(--pz)),520px)}
+:root[data-present="1"] .umenu-pop{max-width:min(320px,calc((100vw - 32px) / var(--pz)))}
+:root[data-present="1"] .sh-panel{width:min(380px,calc((100vw - 32px) / var(--pz)))}
