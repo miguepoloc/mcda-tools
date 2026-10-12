@@ -37,7 +37,7 @@ export default function ElectrePairTable({ names, result, onlyOutranking = false
         {pairs.length === 0 && <tr><td colSpan={6} style={{ ...cell, color: 'var(--muted)' }}>Ningún par cumple las dos condiciones con estos umbrales.</td></tr>}
         {pairs.map(({ i, k, cOk, dOk, win }) => (
           <tr key={`${i}-${k}`} style={{ background: win ? 'color-mix(in srgb, var(--pass) 18%, var(--surface))' : undefined, fontWeight: win ? 700 : 400 }}>
-            <td style={cell}>{names[i]} → {names[k]}</td>
+            <th scope="row" style={{ ...cell, textAlign: 'left', fontWeight: 'inherit', fontFamily: 'inherit', textTransform: 'none', letterSpacing: 0, color: 'inherit' }}>{names[i]} → {names[k]}</th>
             <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{fmtVs(concordance[i][k], cStar, 'c')}</td>
             <td style={{ ...cell, textAlign: 'center' }}>{yn(cOk)}</td>
             <td style={{ ...cell, textAlign: 'right', fontFamily: 'var(--f-mono, monospace)' }}>{fmtVs(discordance[i][k], dStar, 'd')}</td>

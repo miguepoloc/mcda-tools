@@ -103,7 +103,7 @@ export default function GeoClassesEditor({ setup, onSetup, hex, onCut, canCut, v
 
   return (
     <section className="gv-sec" aria-labelledby="gv-cls-h">
-      <header><h4 id="gv-cls-h">Clases del mapa</h4></header>
+      <header><h3 id="gv-cls-h">Clases del mapa</h3></header>
 
       <fieldset className="gv-dir">
         <legend>Un valor alto del índice significa…</legend>

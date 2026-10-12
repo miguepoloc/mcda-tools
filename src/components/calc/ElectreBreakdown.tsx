@@ -179,14 +179,14 @@ export default function ElectreBreakdown({ mode, criteria, alternatives, dm, wei
           const dd = detail(i, k);
           return (
             <div key={i + '-' + k} className="ob-pair">
-              <h5 className="ob-sub">Par {names[i]} y {names[k]}</h5>
+              <h4 className="ob-sub">Par {names[i]} y {names[k]}</h4>
               {kind === 'c' ? concTable(dd) : discTable(dd)}
               <Worked>{kind === 'c' ? concWorked(dd) : discWorked(dd)}</Worked>
             </div>
           );
         })}
         {reportPairsCut && <Note>Con {n} alternativas hay {allUnordered.length} pares; el desglose criterio por criterio se muestra solo para los que tienen alguna relación de superación. Los {totalPairs} pares ordenados, completos, están en la tabla de abajo.</Note>}
-        <h5 className="ob-sub">Los {totalPairs} pares ordenados, todos</h5>
+        <h4 className="ob-sub">Los {totalPairs} pares ordenados, todos</h4>
         {kind === 'c' ? compactC : compactD}
       </>
     );

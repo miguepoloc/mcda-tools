@@ -49,7 +49,7 @@ export default function GeoSensitivityPanel(p: SensitivityPanelProps) {
 
   return (
     <section className="gv-sec" aria-labelledby="gv-sens-h">
-      <header><h4 id="gv-sens-h">Sensibilidad de los pesos</h4></header>
+      <header><h3 id="gv-sens-h">Sensibilidad de los pesos</h3></header>
       <p className="gv-hint" id={noteId}>
         ¿Cuánto cambia el mapa si un peso estuviera algo mal? Se sube y baja el peso de cada criterio ±10 % y ±20 % (los demás se reescalan en proporción) y se ve qué celdas cambian de clase.
         Usa las reglas, vetos y cortes actuales{p.exploring ? ' y los pesos explorados' : ' y los pesos del panel de expertos'}.

@@ -119,12 +119,12 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
           : 'Para cada alternativa, escribe el valor real que tiene en cada criterio — un dato (precio, kilómetros, años, una métrica técnica), no un juicio de 1 a 9 como en AHP. Marca el tipo de cada criterio: Beneficio (MÁS es mejor), Costo (MENOS es mejor) u Objetivo (lo mejor es un valor específico, por ejemplo un voltaje de 110 V: ni más ni menos es mejor).'}
       </p>
       {!isFuzzy && onSetUnit && missingUnits(criteria).length > 0 && (
-        <div className="banner" role="status" style={{ marginBottom: 12 }}>
+        <div className="banner" id="mx-units-warn" role="status" style={{ marginBottom: 12 }}>
           <span><b>Falta la unidad de:</b> {missingUnits(criteria).map((c) => c.name).join(', ')}. Escríbela bajo el nombre del criterio (km, años, USD, «escala 1–5»…); si es un puntaje, «escala 1–5» o «sin unidad».</span>
         </div>
       )}
       {sinObjetivo.length > 0 && (
-        <div className="banner" role="alert" style={{ marginBottom: 12 }}>
+        <div className="banner" id="mx-target-err" role="alert" style={{ marginBottom: 12 }}>
           <span><b>Falta el valor objetivo</b> de: {sinObjetivo.map((c) => c.name).join(', ')}. Escríbelo en la fila «Valor objetivo»; mientras tanto ese criterio no distingue entre alternativas.</span>
         </div>
       )}
@@ -224,7 +224,7 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
                   <th key={c.id} scope="col">
                     <span className="crit-name">{c.name}</span>
                     {!isFuzzy && onSetUnit && (
-                      <input type="text" className={'unit-in' + (c.unit?.trim() ? '' : ' missing')} value={c.unit ?? ''} placeholder="unidad…" autoComplete="off" aria-label={`Unidad de ${c.name}`} onChange={(e) => onSetUnit(c.id, e.target.value)} />
+                      <input type="text" className={'unit-in' + (c.unit?.trim() ? '' : ' missing')} value={c.unit ?? ''} placeholder="unidad…" autoComplete="off" aria-label={`Unidad de ${c.name}`} aria-invalid={c.unit?.trim() ? undefined : true} aria-describedby={c.unit?.trim() ? undefined : 'mx-units-warn'} onChange={(e) => onSetUnit(c.id, e.target.value)} />
                     )}
                     <div className="seg" role="group" aria-label={`Tipo de ${c.name}`}>
                       <button type="button" aria-pressed={getKind(matrix, c.id) === 'max'} onClick={() => onSetType(c.id, 'max')}>Beneficio</button>
@@ -249,7 +249,7 @@ export default function DecisionMatrixEditor({ criteria, alternatives, matrix, m
                         <td key={c.id}>
                           {getKind(matrix, c.id) === 'target' ? (
                             <input type="number" inputMode="decimal" step="any" aria-label={`Valor objetivo de ${c.name}`}
-                              aria-invalid={!t} placeholder="ej. 110" value={t?.value ?? ''}
+                              aria-invalid={!t} aria-describedby={!t ? 'mx-target-err' : undefined} placeholder="ej. 110" value={t?.value ?? ''}
                               onChange={(e) => e.target.value !== '' && onSetTarget(c.id, { value: Number(e.target.value), tol: t?.tol ?? 0 })} />
                           ) : <span className="muted" aria-hidden="true">—</span>}
                         </td>

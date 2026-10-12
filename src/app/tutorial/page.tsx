@@ -161,12 +161,12 @@ export default async function TutorialPage() {
               <div className="tbl"><table aria-label="Criterios, archivos, fuente y regla del mini-tutorial">
                 <thead><tr><th scope="col">Criterio</th><th scope="col">Archivo</th><th scope="col">De dónde</th><th scope="col">Regla</th></tr></thead>
                 <tbody>
-                  <tr><td>Radiación solar</td><td>GeoTIFF de GHI (kWh/m²/día)</td><td>Global Solar Atlas (globalsolaratlas.info → Data download)</td><td>Más es mejor: 0 hasta 4.5, 1 desde 6</td></tr>
-                  <tr><td>Pendiente</td><td>GeoTIFF de pendiente (°)</td><td>DEM SRTM/Copernicus → QGIS «Pendiente»</td><td>Menos es mejor: 1 hasta 5°, 0 desde 15°; veto ≥ 20°</td></tr>
-                  <tr><td>Distancia a la red eléctrica</td><td>Líneas eléctricas (GeoJSON)</td><td>OpenStreetMap <code>power=line</code> (Overpass turbo)</td><td>Distancia (m): menos es mejor, 1 hasta 1 000, 0 desde 15 000</td></tr>
-                  <tr><td>Distancia a vías</td><td>Vías (GeoJSON)</td><td>OpenStreetMap <code>highway</code></td><td>Distancia (m): menos es mejor</td></tr>
-                  <tr><td>Exclusión</td><td>Áreas protegidas, cuerpos de agua, poblados</td><td>RUNAP/WDPA, IGAC, OSM</td><td>Papel «Exclusión»</td></tr>
-                  <tr><td>Área de estudio</td><td>Polígono del municipio</td><td>DANE / IGAC</td><td>Papel «Área de estudio»</td></tr>
+                  <tr><th scope="row">Radiación solar</th><td>GeoTIFF de GHI (kWh/m²/día)</td><td>Global Solar Atlas (globalsolaratlas.info → Data download)</td><td>Más es mejor: 0 hasta 4.5, 1 desde 6</td></tr>
+                  <tr><th scope="row">Pendiente</th><td>GeoTIFF de pendiente (°)</td><td>DEM SRTM/Copernicus → QGIS «Pendiente»</td><td>Menos es mejor: 1 hasta 5°, 0 desde 15°; veto ≥ 20°</td></tr>
+                  <tr><th scope="row">Distancia a la red eléctrica</th><td>Líneas eléctricas (GeoJSON)</td><td>OpenStreetMap <code>power=line</code> (Overpass turbo)</td><td>Distancia (m): menos es mejor, 1 hasta 1 000, 0 desde 15 000</td></tr>
+                  <tr><th scope="row">Distancia a vías</th><td>Vías (GeoJSON)</td><td>OpenStreetMap <code>highway</code></td><td>Distancia (m): menos es mejor</td></tr>
+                  <tr><th scope="row">Exclusión</th><td>Áreas protegidas, cuerpos de agua, poblados</td><td>RUNAP/WDPA, IGAC, OSM</td><td>Papel «Exclusión»</td></tr>
+                  <tr><th scope="row">Área de estudio</th><td>Polígono del municipio</td><td>DANE / IGAC</td><td>Papel «Área de estudio»</td></tr>
                 </tbody>
               </table></div>
               <p>Pasos: 1) crea el proyecto en blanco y renombra los 4 criterios; 2) sube el polígono del municipio como <b>Área de estudio</b> (el área y la resolución se proponen solos); 3) sube cada archivo asignándolo a su criterio; 4) en «Modelo» ajusta las reglas de la tabla; 5) pide a tus expertos que comparen los criterios; 6) haz clic en el mapa sobre los mejores sitios y revisa qué criterio los limita; 7) exporta el GeoTIFF y sigue el análisis en QGIS (Sesión 6) si necesitas áreas contiguas mínimas.</p>

@@ -16,6 +16,8 @@ export default function MethodologyParagraph({ input }: { input: MethodologyInpu
       if (!navigator.clipboard) throw new Error('sin clipboard');
       await navigator.clipboard.writeText(text);
       setMsg(lang === 'es' ? 'Párrafo copiado' : 'Paragraph copied');
+      setTimeout(() => setMsg(''), 6000);
+      return;
     } catch {
       // Fallback: seleccionar el texto y probar el comando clásico; si tampoco, queda seleccionado para Ctrl/Cmd+C.
       const el = ref.current;
@@ -25,7 +27,7 @@ export default function MethodologyParagraph({ input }: { input: MethodologyInpu
       try { done = document.execCommand('copy'); } catch { done = false; }
       setMsg(done ? 'Párrafo copiado' : 'No se pudo copiar solo: el texto quedó seleccionado, cópialo con Ctrl/Cmd+C');
     }
-    setTimeout(() => setMsg(''), 4000);
+    // El aviso de fallo (instrucciones para copiar a mano) no desaparece solo: queda hasta el siguiente intento.
   }
 
   return (

@@ -84,13 +84,13 @@ export default function GeoPointsPanel(p: Props) {
   return (
     <div className="gv-sec-stack">
       <section className="gv-sec">
-        <header><h4>Puntos</h4><span className="gv-badge ok">{p.points.length} / {MAX_POINTS}</span></header>
+        <header><h3>Puntos</h3><span className="gv-badge ok">{p.points.length} / {MAX_POINTS}</span></header>
         <p className="gv-hint">Marca sitios de interés (candidatos a boya, parcelas, estaciones…) y mira cuál queda mejor. Cada punto toma el índice de la celda donde cae, el mismo valor que ves en el mapa.</p>
         <div className="gv-row-acts">
           <button type="button" className={'btn sm' + (p.addMode ? ' primary' : '')} aria-pressed={p.addMode} disabled={full && !p.addMode} onClick={() => p.onAddMode(!p.addMode)}>
             <Icon d={ICONS.plus} size={13} /> {p.addMode ? 'Terminar de agregar' : 'Agregar punto'}
           </button>
-          <button type="button" className="btn sm" disabled={busy || full} onClick={() => fileRef.current?.click()}>
+          <button type="button" className="btn sm" disabled={busy || full} aria-invalid={err ? true : undefined} aria-describedby={err ? 'gv-pts-err' : undefined} onClick={() => fileRef.current?.click()}>
             <Icon d={ICONS.upload} size={13} /> {busy ? 'Leyendo…' : 'Importar archivo'}
           </button>
           <input ref={fileRef} type="file" hidden accept=".csv,.txt,.tsv,.geojson,.json,.kml,.kmz,.gpx,.zip" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }} />
@@ -106,13 +106,13 @@ export default function GeoPointsPanel(p: Props) {
         )}
         {p.addNote && <p className="gv-hint warn" role="status">{p.addNote}</p>}
         {full && <p className="gv-hint warn">Llegaste al tope de {MAX_POINTS} puntos: elimina alguno para agregar más.</p>}
-        {err && <p className="gv-hint warn" role="alert">{err}</p>}
+        {err && <p id="gv-pts-err" className="gv-hint warn" role="alert">{err}</p>}
       </section>
 
       {preview && res && (
         <section className="gv-sec" aria-label="Vista previa de la importación">
-          <header><h4>Vista previa</h4></header>
-          <p className="gv-hint"><b>{preview.fileName}</b>: {res.rows.length} punto(s) válido(s){res.errors.length ? ` · ${res.errors.length} aviso(s) o error(es)` : ''}.</p>
+          <header><h3>Vista previa</h3></header>
+          <p className="gv-hint" role="status"><b>{preview.fileName}</b>: {res.rows.length} punto(s) válido(s){res.errors.length ? ` · ${res.errors.length} aviso(s) o error(es)` : ''}.</p>
           {preview.fc !== null && res.nameFields.length > 0 && (
             <label className="gv-field">
               <span className="gv-hint">Propiedad con el nombre</span>
@@ -124,7 +124,7 @@ export default function GeoPointsPanel(p: Props) {
           )}
           {res.rows.length > room && <p className="gv-hint warn">Hay lugar para {room} punto(s) más: se agregarán los primeros {room} y se omitirán {res.rows.length - room}.</p>}
           {res.errors.length > 0 && (
-            <ul className="gv-perrs">
+            <ul className="gv-perrs" aria-label="Avisos y errores de la importación">
               {res.errors.slice(0, 8).map((e, i) => <li key={i}>{e.line !== null ? `${unit} ${e.line}: ` : ''}{e.msg}</li>)}
               {res.errors.length > 8 && <li>… y {res.errors.length - 8} más.</li>}
             </ul>

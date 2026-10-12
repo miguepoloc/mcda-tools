@@ -32,10 +32,10 @@ export default function CitationBox() {
       }
       if (isSnippet) {
         setCopiedSnippet(true);
-        setTimeout(() => setCopiedSnippet(false), 2500);
+        setTimeout(() => setCopiedSnippet(false), 6000);
       } else {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
+        setTimeout(() => setCopied(false), 6000);
       }
     } catch {
       // fallback gracioso
@@ -220,6 +220,7 @@ export default function CitationBox() {
                 type="button"
                 className={`btn sm ${copiedSnippet ? 'cite-copied-btn' : ''}`}
                 onClick={() => handleCopy(METHODOLOGY_SNIPPET, true)}
+                aria-live="polite"
                 title="Copiar texto de metodología"
               >
                 {copiedSnippet ? '¡Párrafo copiado!' : 'Copiar párrafo'}

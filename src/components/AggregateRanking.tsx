@@ -33,9 +33,9 @@ export default function AggregateRanking({ names, methods, electreExcluded, comp
           <tbody>
             {res.rows.map((r) => (
               <tr key={r.index}>
-                <td className="n mono" style={{ fontWeight: r.rank === 1 ? 700 : 500, color: r.rank === 1 ? 'var(--pass)' : undefined }}>
+                <th scope="row" className="n mono" style={{ fontWeight: r.rank === 1 ? 700 : 500, color: r.rank === 1 ? 'var(--pass)' : undefined }}>
                   #{r.rank}{r.tied ? ' (empate)' : ''}
-                </td>
+                </th>
                 <td style={{ fontWeight: r.rank === 1 ? 700 : 500 }}>{r.name}</td>
                 <td className="n mono" title={rule === 'borda' ? `de ${(names.length - 1) * res.methodCount} puntos posibles` : undefined}>
                   {rule === 'copeland' && r.score > 0 ? '+' : ''}{Number.isInteger(r.score) ? r.score : r.score.toFixed(1)}

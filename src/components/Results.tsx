@@ -174,7 +174,7 @@ function Table({ names, M, f, label }: { names: string[]; M: number[][]; f: (x: 
     <div className="tbl" style={{ marginTop: 8 }}>
       <table aria-label={label}>
         <thead><tr><th scope="col"><span className="sr-only">Alternativa</span></th>{names.map((x) => <th scope="col" key={x} className="n">{x}</th>)}</tr></thead>
-        <tbody>{M.map((r, i) => <tr key={i}><td>{names[i]}</td>{r.map((x, j) => <td key={j} className="n">{f(x)}</td>)}</tr>)}</tbody>
+        <tbody>{M.map((r, i) => <tr key={i}><th scope="row">{names[i]}</th>{r.map((x, j) => <td key={j} className="n">{f(x)}</td>)}</tr>)}</tbody>
       </table>
     </div>
   );
@@ -641,13 +641,13 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                   <table aria-label="Síntesis: prioridad por criterio, global y posición">
                     <thead><tr><th scope="col">Alternativa</th>{criteria.map((c) => <th scope="col" key={c.id} className="n">{c.name}</th>)}<th scope="col" className="n">Global</th><th scope="col" className="n">Rank</th></tr></thead>
                     <tbody>
-                      <tr><td className="muted">Peso del criterio</td>{syn.wr.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}<td /><td /></tr>
+                      <tr><th scope="row" className="muted">Peso del criterio</th>{syn.wr.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}<td /><td /></tr>
                       {syn.order.map((idx) => {
                         const row = syn.rows[idx];
                         const isWinner = row.rank === 1 && !syn.tie;
                         return (
                           <tr key={idx} className={isWinner ? 'row-winner' : ''}>
-                            <td>
+                            <th scope="row">
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontWeight: isWinner ? 700 : 500, color: isWinner ? '#FFF' : undefined }}>
                                   {row.name}
@@ -674,7 +674,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                                   </span>
                                 )}
                               </div>
-                            </td>
+                            </th>
                             {row.loc.map((x, j) => (
                               <td key={j} className="n" style={{ color: isWinner ? 'var(--ink)' : undefined, fontWeight: isWinner ? 600 : undefined }}>
                                 {x.toFixed(4)}
@@ -723,7 +723,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                 <div className="tbl" style={{ marginTop: 8 }}>
                   <table aria-label="Peso de cada criterio">
                     <thead><tr><th scope="col"></th>{criteria.map((c) => <th scope="col" key={c.id} className="n">{withUnit(c)}</th>)}</tr></thead>
-                    <tbody><tr><td className="muted">Peso</td>{critWeights.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}</tr></tbody>
+                    <tbody><tr><th scope="row" className="muted">Peso</th>{critWeights.map((w, i) => <td key={i} className="n">{w.toFixed(4)}</td>)}</tr></tbody>
                   </table>
                 </div>
                 <h4>Matriz de decisión (valores tal cual se ingresaron)</h4>
@@ -735,7 +735,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                     })}</tr></thead>
                     <tbody>
                       {alternatives.map((a) => (
-                        <tr key={a.id}><td>{a.name}</td>{criteria.map((c) => {
+                        <tr key={a.id}><th scope="row">{a.name}</th>{criteria.map((c) => {
                           const x = getCell(dmRaw, a.id, c.id), t = getTarget(dmRaw, c.id);
                           return <td key={c.id} className="n">{x ?? '—'}{x != null && t && getKind(dmRaw, c.id) === 'target' ? <span className="muted"> (distancia {Number(targetDistance(x, t.value, t.tol).toPrecision(6))})</span> : null}</td>;
                         })}</tr>
@@ -799,7 +799,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
                       const firsts = compareViews.filter((m) => !m.tie && !m.soft && m.rows.find((row) => row.name === a.name)?.rank === 1).length + (elecFirst ? 1 : 0);
                       return (
                         <tr key={a.id}>
-                          <td>{a.name}</td>
+                          <th scope="row">{a.name}</th>
                           {compareViews.map((m) => {
                             const row = m.rows.find((rr) => rr.name === a.name);
                             const isFirst = !m.tie && !m.soft && row?.rank === 1;

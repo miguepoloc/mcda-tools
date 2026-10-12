@@ -560,7 +560,7 @@ export default function ExecutiveReportModal({
                   const w = weights[i] ?? 0;
                   return (
                     <tr key={c.id} style={{ borderBottom: '1px solid #CBD5E1' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 600 }}>{c.name}{!isAhp && c.unit?.trim() ? <span style={{ fontWeight: 400, color: '#475569' }}> ({c.unit.trim()})</span> : null}</td>
+                      <th scope="row" style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 600 }}>{c.name}{!isAhp && c.unit?.trim() ? <span style={{ fontWeight: 400, color: '#475569' }}> ({c.unit.trim()})</span> : null}</th>
                       {showMatrix && (
                         <td style={{ padding: '8px 10px', color: '#475569' }}>{ruleText(c.id)}</td>
                       )}
@@ -633,9 +633,9 @@ export default function ExecutiveReportModal({
                     const st = sheetStatus(sh);
                     return (
                       <tr key={sh.label + i} style={{ borderBottom: '1px solid #CBD5E1' }}>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                        <th scope="row" style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 600 }}>
                           {i === 0 ? sh.label : `Alternativas según «${sh.label}»`}
-                        </td>
+                        </th>
                         <td style={{ padding: '8px 10px', textAlign: 'right', whiteSpace: 'nowrap', ...MONO }}>{sh.answered} de {sh.total}</td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: st.color, ...MONO }}>{sh.cr.toFixed(4)}</td>
                         <td style={{ padding: '8px 10px', fontSize: 12, color: st.color, fontWeight: st.bold ? 700 : 500 }}>{st.text}</td>
@@ -685,7 +685,7 @@ export default function ExecutiveReportModal({
                   <tbody>
                     {alternatives.map((alt, i) => (
                       <tr key={alt.id} style={{ borderBottom: '1px solid #CBD5E1' }}>
-                        <td style={{ padding: '6px 8px', fontWeight: 600 }}>{alt.name}</td>
+                        <th scope="row" style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>{alt.name}</th>
                         {criteria.map((c, j) => {
                           const v = ahp.local[i]?.[j];
                           const best = v != null && v >= Math.max(...ahp.local.map((r) => r[j] ?? 0)) - 1e-12;
@@ -725,7 +725,7 @@ export default function ExecutiveReportModal({
                   <tbody>
                     {alternatives.map((alt) => (
                       <tr key={alt.id} style={{ borderBottom: '1px solid #CBD5E1' }}>
-                        <td style={{ padding: '6px 8px', fontWeight: 600 }}>{alt.name}</td>
+                        <th scope="row" style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>{alt.name}</th>
                         {criteria.map((c) => (
                           <td key={c.id} style={{ padding: '6px 8px', textAlign: 'right', ...MONO }}>
                             {cellText(alt.id, c.id)}
@@ -800,7 +800,7 @@ export default function ExecutiveReportModal({
                         background: row.rank === 1 ? '#F0FDF4' : undefined,
                       }}
                     >
-                      <td style={{ padding: '8px 10px', fontWeight: 700, ...MONO }}>#{row.rank}</td>
+                      <th scope="row" style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 700, ...MONO }}>#{row.rank}</th>
                       <td style={{ padding: '8px 10px', fontWeight: row.rank === 1 ? 700 : 500 }}>
                         {row.name} {row.rank === 1 && tied.length === 1 && !(compromiseSet && compromiseSet.length > 1) && '✓'}
                       </td>
@@ -914,7 +914,7 @@ export default function ExecutiveReportModal({
                 <tbody>
                   {blk.steps.map((st) => (
                     <tr key={st.title} style={{ borderBottom: '1px solid #CBD5E1', verticalAlign: 'top' }}>
-                      <td style={{ padding: '5px 8px', width: '30%', fontWeight: 600 }}>{st.title}</td>
+                      <th scope="row" style={{ textAlign: 'left', padding: '5px 8px', width: '30%', fontWeight: 600 }}>{st.title}</th>
                       <td style={{ padding: '5px 8px', fontSize: 11, wordBreak: 'break-word', ...MONO }}>{st.formula ?? st.desc}</td>
                     </tr>
                   ))}

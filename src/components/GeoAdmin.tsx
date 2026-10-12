@@ -148,7 +148,7 @@ export default function GeoAdmin({ client }: { client?: SupabaseClient } = {}) {
             <tbody>
               {usageRows.map((u) => (
                 <tr key={u.user_id}>
-                  <td>{u.name || '—'}<br /><span className="muted" style={{ fontSize: 12 }}>{u.email}</span></td>
+                  <th scope="row">{u.name || '—'}<br /><span className="muted" style={{ fontSize: 12 }}>{u.email}</span></th>
                   <td className="n">{u.projects}</td><td className="n">{u.layers}</td>
                   <td>{mb(u.used_bytes)} MB{u.used_bytes > u.quota_bytes && <b className="gv-over"> · sobre la cuota</b>}</td>
                   <td>{edit?.email === u.email
@@ -184,7 +184,7 @@ export default function GeoAdmin({ client }: { client?: SupabaseClient } = {}) {
                 const layers = Object.values(p.definition.geo.layers);
                 return (
                   <tr key={p.id}>
-                    <td><b>{p.title}</b><br /><span className="muted mono" style={{ fontSize: 12 }}>{p.id}</span></td>
+                    <th scope="row"><b>{p.title}</b><br /><span className="muted mono" style={{ fontSize: 12 }}>{p.id}</span></th>
                     <td className="n">{layers.length}</td><td className="n">{mb(layers.reduce((a, l) => a + (l.bytes || 0), 0))} MB</td>
                     <td>{p.is_active ? 'Activo' : 'Oculto'}</td>
                     <td className="uact">

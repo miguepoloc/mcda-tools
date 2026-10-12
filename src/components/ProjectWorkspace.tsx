@@ -369,13 +369,14 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
 
       <div className="tabsbar" role="tablist" aria-label="Secciones del proyecto" onKeyDown={tablistKeys}>
         {TABS.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => goTab(t)}>
+          <button key={t} type="button" role="tab" id={`pw-tab-${tabSlug(t)}`} aria-controls={tab === t ? 'pw-panel' : undefined} aria-selected={tab === t} tabIndex={tab === t ? 0 : -1} onClick={() => goTab(t)}>
             {t}
           </button>
         ))}
       </div>
       {msg && <p className="muted" role="status" style={{ marginBottom: 10 }}>{msg}</p>}
 
+      <div role="tabpanel" id="pw-panel" aria-labelledby={`pw-tab-${tabSlug(tab)}`}>
       {tab === 'Proyecto' && (
         <div className="panel">
           <div className="card form">
@@ -772,6 +773,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
           onExcel={exportExcel} onPrioExcel={exportPrioExcel}
         />
       )}
+      </div>
 
       {showSciModal && (
         <ScientificMethodModal

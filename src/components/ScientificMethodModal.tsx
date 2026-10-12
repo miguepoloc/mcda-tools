@@ -547,6 +547,7 @@ export default function ScientificMethodModal({
   const extraRefs = extraRefsFor(methodKey);
   const [format, setFormat] = useState<CitationFormat>('ieee');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastPaused, setToastPaused] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -575,9 +576,10 @@ export default function ScientificMethodModal({
 
   useEffect(() => {
     if (!toastMsg) return;
-    const timer = setTimeout(() => setToastMsg(null), 2800);
+    if (toastPaused) return; // 2.2.1: con el puntero encima el aviso no se va
+    const timer = setTimeout(() => setToastMsg(null), 7000);
     return () => clearTimeout(timer);
-  }, [toastMsg]);
+  }, [toastMsg, toastPaused]);
 
   const activeCitation = method.citations[format];
 
@@ -606,10 +608,13 @@ export default function ScientificMethodModal({
       }}
     >
       {/* Toast Notificación Glassmórfica («Toast Lindo») */}
+      {/* Región viva siempre montada (una región que aparece con su texto no siempre se anuncia). */}
+      <div className="sr-only" role="status" aria-live="polite">{toastMsg ?? ''}</div>
       {toastMsg && (
         <div
-          role="status"
-          aria-live="polite"
+          aria-hidden="true"
+          onMouseEnter={() => setToastPaused(true)}
+          onMouseLeave={() => setToastPaused(false)}
           style={{
             position: 'fixed',
             top: 24,

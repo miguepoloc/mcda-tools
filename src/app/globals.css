@@ -143,6 +143,9 @@ label.lbl,legend.lbl{font:600 12px var(--f-mono);letter-spacing:.05em;text-trans
 table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
 th{font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--line);vertical-align:bottom}
 td{padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tbody th[scope=row]:not(.n){font:inherit;letter-spacing:0;text-transform:none;color:inherit;padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tbody th[scope=row].n{text-transform:none;letter-spacing:0;color:var(--ink);padding:7px 10px 7px 0;vertical-align:top}
+tbody th[scope=row].muted{color:var(--muted)}
 td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 td input[type=text]{padding:5px 8px;font-size:13px}
 tr.win td{font-weight:600}
@@ -229,7 +232,8 @@ h4{font:500 12px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;col
 .card.win .big{font:700 26px var(--f-display)}
 tr.win, tr.row-winner{display:table-row !important;background:color-mix(in srgb, var(--accent) 8%, transparent)}
 tr.win td, tr.row-winner td{font-weight:600;color:var(--ink);border-bottom:1px solid color-mix(in srgb, var(--accent) 25%, transparent)}
-tr.win td:first-child, tr.row-winner td:first-child{border-left:3px solid var(--accent);padding-left:8px}
+tr.win th[scope=row], tr.row-winner th[scope=row]{font-weight:600;color:var(--ink);border-bottom:1px solid color-mix(in srgb, var(--accent) 25%, transparent)}
+tr.win td:first-child, tr.row-winner td:first-child, tr.win th[scope=row]:first-child, tr.row-winner th[scope=row]:first-child{border-left:3px solid var(--accent);padding-left:8px}
 .stack{display:grid;gap:8px}
 .srow{display:grid;grid-template-columns:minmax(110px,200px) 1fr;gap:12px;align-items:center}
 .srow .nm{font-size:13px;line-height:1.3}
@@ -537,7 +541,7 @@ a{color:var(--accent)}
 .thsort:hover{color:var(--ink)}
 th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(--ink)}
 .utable{min-width:900px}
-.utable th.ucell{font:inherit;letter-spacing:0;text-transform:none;color:var(--ink);padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.utable th.ucell{font:inherit;letter-spacing:0;text-transform:none;color:inherit;padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .utable td,.utable th.ucell{padding-block:11px}
 .utable td{vertical-align:middle}
 .utable th.ucell{vertical-align:middle}
@@ -602,7 +606,7 @@ th[aria-sort="ascending"] .thsort,th[aria-sort="descending"] .thsort{color:var(-
 .gv-sec-stack{display:grid;gap:12px}
 .gv-sec{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:9px;background:var(--bg)}
 .gv-sec>header{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.gv-sec h4{margin:0;font:700 12px var(--f-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.gv-sec h2,.gv-sec h3,.gv-sec h4{margin:0;font:700 12px var(--f-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .gv-hint{margin:0;font-size:12.5px;line-height:1.45;color:var(--muted)}
 .gv-hint.warn{color:var(--warn-text)}
 .gv-howto{margin:0;padding:0;list-style:none;display:grid;gap:5px;font-size:12.5px;line-height:1.4;color:var(--muted)}
@@ -1589,7 +1593,7 @@ details.calc-sec[open]>.calc-sec-sum .calc-sec-result{display:none}
 /* Lista del ranking de puntos: filas de dos líneas, sin scroll horizontal ni scroll anidado (desplaza el panel). */
 .gv-plist{display:grid;gap:8px;min-width:0}
 .gv-plist-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
-.gv-plist-h h5{margin:0;font:700 13px var(--f-body);color:var(--ink)}
+.gv-plist-h h4{margin:0;font:700 13px var(--f-body);color:var(--ink)}
 .gv-plist-sub{flex:1 1 100%;font-size:12px;color:var(--muted)}
 .gv-psearch input{width:100%;min-height:36px;padding:5px 9px;font-size:13px}
 .gv-psearch-n{margin:0;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}

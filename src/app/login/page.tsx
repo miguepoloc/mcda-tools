@@ -33,6 +33,7 @@ function LoginForm() {
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState<'err' | 'ok'>('err');
   const [busy, setBusy] = useState(false);
+  const hasErr = !!msg && msgType === 'err';
   const [showPw, setShowPw] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
@@ -141,7 +142,7 @@ function LoginForm() {
             {mode === 'up' && <div><label className="lbl" htmlFor="n">Nombre completo</label><input id="n" type="text" required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Ej.: Ana Pérez" /></div>}
             <div>
               <label className="lbl" htmlFor="e">Correo electrónico</label>
-              <input id="e" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="tu-correo@universidad.edu.co" />
+              <input id="e" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="tu-correo@universidad.edu.co" aria-invalid={hasErr || undefined} aria-describedby={hasErr ? 'auth-err' : undefined} />
             </div>
             {mode !== 'reset' && (
               <div>
@@ -154,7 +155,7 @@ function LoginForm() {
                   )}
                 </div>
                 <div className="pwfield">
-                  <input id="p" type={showPw ? 'text' : 'password'} required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} placeholder="Mínimo 8 caracteres" aria-describedby={mode === 'up' ? 'pwhelp' : undefined} />
+                  <input id="p" type={showPw ? 'text' : 'password'} required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} placeholder="Mínimo 8 caracteres" aria-invalid={hasErr || undefined} aria-describedby={[mode === 'up' ? 'pwhelp' : '', hasErr ? 'auth-err' : ''].filter(Boolean).join(' ') || undefined} />
                   <button type="button" className="pwtoggle" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw} aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                     {showPw ? 'Ocultar' : 'Mostrar'}
                   </button>
@@ -163,7 +164,7 @@ function LoginForm() {
               </div>
             )}
             {msg && (
-              <div className={msgType === 'ok' ? 'banner info' : 'banner'} role="alert" style={{ margin: 0, fontSize: 13.5 }}>
+              <div className={msgType === 'ok' ? 'banner info' : 'banner'} id="auth-err" role="alert" style={{ margin: 0, fontSize: 13.5 }}>
                 <span><b>{msgType === 'ok' ? 'Listo:' : 'Error:'}</b> {msg}</span>
               </div>
             )}

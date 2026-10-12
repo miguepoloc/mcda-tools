@@ -301,7 +301,7 @@ function Proyectos({ s, ahp, ahpFailed }: { s: AdminStats; ahp: ReturnType<typeo
             <thead><tr><th scope="col">Título</th><th scope="col">Dueño</th><th scope="col">Actualizado</th><th scope="col" className="n">Expertos</th></tr></thead>
             <tbody>
               {s.proyectos_abandonados.map((p) => (
-                <tr key={p.id}><td>{p.titulo}</td><td>{p.dueño_email}</td><td className="mono">{fmtDate(p.actualizado)}</td><td className="n">{p.expertos_total}</td></tr>
+                <tr key={p.id}><th scope="row">{p.titulo}</th><td>{p.dueño_email}</td><td className="mono">{fmtDate(p.actualizado)}</td><td className="n">{p.expertos_total}</td></tr>
               ))}
             </tbody>
           </Table>
@@ -349,7 +349,7 @@ function Proyectos({ s, ahp, ahpFailed }: { s: AdminStats; ahp: ReturnType<typeo
           <tbody>
             {s.proyectos_historial.map((p) => (
               <tr key={p.id}>
-                <td>{p.titulo}</td><td>{p.dueño_email}</td><td>{METHOD_LABEL[p.metodo] ?? p.metodo}</td>
+                <th scope="row">{p.titulo}</th><td>{p.dueño_email}</td><td>{METHOD_LABEL[p.metodo] ?? p.metodo}</td>
                 <td>{p.publico ? 'Público' : 'Privado'}</td><td className="mono">{fmtDate(p.creado)}</td>
               </tr>
             ))}
@@ -413,7 +413,7 @@ function Seguridad({ s, events, eventsFailed, eventLimit, suspendidas }: { s: Ad
                 {s.rate_limit_picos.length === 0 && <tr><td colSpan={4} className="muted">Sin actividad en las últimas 24 h.</td></tr>}
                 {s.rate_limit_picos.map((r) => (
                   <tr key={r.funcion}>
-                    <td>{r.funcion}</td><td className="n">{r.pico_por_minuto}</td><td className="n">{r.limite}</td>
+                    <th scope="row">{r.funcion}</th><td className="n">{r.pico_por_minuto}</td><td className="n">{r.limite}</td>
                     <td><span className={`pill${r.cerca_del_limite ? ' warn' : ''}`}>{r.cerca_del_limite ? 'Cerca del límite' : 'OK'}</span></td>
                   </tr>
                 ))}
