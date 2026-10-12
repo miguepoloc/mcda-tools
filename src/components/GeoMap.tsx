@@ -71,7 +71,7 @@ type Props = {
   draft: Bounds | null;
   drawing: boolean;
   initialBounds: Bounds | null;
-  onClick: (lat: number, lon: number) => void;
+  onClick: (lat: number, lon: number, zoom?: number) => void;
   onMove: (lat: number, lon: number) => void;
   onDrawn: (b: Bounds) => void;
   onMarkerClick?: (id: string) => void;
@@ -127,13 +127,13 @@ const GeoMap = forwardRef<GeoMapHandle, Props>(function GeoMap(props, ref) {
     const ib = cb.current.initialBounds;
     if (ib) m.fitBounds(toLBounds(L, ib), { padding: [30, 30] });
     else m.setView([8, -74], 5);
-    m.on('click', (e) => cb.current.onClick(e.latlng.lat, e.latlng.lng));
+    m.on('click', (e) => cb.current.onClick(e.latlng.lat, e.latlng.lng, m.getZoom()));
     // Sin ratón no hay «clic»: con el mapa enfocado, Intro consulta el punto del centro (las flechas lo desplazan).
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.target !== m.getContainer()) return;
       e.preventDefault();
       const c = m.getCenter();
-      cb.current.onClick(c.lat, c.lng);
+      cb.current.onClick(c.lat, c.lng, m.getZoom());
     };
     m.getContainer().addEventListener('keydown', onKey);
     // La rueda solo acerca con Ctrl/⌘ (o el pellizco del panel táctil, que llega como Ctrl + rueda): sin tecla, la

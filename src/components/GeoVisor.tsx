@@ -24,7 +24,9 @@ import { findParcels } from '@/lib/geo/patches';
 import { evaluateOnePoint, type PointEval } from '@/lib/geo/pointEval';
 import { describeFn, describeVeto, suitability, vetoed } from '@/lib/geo/membership';
 import { downloadLayer, getQuota, type Quota } from '@/lib/geo/store';
-import { downloadRef, nameFields } from '@/lib/geo/refLayer';
+import { downloadRef, nameFields, polygonView } from '@/lib/geo/refLayer';
+import { queryRefs, tolDegAtZoom, type RefHit } from '@/lib/geo/refQuery';
+import GeoRefHits from './GeoRefHits';
 import { buildZoneGrid, cellOf, defaultZoneOrder, toPublishedZones, zonalStats, zoneOrderHeading, zonesCsv } from '@/lib/geo/zonal';
 import { exposure, populationPoints } from '@/lib/geo/population';
 import { fcBounds, numericFields } from '@/lib/geo/vector';
@@ -468,8 +470,10 @@ export default function GeoVisor(props: Props) {
   useEffect(() => { if (addMode) { setAddNote(''); setSelected(null); } }, [addMode]);
 
   // ------------------------------------------------------------------ resumen por zonas
-  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref).map((v) => ({ key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: v.fc.features.length, fields: nameFields(v.fc), numFields: numericFields(v.fc) })), [vecs, geo.layers]);
-  const zoneVec = useMemo(() => (geo.zonal ? vecs.find((v) => v.ref && v.id === geo.zonal!.layer) ?? null : null), [vecs, geo.zonal]);
+  // Una referencia puede traer líneas/puntos además de polígonos: las zonas usan solo los polígonos (`polygonView`
+  // conserva sus índices, porque se guardan primero).
+  const zoneLayers = useMemo(() => vecs.filter((v) => v.ref && polygonView(v.fc).features.length > 0).map((v) => { const pf = polygonView(v.fc); return { key: v.id, label: geo.layers?.[v.id]?.label ?? v.name, count: pf.features.length, fields: nameFields(pf), numFields: numericFields(pf) }; }), [vecs, geo.layers]);
+  const zoneVec = useMemo(() => { const v = geo.zonal ? vecs.find((x) => x.ref && x.id === geo.zonal!.layer) : undefined; return v ? { ...v, fc: polygonView(v.fc) } : null; }, [vecs, geo.zonal]);
   const zoneGrid = useMemo(() => (zoneVec && data ? buildZoneGrid(zoneVec.fc, data.grid, geo.zonal?.nameField) : null), [zoneVec, data, geo.zonal?.nameField]);
   const zoneStats = useMemo(() => {
     if (!zoneGrid || !data || !ev) return null;
@@ -477,7 +481,7 @@ export default function GeoVisor(props: Props) {
     return zonalStats({ zones: zoneGrid, pct: ev.pct, cls: ev.cls, mask: data.mask, haPerPixel: data.grid.haPerPixel, nClasses: rm.n, direction: rm.direction, pointCells });
   }, [zoneGrid, data, ev, rm.n, rm.direction, points]);
   // Población (opcional): cada polígono con valor se asigna entero a la celda de su centroide.
-  const popVec = useMemo(() => (geo.zonal?.popLayer && geo.zonal.popField ? vecs.find((v) => v.ref && v.id === geo.zonal!.popLayer) ?? null : null), [vecs, geo.zonal]);
+  const popVec = useMemo(() => { const v = geo.zonal?.popLayer && geo.zonal.popField ? vecs.find((x) => x.ref && x.id === geo.zonal!.popLayer) : undefined; return v ? { ...v, fc: polygonView(v.fc) } : null; }, [vecs, geo.zonal]);
   const popPts = useMemo(() => (popVec && geo.zonal?.popField ? populationPoints(popVec.fc, geo.zonal.popField) : null), [popVec, geo.zonal?.popField]);
   const popExp = useMemo(() => (popPts && data && ev
     ? exposure({ pts: popPts.pts, grid: data.grid, pct: ev.pct, cls: ev.cls, mask: data.mask, nClasses: rm.n, direction: rm.direction, zones: zoneGrid })
@@ -602,7 +606,16 @@ export default function GeoVisor(props: Props) {
     return out;
   }, [data, selected]);
 
-  const onMapClick = useCallback((lat: number, lon: number) => {
+  // Atributos de las referencias visibles bajo el clic (G8; solo del dueño, nunca se publican).
+  const [refHits, setRefHits] = useState<RefHit[]>([]);
+  const vecsRef = useRef(vecs); vecsRef.current = vecs;
+  const visRef = useRef(vis); visRef.current = vis;
+  const onMapClick = useCallback((lat: number, lon: number, zoom?: number) => {
+    if (!addMode) {
+      const layers = vecsRef.current.filter((v) => v.ref && (visRef.current[`v:${v.id}`]?.on ?? true))
+        .map((v) => ({ id: v.id, name: geoRef.current.layers?.[v.id]?.label ?? v.name, fc: v.fc, nameField: geoRef.current.layers?.[v.id]?.ref?.nameField }));
+      setRefHits(layers.length ? queryRefs(layers, lat, lon, tolDegAtZoom(zoom ?? 12)) : []);
+    }
     if (addMode) {
       // Modo explícito: cada clic crea un punto. Fuera del modo, el clic sigue siendo la consulta de un punto de siempre.
       const cur = sanitizePoints(geoRef.current.points);
@@ -1107,11 +1120,12 @@ export default function GeoVisor(props: Props) {
             </div>
           )}
 
-          {point && (
+          {(point || refHits.length > 0) && (
             <div className="gv-point" role="status">
-              <button type="button" className="x" aria-label="Cerrar" onClick={() => setSelected(null)}>×</button>
-              <PointFicha pct={point.pct} label={point.label} color={RHEX[point.cls]} lat={point.lat} lon={point.lon} rows={point.rows} />
-              <div className="disc">{T.disclaimer} Con el mapa enfocado, Intro consulta el punto central.</div>
+              <button type="button" className="x" aria-label="Cerrar" onClick={() => { setSelected(null); setRefHits([]); }}>×</button>
+              {point && <PointFicha pct={point.pct} label={point.label} color={RHEX[point.cls]} lat={point.lat} lon={point.lon} rows={point.rows} />}
+              <GeoRefHits hits={refHits} />
+              {point && <div className="disc">{T.disclaimer} Con el mapa enfocado, Intro consulta el punto central.</div>}
             </div>
           )}
 
