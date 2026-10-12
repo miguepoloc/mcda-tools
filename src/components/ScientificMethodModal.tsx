@@ -196,7 +196,7 @@ export const METHOD_SPECS: Record<MethodKey, MethodDoc> = {
     },
   },
   promethee: {
-    name: 'PROMETHEE II · Preference Ranking Organization METHod',
+    name: 'PROMETHEE I y II · Preference Ranking Organization METHod',
     family: 'Superación',
     color: 'var(--m-promethee)',
     author: 'Brans, Jean-Pierre & Vincke, Philippe',
@@ -204,18 +204,18 @@ export const METHOD_SPECS: Record<MethodKey, MethodDoc> = {
     publication: 'Management Science, 31(6), 647–656',
     doi: '10.1287/mnsc.31.6.647',
     doiUrl: 'https://doi.org/10.1287/mnsc.31.6.647',
-    summary: 'Método de superación (outranking) que compara cada par de alternativas criterio por criterio con una función de preferencia P_j(a, b), agrega esas preferencias con los pesos en un índice π(a, b) y resume cada alternativa con sus flujos de salida (Φ⁺), de entrada (Φ⁻) y neto (Φ). PROMETHEE II ordena por el flujo neto: preorden completo.',
+    summary: 'Método de superación (outranking) que compara cada par de alternativas criterio por criterio con una función de preferencia P_j(a, b), agrega esas preferencias con los pesos en un índice π(a, b) y resume cada alternativa con sus flujos de salida (Φ⁺), de entrada (Φ⁻) y neto (Φ). PROMETHEE II ordena por el flujo neto (preorden completo); PROMETHEE I conserva φ⁺ y φ⁻ por separado y da un orden parcial con preferencia, indiferencia e incomparabilidad.',
     whenToUse: 'Matriz cuantitativa donde importa cuánto mejor es una alternativa que otra (no solo si lo es) y se quiere un orden completo con flujos que expliquen «a quién supera y quién la supera».',
     limits: [
-      'La plataforma usa solo la función de preferencia lineal (tipo III/V) con umbral de indiferencia q = 0 y umbral de preferencia p = rango de cada criterio, como el notebook del curso. No implementa las demás formas (usual, con zona de indiferencia, gaussiana) ni umbrales por criterio elegidos por quien decide.',
+      'Por defecto cada criterio usa la función lineal (tipo III/V) con q = 0 y p = rango, como el notebook del curso. Se puede elegir por criterio cualquiera de las seis funciones de Brans y Vincke (usual, en U, en V, por niveles, lineal con indiferencia, gaussiana) con umbrales q, p y σ; esos umbrales no salen de los datos: los fija quien decide y pueden cambiar el ranking.',
       'Es compensatorio en el flujo neto: un flujo alto en unos criterios compensa flujos bajos en otros.',
       'Los pesos vienen de fuera (AHP, CRITIC, Entropía…).',
     ],
     steps: [
       {
         title: '1. Preferencia por criterio',
-        formula: 'P_j(a, b) = min( 1,  max(0, g_j(a) − g_j(b)) / p_j ),   p_j = max_i g_j − min_i g_j',
-        desc: 'g_j es el valor en dirección «mayor es mejor» (en criterios de costo se invierte el signo). Función lineal (tipo III/V) con q = 0.',
+        formula: 'P_j(a, b) = F_j( g_j(a) − g_j(b) ),   F_j ∈ {usual, U(q), V(p), nivel(q, p), lineal(q, p), gaussiana(σ)};  por defecto V con p = max_i g_j − min_i g_j',
+        desc: 'g_j es el valor en dirección «mayor es mejor» (en criterios de costo se invierte el signo). F_j vale 0 si la diferencia no es positiva y nunca pasa de 1.',
       },
       {
         title: '2. Índice de preferencia global',
@@ -231,6 +231,11 @@ export const METHOD_SPECS: Record<MethodKey, MethodDoc> = {
         title: '4. Flujo neto (PROMETHEE II)',
         formula: 'Φ(a) = Φ⁺(a) − Φ⁻(a),   Σ_a Φ(a) = 0',
         desc: 'Da un preorden completo: mayor Φ es mejor.',
+      },
+      {
+        title: '5. Orden parcial (PROMETHEE I)',
+        formula: 'a precede a b ⇔ Φ⁺(a) ≥ Φ⁺(b) y Φ⁻(a) ≤ Φ⁻(b), con una estricta',
+        desc: 'Indiferentes si los dos flujos coinciden; incomparables si un flujo favorece a a y el otro a b.',
       },
     ],
     citationApa: 'Brans, J. P., & Vincke, P. (1985). A preference ranking organisation method: The PROMETHEE method for multiple criteria decision-making. Management Science, 31(6), 647–656. https://doi.org/10.1287/mnsc.31.6.647',

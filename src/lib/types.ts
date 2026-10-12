@@ -20,6 +20,12 @@ export type MatrixType = 'max' | 'min';
  * `DecisionMatrix.targets`). Los métodos SOLO ven 'max'/'min': un criterio 'target' se convierte antes en su
  * distancia al objetivo, que es un costo normal (ver `resolveTargets` en topsis.ts). */
 export type MatrixKind = MatrixType | 'target';
+/** Las seis funciones de preferencia de PROMETHEE (Brans & Vincke, 1985): I usual, II en U (cuasi-criterio, umbral q),
+ * III en V (preferencia lineal, umbral p), IV por niveles (q, p), V lineal con indiferencia (q, p), VI gaussiana (σ = s). */
+export type PrometheeFn = 'usual' | 'ushape' | 'vshape' | 'level' | 'linear' | 'gaussian';
+/** Función y umbrales de un criterio, en la unidad del criterio. Un umbral ausente toma su valor por defecto (ver
+ * `resolvePref` en promethee.ts): el de la plataforma de siempre es Tipo III con p = rango del criterio. */
+export type PrometheeCriterionConfig = { fn: PrometheeFn; q?: number; p?: number; s?: number };
 /** Objetivo de un criterio 'target': la distancia de un valor x es max(0, |x − value| − tol), es decir 0 dentro
  * de la banda value ± tol y la distancia al borde más cercano fuera de ella. tol = 0 → objetivo puntual. */
 export type TargetSpec = { value: number; tol: number };
@@ -44,6 +50,10 @@ export type DecisionMatrix = {
    * valor por defecto de la plataforma (ver ELECTRE_C_STAR_DEFAULT/ELECTRE_D_STAR_DEFAULT en electre.ts). */
   electreCStar?: number;
   electreDStar?: number;
+  /** Solo PROMETHEE: función de preferencia y umbrales por criterio (clave = id de criterio). Aditivo y opcional,
+   * sin migración: si falta, o falta un criterio, rige el Tipo III con q = 0 y p = rango (lo de siempre, mismos
+   * números que el notebook 05 del curso). */
+  prometheeConfig?: Record<string, PrometheeCriterionConfig>;
 };
 
 /** 'decision': proyecto de siempre (alternativas comparadas por AHP o rankeadas con una matriz de

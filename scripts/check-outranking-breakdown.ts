@@ -85,7 +85,7 @@ for (const mode of ['screen', 'report']) {
   ok(/Σφ = 0\.0000/.test(tp) && /0\.0000 ✓/.test(tp), `PROMETHEE viaje (${mode}): comprobación Σφ = 0`);
   ok((p.match(/class="ob-curve"/g) ?? []).length === 3, `PROMETHEE viaje (${mode}): una curva P(d) por criterio`);
   ok(/PROMETHEE I da un ranking completo/.test(tp) && (p.match(/class="calc-no"/g) ?? []).length === 7, `PROMETHEE viaje (${mode}): 7 pasos y PROMETHEE I completo`);
-  ok(/mejora aparte/.test(tp), `PROMETHEE viaje (${mode}): la nota aclara que elegir tipos 1-6 es una mejora aparte`);
+  ok(/Valor por defecto del curso/.test(tp) && /seis funciones/.test(tp), `PROMETHEE viaje (${mode}): la nota declara el valor por defecto del curso y que hay seis funciones`);
 
   const pr = render(PrometheeBreakdown, mode, real, [0.16, 0.25, 0.488, 0.102]);
   ok(clean(pr) && ['0.3520', '0.3020', '0.6082', '0.6647'].every((x) => text(pr).includes(x)) && /1º Sigfox/.test(text(pr)), `PROMETHEE caso real (${mode}): Sigfox 1º y π de la diap. 38 (0.352, 0.302, 0.608, 0.665)`);

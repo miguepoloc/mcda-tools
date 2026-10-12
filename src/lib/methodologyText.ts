@@ -25,6 +25,9 @@ export type MethodologyInput = {
   /** Mayor CR entre las matrices de alternativas (solo AHP como método de ranking). */
   altMaxCr?: number;
   vikorV?: number;
+  /** Solo PROMETHEE: función de preferencia elegida por criterio (texto ya formado) y si alguna se apartó de la del curso. */
+  prometheeFns?: { name: string; text: string }[];
+  prometheeCustom?: boolean;
   cStar?: number;
   dStar?: number;
 };
@@ -52,10 +55,17 @@ function methodSentence(i: MethodologyInput, lang: MethodologyLang): string {
       return es
         ? `Las ${nAlt} alternativas se ordenaron con VIKOR (Opricovic y Tzeng, 2004) con v = ${f(i.vikorV ?? 0.5, 2)} (peso de la estrategia de utilidad de grupo, definido por el decisor), y se verificaron las dos condiciones de ventaja aceptable y estabilidad para declarar una solución de compromiso.`
         : `The ${nAlt} alternatives were ranked with VIKOR (Opricovic & Tzeng, 2004) with v = ${f(i.vikorV ?? 0.5, 2)} (weight of the group-utility strategy, set by the decision maker), and the two conditions of acceptable advantage and stability were checked before declaring a compromise solution.`;
-    case 'promethee':
+    case 'promethee': {
+      if (i.prometheeCustom && i.prometheeFns?.length) {
+        const list = i.prometheeFns.map((x) => `${x.name}: ${x.text}`).join('; ');
+        return es
+          ? `Las ${nAlt} alternativas se ordenaron con PROMETHEE II (Brans y Vincke, 1985) mediante el flujo neto de preferencia, y se examinó el orden parcial de PROMETHEE I con los flujos de salida y de entrada. La función de preferencia y sus umbrales (definidos por el decisor, en la unidad de cada criterio) fueron: ${list}.`
+          : `The ${nAlt} alternatives were ranked with PROMETHEE II (Brans & Vincke, 1985) using the net preference flow, and the partial order of PROMETHEE I was examined from the outgoing and incoming flows. The preference function and thresholds (set by the decision maker, in each criterion's unit) were: ${list}.`;
+      }
       return es
         ? `Las ${nAlt} alternativas se ordenaron con PROMETHEE II (Brans y Vincke, 1985) mediante el flujo neto de preferencia, con función de preferencia lineal (Tipo III; q = 0, p = rango de cada criterio).`
         : `The ${nAlt} alternatives were ranked with PROMETHEE II (Brans & Vincke, 1985) using the net preference flow, with a linear preference function (Type III; q = 0, p = range of each criterion).`;
+    }
     case 'electre':
       return es
         ? `Las ${nAlt} alternativas se compararon con ELECTRE (Roy, 1968) con umbral de concordancia c* = ${f(i.cStar ?? 0.65, 2)} y umbral de discordancia d* = ${f(i.dStar ?? 0.3, 2)}; el resultado es una relación de superación con posibles incomparabilidades y su núcleo, no un ranking total.`

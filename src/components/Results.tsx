@@ -5,7 +5,7 @@ import ElectreGraph from './ElectreGraph';
 import ElectreMatrices from './ElectreMatrices';
 import { withUnit } from '@/lib/units';
 import MethodCharts, { type MethodChartData } from './MethodCharts';
-import type { Alternative, Criterion, DecisionMatrix, JudgmentRow, Method, WeightingMethod } from '@/lib/types';
+import type { Alternative, Criterion, DecisionMatrix, JudgmentRow, Method, PrometheeCriterionConfig, WeightingMethod } from '@/lib/types';
 import {
   CRIT_SHEET, DEFAULT_WEIGHT_METHOD, altSheet, aggMatrix, fmt, getV, indexJudgments, pairsOf, phrase, sheetItems, sheetResult, synthesis,
   type WeightMethod,
@@ -13,7 +13,8 @@ import {
 import { getCell, getKind, getTarget, getType, missingTargets, normalizeMatrix, resolveTargets, targetDistance, topsis, topsisSynthesis } from '@/lib/topsis';
 import { vikorFirstPlaceChanges, vikorInputs, vikorSensitivity, vikorSynthesis, vikorV } from '@/lib/vikor';
 import VikorPanel from './VikorPanel';
-import { promethee, prometheeSynthesis } from '@/lib/promethee';
+import PrometheePanel from './PrometheePanel';
+import { promethee, prometheeCfgFor, prometheeConfigSummary, prometheeSynthesis } from '@/lib/promethee';
 import { electreCStar, electreDStar, electreKernelText, electreSynthesis } from '@/lib/electre';
 import { saw, sawSynthesis } from '@/lib/saw';
 import { defuzzifyMatrix, fuzzyTopsisSynthesis } from '@/lib/fuzzy_topsis';
@@ -73,6 +74,8 @@ type Props = {
    * en pantalla. */
   onChangeCStar?: (c: number) => void;
   onChangeDStar?: (d: number) => void;
+  /** Solo PROMETHEE, mismo patrón: función y umbrales por criterio, en `decision_matrix.prometheeConfig` (undefined = lo del curso). */
+  onChangePrometheeConfig?: (cfg: Record<string, PrometheeCriterionConfig> | undefined) => void;
   /** Solo dueño: atajos de los mensajes de «faltan juicios». Sin ellos (vista pública) el mensaje va sin botón. */
   onGoExperts?: () => void;
   onGoProject?: () => void;
@@ -180,7 +183,7 @@ function Table({ names, M, f, label }: { names: string[]; M: number[][]; f: (x: 
   );
 }
 
-export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onGoExperts, onGoProject, prio, headerExtra }: Props) {
+export default function Results({ mode, criteria, alternatives, experts, judgments, method = 'ahp', weightingMethod = 'ahp', decisionMatrix, showPerExpert, projectTitle = 'Proyecto MCDA', projectObjective = '', onChangeV, onChangeCStar, onChangeDStar, onChangePrometheeConfig, onGoExperts, onGoProject, prio, headerExtra }: Props) {
   const [showReportModal, setShowReportModal] = useState(false);
   const idx = useMemo(() => indexJudgments(judgments), [judgments]);
   // Con CRITIC/Entropía los pesos salen de la matriz de decisión: los juicios guardados de una fase anterior (AHP) NO cuentan para nada
@@ -204,6 +207,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
   const [vLocal, setVLocal] = useState<number | null>(null);
   const [cLocal, setCLocal] = useState<number | null>(null);
   const [dLocal, setDLocal] = useState<number | null>(null);
+  const [pcLocal, setPcLocal] = useState<{ cfg: Record<string, PrometheeCriterionConfig> | undefined } | null>(null);
   // dmRaw = lo que ingresó el usuario (con tipo 'target' y su objetivo); dm = matriz EFECTIVA que leen todos los
   // métodos: cada criterio de tipo objetivo ya convertido en su distancia al objetivo, como costo (resolveTargets).
   const dmRaw = useMemo(() => {
@@ -212,8 +216,14 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
     if (!onChangeV && vLocal != null) overrides.vikorV = vLocal;
     if (!onChangeCStar && cLocal != null) overrides.electreCStar = cLocal;
     if (!onChangeDStar && dLocal != null) overrides.electreDStar = dLocal;
-    return Object.keys(overrides).length ? { ...base, ...overrides } : base;
-  }, [decisionMatrix, onChangeV, vLocal, onChangeCStar, cLocal, onChangeDStar, dLocal]);
+    let out: DecisionMatrix = Object.keys(overrides).length ? { ...base, ...overrides } : base;
+    if (!onChangePrometheeConfig && pcLocal) {
+      const { prometheeConfig: _drop, ...rest } = out;
+      void _drop;
+      out = pcLocal.cfg ? { ...rest, prometheeConfig: pcLocal.cfg } : rest;
+    }
+    return out;
+  }, [decisionMatrix, onChangeV, vLocal, onChangeCStar, cLocal, onChangeDStar, dLocal, onChangePrometheeConfig, pcLocal]);
   const dm = useMemo(() => resolveTargets(criteria, alternatives, dmRaw), [criteria, alternatives, dmRaw]);
   const noTarget = useMemo(() => missingTargets(criteria, dmRaw), [criteria, dmRaw]);
   const vEff = vikorV(dmRaw);
@@ -222,6 +232,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
   const changeV = (v: number) => (onChangeV ? onChangeV(v) : setVLocal(v));
   const changeCStar = (c: number) => (onChangeCStar ? onChangeCStar(c) : setCLocal(c));
   const changeDStar = (d: number) => (onChangeDStar ? onChangeDStar(d) : setDLocal(d));
+  const changePrometheeConfig = (cfg: Record<string, PrometheeCriterionConfig> | undefined) => (onChangePrometheeConfig ? onChangePrometheeConfig(cfg) : setPcLocal({ cfg }));
   // CRITIC y Entropía necesitan números: en Fuzzy TOPSIS las etiquetas se desdifusifican (centroide) antes de calcularlos.
   const dmNum = useMemo(() => (method === 'fuzzy_topsis' ? defuzzifyMatrix(dm, criteria, alternatives) : dm), [method, dm, criteria, alternatives]);
   const critWeights = useMemo(() => {
@@ -234,6 +245,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
   const topSyn = useMemo(() => topsisSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
   const vikSyn = useMemo(() => vikorSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
   const promSyn = useMemo(() => prometheeSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
+  // Función de preferencia elegida por criterio (informe, metodología y comparativa la declaran; custom = false es lo del curso).
+  const promCfg = useMemo(() => prometheeConfigSummary(criteria, alternatives, dm), [criteria, alternatives, dm]);
   const elecSyn = useMemo(() => electreSynthesis(criteria, alternatives, dm, critWeights, cEff, dEff), [criteria, alternatives, dm, critWeights, cEff, dEff]);
   const sawSyn  = useMemo(() => sawSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
   const fuzzyTopSyn = useMemo(() => fuzzyTopsisSynthesis(criteria, alternatives, dm, critWeights), [criteria, alternatives, dm, critWeights]);
@@ -364,7 +377,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
         rows: alternatives.map((a, i) => ({ name: a.name, parts: (r.normalized[i] ?? []).map((v, j) => (r.weights[j] ?? 0) * v), total: r.scores[i] ?? 0, rank: sawSyn.rows[i].rank })),
       };
     } else if (method === 'promethee') {
-      const r = promethee(matrix, critWeights, types);
+      const r = promethee(matrix, critWeights, types, prometheeCfgFor(criteria, dm));
       data.flows = alternatives.map((a, i) => ({ name: a.name, plus: r.phiPlus[i] ?? 0, minus: r.phiMinus[i] ?? 0, net: r.phi[i] ?? 0, rank: promSyn.rows[i].rank }));
     } else if (method === 'topsis') {
       const r = topsis(matrix, critWeights, types);
@@ -392,7 +405,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       ranks: m.tie ? null : alternatives.map((a) => m.rows.find((rr) => rr.name === a.name)?.rank ?? null),
       scores: alternatives.map((a) => m.rows.find((rr) => rr.name === a.name)?.value ?? null),
       scoreLabel: m.unit,
-      params: describeMethodParams(m.key, { vikorV: vEff }),
+      params: describeMethodParams(m.key, { vikorV: vEff, promethee: promCfg }),
       compromise: m.soft,
       unavailableReason: m.tie ? 'sin datos suficientes' : undefined,
     }));
@@ -401,7 +414,7 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
       electre: electreCompare.hasData ? electreCompareInfo(elecSyn) : undefined,
       weightsNote: weighting === 'ahp' ? 'AHP, de los juicios de los expertos' : WEIGHTING_SHORT[weighting],
     };
-  }, [compareViews, alternatives, vEff, electreCompare, elecSyn, weighting]);
+  }, [compareViews, alternatives, vEff, promCfg, electreCompare, elecSyn, weighting]);
 
   // Entrada del párrafo de metodología (es/en): todo sale del estado actual, nada de texto fijo.
   const methodologyInput = useMemo<MethodologyInput>(() => ({
@@ -412,9 +425,11 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
     criteriaCr: reportAhp?.criteriaSheet.cr,
     altMaxCr: method === 'ahp' && reportAhp && reportAhp.altSheets.length ? Math.max(...reportAhp.altSheets.map((s) => s.cr)) : undefined,
     vikorV: method === 'vikor' ? vEff : undefined,
+    prometheeFns: method === 'promethee' ? promCfg.items.map((x) => ({ name: x.name, text: x.text })) : undefined,
+    prometheeCustom: method === 'promethee' ? promCfg.custom : undefined,
     cStar: method === 'electre' ? cEff : undefined,
     dStar: method === 'electre' ? dEff : undefined,
-  }), [method, weighting, wm, criteria, critWeights, alternatives.length, objective, used.length, reportAhp, vEff, cEff, dEff]);
+  }), [method, weighting, wm, criteria, critWeights, alternatives.length, objective, used.length, reportAhp, vEff, cEff, dEff, promCfg]);
 
   // Con pesos objetivos el bloqueo depende SOLO de la matriz de decisión. Con pesos AHP en un método de matriz, sin juicios sobre los
   // criterios los pesos quedarían iguales en silencio: se bloquea y se manda a Expertos.
@@ -750,6 +765,9 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
               {/* Con pesos objetivos las barras de pesos ya van en su propia tarjeta (con método y referencia): no se repiten. */}
               <MethodCharts method={method} data={methodCharts} showWeights={!objective} />
             </div>
+            {method === 'promethee' && (
+              <PrometheePanel criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} onChange={changePrometheeConfig} persisted={!!onChangePrometheeConfig} />
+            )}
             {method === 'vikor' && (
               <VikorPanel criteria={criteria} alternatives={alternatives} dm={dm} weights={critWeights} synth={vikSyn} v={vEff} onChangeV={changeV} persisted={!!onChangeV} />
             )}
@@ -1026,6 +1044,8 @@ export default function Results({ mode, criteria, alternatives, experts, judgmen
           vikorChart={vikorReportChart}
           charts={methodCharts}
           vikorV={method === 'vikor' ? vEff : undefined}
+          prometheeFns={method === 'promethee' ? promCfg.items.map((x) => ({ name: x.name, text: x.text })) : undefined}
+          prometheeCustom={method === 'promethee' ? promCfg.custom : undefined}
           prio={prio}
           ahpBreakdown={ahpBreakdown}
           comparison={comparison}
