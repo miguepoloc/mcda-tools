@@ -10,7 +10,7 @@ import { parseFile, type Parsed } from '@/lib/geo/parse';
 import { burn, distanceLayerPadded, interpolateSurface, type FC } from '@/lib/geo/vector';
 import { layerRange, resampleToGrid } from '@/lib/geo/raster';
 import { isQuotaError, layerPath, refPath, removeLayers, uploadLayer, type Quota } from '@/lib/geo/store';
-import { nameFields, polygonsOnly, uploadRef, zonalAfterDrop, zonalAfterReplace } from '@/lib/geo/refLayer';
+import { nameFields, referenceFeatures, referenceNotes, referenceSummary, uploadRef, zonalAfterDrop, zonalAfterReplace } from '@/lib/geo/refLayer';
 import { refsAfterDrop, refsAfterReplace } from '@/lib/geo/refPublic';
 import { slug } from '@/lib/geo/export';
 import type { GeoData } from '@/lib/geo/data';
@@ -38,12 +38,12 @@ type Pending = {
 };
 
 const COLORS = ['#22D3EE', '#F472B6', '#FACC15', '#A78BFA', '#FB923C', '#34D399'];
-const ROLE_LABEL: Record<Role, string> = { criterion: 'Criterio', exclusion: 'Exclusión', area: 'Área de estudio', reference: 'Referencia (polígonos)' };
+const ROLE_LABEL: Record<Role, string> = { criterion: 'Criterio', exclusion: 'Exclusión', area: 'Área de estudio', reference: 'Referencia (capa de contexto)' };
 const ROLE_HINT: Record<Role, string> = {
   criterion: 'Un valor por celda que alimenta un criterio (temperatura, profundidad, distancia a algo…).',
   exclusion: 'Zonas donde NO se puede instalar (p. ej. concesiones). Se muestran en gris y no entran al cálculo.',
   area: 'La zona que se analiza (p. ej. la isóbata de 200 m). Fuera de ella no se calcula nada.',
-  reference: 'Polígonos que solo se dibujan (contorno) sobre el mapa y sirven de zonas para el resumen por zonas (comunas, sectores, manzanas). NO entran al modelo ni se rasterizan; se guardan tal cual.',
+  reference: 'Polígonos, líneas (vías, ríos) o puntos que solo se dibujan sobre el mapa; los polígonos además sirven de zonas para el resumen por zonas (comunas, sectores, manzanas). NO entran al modelo ni se rasterizan; se guardan tal cual y al hacer clic se ven sus atributos.',
 };
 
 const bytesFmt = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -215,13 +215,14 @@ export default function GeoLayersPanel(p: Props) {
     p.onQuotaChange();
   }
 
-  /** Polígonos de referencia: se guarda el FeatureCollection original (sin rasterizar) y se dibuja como vector. No
-   * toca la caché de rásters ni las reglas: no entra al modelo. */
+  /** Capa de referencia (polígonos, líneas y puntos): se guarda el FeatureCollection original (sin rasterizar) y se
+   * dibuja como vector. No toca la caché de rásters ni las reglas: no entra al modelo. Las zonas usan solo polígonos. */
   async function addReference(pn: Pending) {
     const ps = pn.parsed;
-    if (ps.kind !== 'vector') throw new Error('Una capa de referencia debe ser un vector de polígonos (GeoJSON, shapefile .zip, KML).');
-    const { fc, dropped } = polygonsOnly(ps.fc);
-    if (!fc.features.length) throw new Error('El archivo no tiene polígonos: una capa de referencia necesita polígonos (puntos y líneas no sirven como zonas).');
+    if (ps.kind !== 'vector') throw new Error('Una capa de referencia debe ser un vector (GeoJSON, shapefile .zip, KML).');
+    const { fc, report: rr } = referenceFeatures(ps.fc);
+    if (!fc.features.length) throw new Error('El archivo no tiene polígonos, líneas ni puntos que guardar como referencia.');
+    const notes = referenceNotes(rr);
     let key = slug(pn.label).slice(0, 18) || 'zonas';
     const taken = new Set([...Object.keys(layers), ...Object.keys(data?.info ?? {}), ...Object.keys(p.cache.current)]);
     for (let n = 2; taken.has(key); n++) key = `${slug(pn.label).slice(0, 15)}-${n}`;
@@ -232,14 +233,14 @@ export default function GeoLayersPanel(p: Props) {
         path = '';
         const m = e instanceof Error ? e.message : String(e);
         if (isQuotaError(m)) throw e;
-        warn = `Los polígonos quedaron solo en esta sesión (no se pudo guardar: ${m}).`;
+        warn = `La capa quedó solo en esta sesión (no se pudo guardar: ${m}).`;
       }
     }
     const repKey = pn.replace ? dupKeyOf(ps.name) : undefined;
     const repMeta = repKey ? layers[repKey] : undefined;
     const color = COLORS[Object.values(layers).filter((l) => l.role === 'reference').length % COLORS.length];
     const meta: GeoLayerMeta = {
-      label: pn.label.trim() || key, unit: '', role: 'reference', origin: `Polígonos de referencia (${fc.features.length})${dropped ? `; se omitieron ${dropped} elementos que no eran polígonos` : ''}`,
+      label: pn.label.trim() || key, unit: '', role: 'reference', origin: `Capa de referencia (${referenceSummary(rr)})${notes.length ? `; ${notes.join('; ')}` : ''}`,
       source: ps.name, min: 0, max: 0, path, bytes,
       ref: { color, weight: 2, labels: false, nameField: nameFields(fc)[0], count: fc.features.length },
     };
@@ -256,7 +257,7 @@ export default function GeoLayersPanel(p: Props) {
     p.setVis((v) => ({ ...v, [`v:${key}`]: { on: true, op: 1 } }));
     setPending((cur) => cur.filter((x) => x.pid !== pn.pid));
     p.onQuotaChange();
-    if (warn) setMsg(warn);
+    if (warn || notes.length) setMsg([warn, notes.length ? `Referencia guardada con recortes: ${notes.join('; ')}.` : ''].filter(Boolean).join(' '));
   }
 
   async function addOne(pn: Pending, g: GeoGrid) {
@@ -455,7 +456,7 @@ export default function GeoLayersPanel(p: Props) {
                 <li><b>Vector, «Dentro / fuera»:</b> cada celda dentro del polígono vale 1; fuera, 0.</li>
                 <li><b>Ráster:</b> se remuestrea (se ajusta) a la resolución y el encuadre de tu grilla, celda por celda.</li>
               </ul>
-              <p><b>El archivo que arrastraste no se guarda</b> (salvo los polígonos que marques como «Referencia»: esos se guardan tal cual, se dibujan sobre el mapa y sirven de zonas para el resumen por zonas, pero no entran al cálculo). Lo que queda guardado es el resultado ya calculado: esa grilla de números. Por eso puedes editar después el nombre, la unidad o a qué criterio alimenta una capa (es solo una etiqueta) — pero no cómo se calculó: para eso la app necesitaría el archivo original, que ya no tiene.</p>
+              <p><b>El archivo que arrastraste no se guarda</b> (salvo las capas que marques como «Referencia»: esas se guardan tal cual con sus polígonos, líneas y puntos, se dibujan sobre el mapa y sus polígonos sirven de zonas para el resumen por zonas, pero no entran al cálculo). Lo que queda guardado es el resultado ya calculado: esa grilla de números. Por eso puedes editar después el nombre, la unidad o a qué criterio alimenta una capa (es solo una etiqueta) — pero no cómo se calculó: para eso la app necesitaría el archivo original, que ya no tiene.</p>
               <p>Ese número por celda se vuelve idoneidad (0 a 1) con la regla que defines en la pestaña <b>Modelo</b>. Lo que el mapa pinta con colores es esa idoneidad, no el dato crudo.</p>
             </div>
           </details>
@@ -505,7 +506,7 @@ export default function GeoLayersPanel(p: Props) {
                 <label className="gv-field"><span>Nombre de la capa</span><input type="text" value={pn.label} onChange={(e) => upd(pn.pid, { label: e.target.value })} /></label>
                 <label className="gv-field"><span>Qué es</span>
                   <select value={pn.role} onChange={(e) => { const role = e.target.value as Role; upd(pn.pid, { role, mode: role === 'criterion' ? 'distance' : 'presence', unit: role === 'criterion' && ps.kind === 'vector' ? 'm' : '' }); }}>
-                    {(Object.keys(ROLE_LABEL) as Role[]).filter((r) => !(isPack && r === 'area') && !(r === 'reference' && !(ps.kind === 'vector' && ps.geoms.includes('polygon')))).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                    {(Object.keys(ROLE_LABEL) as Role[]).filter((r) => !(isPack && r === 'area') && !(r === 'reference' && ps.kind !== 'vector')).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                   </select>
                 </label>
                 <p className="gv-hint">{ROLE_HINT[pn.role]}{ps.kind === 'raster' && pn.role !== 'criterion' ? ' En un ráster, cada celda con valor mayor que 0 cuenta como marcada.' : ''}</p>
@@ -617,7 +618,7 @@ export default function GeoLayersPanel(p: Props) {
           const sid = `v:${k}`, st = p.styles?.[sid];
           return (
             <div key={k}>
-              <LayerRow id={sid} label={m.label} role={`referencia · ${m.ref?.count ?? '?'} polígonos`} vis={p.vis} setVis={p.setVis} swatch={m.ref?.color ?? '#22D3EE'} defaultOn
+              <LayerRow id={sid} label={m.label} role={`referencia · ${m.ref?.count ?? '?'} elementos`} vis={p.vis} setVis={p.setVis} swatch={m.ref?.color ?? '#22D3EE'} defaultOn
                 onStyle={p.onStyle ? () => setStyleKey((cur) => (cur === sid ? null : sid)) : undefined} styling={styleKey === sid}
                 note={!m.path ? 'Solo esta sesión: no se pudo guardar' : !v ? 'No se pudo cargar (revisa tu conexión y recarga)' : `${m.origin} · guardada tal cual (${bytesFmt(m.bytes)})`}
                 onDelete={() => setConfirmDrop(k)} onEdit={() => setEditKey((cur) => (cur === k ? null : k))} editing={editKey === k} />
@@ -735,14 +736,14 @@ function RefEditForm({ meta, fields, onCancel, onSave }: {
       <label className="gv-field"><span>Nombre de la capa</span><input type="text" value={label} onChange={(e) => setLabel(e.target.value)} /></label>
       <label className="gv-field"><span>Color del contorno</span><input type="color" value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#22D3EE'} onChange={(e) => setColor(e.target.value)} /></label>
       <label className="gv-field"><span>Grosor del contorno ({weight} px)</span><input type="range" min={1} max={6} step={1} value={weight} onChange={(e) => setWeight(Number(e.target.value))} /></label>
-      <label className="gv-field"><span>Atributo con el nombre de cada polígono</span>
+      <label className="gv-field"><span>Atributo con el nombre de cada elemento</span>
         <select value={nameField} onChange={(e) => setNameField(e.target.value)}>
           <option value="">— ninguno —</option>
           {opts.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
       </label>
-      <label className="gv-check"><input type="checkbox" checked={labels} disabled={!nameField} onChange={(e) => setLabels(e.target.checked)} /> Mostrar el nombre sobre cada polígono</label>
-      <p className="gv-hint">Solo se dibuja el contorno (relleno transparente). Estos polígonos no entran al modelo.</p>
+      <label className="gv-check"><input type="checkbox" checked={labels} disabled={!nameField} onChange={(e) => setLabels(e.target.checked)} /> Mostrar el nombre sobre cada elemento</label>
+      <p className="gv-hint">Solo se dibuja el contorno o la línea (relleno transparente). Esta capa no entra al modelo; el nombre y los atributos se ven al hacer clic en el mapa (solo tú, no se publican).</p>
       <div className="gv-row-acts">
         <button type="button" className="btn primary sm" onClick={() => onSave({ label, color, weight, labels: labels && !!nameField, nameField: nameField || undefined })}>Guardar</button>
         <button type="button" className="btn sm" onClick={onCancel}>Cancelar</button>
