@@ -8,6 +8,7 @@ import type { AhpSummary } from './ahpSummary.ts';
 import type { SigParts } from './publishSig.ts';
 import { sanitizePublishedRows, type PublishedPoint } from './points.ts';
 import type { PublishedZones } from './zonal.ts';
+import type { PublishedRef } from './refPublic.ts';
 
 /** Puntos que la vista pública debe mostrar: solo con `showPoints` y una lista válida (publicaciones anteriores → null). */
 export function publishedPoints(meta: { showPoints?: boolean; points?: unknown }): PublishedPoint[] | null {
@@ -60,6 +61,11 @@ type PublishedBase = {
   /** Resumen por zonas (agregados). SOLO viaja con el interruptor `showZones` (por defecto apagado). Aditivo: no sube `v`. */
   zones?: PublishedZones;
   showZones?: boolean;
+  /** Capas de referencia (solo geometría simplificada y nombre). SOLO viajan con `showRefs` (decisión del dueño, por capa). Aditivo: no sube `v`. */
+  refs?: PublishedRef[];
+  showRefs?: boolean;
+  /** Avisos de recorte al publicar (p. ej. «simplificada…»), para mostrarlos en la vista pública si hace falta. */
+  refsNote?: string;
 };
 
 /** v1: siempre aptitud con 3 clases (alta / moderada / no apta); el plano de clase codifica la vetada como 4. */

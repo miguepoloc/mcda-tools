@@ -3,7 +3,7 @@
  * alimentan o lo recortan, área); nombres, estilo, visibilidad, orden u opacidad no. Puro. */
 import type { GeoConfig, GeoGrid } from '../types.ts';
 
-export type SigPart = 'pesos' | 'reglas' | 'umbrales' | 'capas' | 'area' | 'puntos' | 'zonas';
+export type SigPart = 'pesos' | 'reglas' | 'umbrales' | 'capas' | 'area' | 'puntos' | 'zonas' | 'referencias';
 export type SigParts = Record<SigPart, string>;
 
 export const SIG_PART_LABEL: Record<SigPart, string> = {
@@ -14,8 +14,9 @@ export const SIG_PART_LABEL: Record<SigPart, string> = {
   area: 'el área de estudio',
   puntos: 'los puntos y su ranking en la vista pública',
   zonas: 'el resumen por zonas en la vista pública',
+  referencias: 'las capas de referencia en la vista pública',
 };
-const ORDER: SigPart[] = ['pesos', 'reglas', 'umbrales', 'capas', 'area', 'puntos', 'zonas'];
+const ORDER: SigPart[] = ['pesos', 'reglas', 'umbrales', 'capas', 'area', 'puntos', 'zonas', 'referencias'];
 
 export type SigInput = {
   criteria: { id: string }[];
@@ -36,6 +37,8 @@ export type SigInput = {
   /** Resumen por zonas: solo cuenta si `show`. `spec` = qué se resume (capa, atributo de nombre, población…); los valores
    * dependen de las otras partes. Con `show` apagado la firma es la de siempre. */
   zones?: { show: boolean; spec: unknown };
+  /** Capas de referencia publicadas: solo cuentan si `show`. `spec` = qué capas, con qué estilo y qué archivo (`refsSpec`). */
+  refs?: { show: boolean; spec: unknown };
 };
 
 /** JSON con las claves ordenadas: el mismo contenido da siempre el mismo texto. */
@@ -88,16 +91,17 @@ export function publishParts(inp: SigInput): SigParts {
       ? ['on', inp.points.list.map((p) => [p.name, Math.round(p.lat * 1e6), Math.round(p.lon * 1e6)]).sort((a, b) => (String(a) < String(b) ? -1 : 1))]
       : 'off')),
     zonas: hash36(stableStringify(inp.zones?.show ? ['on', inp.zones.spec] : 'off')),
+    referencias: hash36(stableStringify(inp.refs?.show ? ['on', inp.refs.spec] : 'off')),
   };
 }
 
 /** Partes que difieren entre lo publicado y lo actual (en orden fijo). Vacío = al día. */
 export function changedParts(published: Partial<SigParts> | null | undefined, current: SigParts): SigPart[] {
   if (!published) return [];
-  // Una publicación anterior a los puntos (o a las zonas) no trae esa parte: equivale a «sin eso publicado» (así, activar el
+  // Una publicación anterior a los puntos (o a las zonas o referencias) no trae esa parte: equivale a «sin eso publicado» (así, activar el
   // interruptor después sí la marca como desactualizada). Con las demás partes, ausente = no se afirma nada.
   return ORDER.filter((k) => {
-    const was = k === 'puntos' || k === 'zonas' ? published[k] ?? PUNTOS_OFF : published[k];
+    const was = k === 'puntos' || k === 'zonas' || k === 'referencias' ? published[k] ?? PUNTOS_OFF : published[k];
     return was !== undefined && was !== current[k];
   });
 }

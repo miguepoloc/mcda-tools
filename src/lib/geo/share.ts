@@ -2,6 +2,7 @@
  * armado de los grupos de descargas, estado de la publicación y filas de «qué ve quien abra el enlace».
  * Sin React ni E/S, para poder verificarla con un script. */
 import { changedParts, describeChanges, type SigPart, type SigParts } from './publishSig.ts';
+import { REF_LIMITS, refTrimNote, type RefBuild } from './refPublic.ts';
 
 export type ExportKey = 'compose' | 'report' | 'xls' | 'tif' | 'kmz' | 'cls' | 'csv' | 'ptif' | 'pcsv' | 'rank' | 'zcsv' | 'png' | 'pngr' | 'zip';
 /** `opens`: abre un diálogo en vez de descargar (el botón dice «Abrir»). */
@@ -101,3 +102,21 @@ export function viewerRows(o: { showPoints: boolean; showZones: boolean; nPoints
 
 /** Enlace público de un proyecto. */
 export const publicLink = (origin: string, token: string) => `${origin}/p/${token}`;
+
+export type RefShareRow = { id: string; label: string; count: number; checked: boolean };
+export type RefShare = { rows: RefShareRow[]; /** Aviso de privacidad y tamaño de lo marcado (vacío si no hay nada marcado). */ warn: string; /** Un aviso por capa que perdió detalle. */ notes: string[]; kb: number };
+
+/** Filas de «Capas de referencia» (una por capa, con su nombre) y el aviso de qué se publicará, con su tamaño y recortes. */
+export function refShareRows(layers: { id: string; label: string; count: number }[], selected: string[], build: RefBuild | null, published: boolean): RefShare {
+  const on = new Set(selected);
+  const rows = layers.map((l) => ({ id: l.id, label: l.label, count: l.count, checked: on.has(l.id) }));
+  if (!build || !build.refs.length) return { rows, warn: '', notes: [], kb: 0 };
+  const when = `Se publica al pulsar «${published ? 'Actualizar el mapa publicado' : 'Publicar el mapa'}».`;
+  const kb = Math.max(1, Math.round(build.bytes / 1024));
+  const names = build.refs.map((r) => `«${r.name}»`).join(', ');
+  const skipped = build.skipped.length ? ` Solo caben ${REF_LIMITS.maxLayers} capas: no se publicarán ${build.skipped.map((n) => `«${n}»`).join(', ')}.` : '';
+  return {
+    rows, kb, notes: build.report.map(refTrimNote).filter(Boolean),
+    warn: `Quien tenga el enlace verá el nombre y la forma (geometría simplificada, ≈ ${kb} KB) de ${names}. No se publican los atributos de la capa ni tus capas de entrada.${skipped} ${when}`,
+  };
+}

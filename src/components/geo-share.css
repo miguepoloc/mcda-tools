@@ -61,3 +61,9 @@ details.gx-group>summary:focus-visible{outline:2px solid var(--accent,#4D7C0F);o
 .gs-emb-code{width:100%;font:12px/1.45 var(--f-mono);resize:vertical;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface2);color:var(--ink)}
 .gs-emb-prev{border:1px dashed var(--line);border-radius:10px;padding:8px;overflow:auto;background:var(--surface2)}
 .gs-hint-s{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+
+/* ---- Capas de referencia públicas ---- */
+.gs-refs{display:grid;gap:10px;margin:4px 0 0;padding:12px 0 0;border:0;border-top:1px solid var(--line);min-width:0}
+.gs-refs legend{padding:0;font-weight:700}
+.gs-refs .gs-warn{margin:0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#d97706 12%,var(--surface));border:1px solid color-mix(in srgb,#d97706 55%,var(--line));color:var(--ink,inherit);font-size:13px;line-height:1.45}
+.gs-refnotes{margin:0;padding-left:18px}

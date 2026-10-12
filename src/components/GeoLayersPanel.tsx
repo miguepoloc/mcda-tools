@@ -11,6 +11,7 @@ import { burn, distanceLayerPadded, interpolateSurface, type FC } from '@/lib/ge
 import { layerRange, resampleToGrid } from '@/lib/geo/raster';
 import { isQuotaError, layerPath, refPath, removeLayers, uploadLayer, type Quota } from '@/lib/geo/store';
 import { nameFields, polygonsOnly, uploadRef, zonalAfterDrop, zonalAfterReplace } from '@/lib/geo/refLayer';
+import { refsAfterDrop, refsAfterReplace } from '@/lib/geo/refPublic';
 import { slug } from '@/lib/geo/export';
 import type { GeoData } from '@/lib/geo/data';
 import type { FnSpec } from '@/lib/geo/membership';
@@ -172,7 +173,7 @@ export default function GeoLayersPanel(p: Props) {
     p.commit((c) => {
       const { [key]: _gone, ...rest } = c.layers ?? {};
       const rules = Object.fromEntries(Object.entries(c.rules).filter(([, r]) => r.layerKey !== key));
-      return { ...zonalAfterDrop({ ...c, layers: rest, rules }, key) };
+      return { ...refsAfterDrop(zonalAfterDrop({ ...c, layers: rest, rules }, key), key) };
     });
     p.setVecs((v) => v.filter((x) => x.id !== key));
     p.onQuotaChange();
@@ -246,7 +247,7 @@ export default function GeoLayersPanel(p: Props) {
       let next: GeoConfig = { ...c, layers: { ...(c.layers ?? {}), [key]: meta } };
       if (repKey) {
         const { [repKey]: _old, ...others } = next.layers ?? {};
-        next = zonalAfterReplace({ ...next, layers: others }, repKey, key);
+        next = refsAfterReplace(zonalAfterReplace({ ...next, layers: others }, repKey, key), repKey, key);
       }
       return next;
     });

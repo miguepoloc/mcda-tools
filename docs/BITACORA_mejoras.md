@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**22 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 22). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**24 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 25). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -158,7 +158,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | G4 | Leyendas plegables | ✅ | entrada 6 |
 | G5 | Un solo rótulo de área | ✅ | entrada 6 |
 | G6 | Vectores sin rasterizar | ◐ | polígonos «Referencia» sí (entrada 12); simbología de puntos/líneas de entrada no |
-| G7 | Papel «Referencia» | ◐ | dibujado sí; mostrarlo en la vista pública no (R4, pendiente) |
+| G7 | Papel «Referencia» | ✅ | dibujado (entrada 12) y opcional en la vista pública y `/embed`, capa por capa (entrada 25); solo polígonos persistidos |
 | G8 | Etiquetas, atributos al clic, búsqueda, categorías | ◐ | etiquetas de puntos del usuario sí; atributos de capas no |
 | G9 | Resumen por polígonos (zonal) | ✅ | entrada 12 |
 | G10 | Exposición por población | ✅ | entrada 12 (población al centroide) |
@@ -180,7 +180,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | R1 | Composición de mapa para entregar | ✅ | entradas 14 y 16 |
 | R2 | Informe ejecutivo PDF de mapas | ✅ | entrada 14 |
 | R3 | Párrafo de metodología es/en | ✅ | entrada 7 |
-| R4 | Vista pública configurable / iframe | ◐ | puntos y zonas opcionales sí; iframe (`/embed`) y vista previa social sí (entrada 20); capa «Referencia» pública no |
+| R4 | Vista pública configurable / iframe | ✅ | puntos, zonas y capas de referencia opcionales; iframe (`/embed`) y vista previa social (entrada 20); capas de referencia públicas (entrada 25) |
 | R5 | Aviso de publicación confiable | ✅ | entrada 6 |
 | U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
 | U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
@@ -254,3 +254,15 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Por qué:** el docente pidió radios más legibles; la selección ya no depende solo del color (punto relleno + borde) y el área clicable crece a ≥44 px.
 - **Cómo:** solo CSS al final de `globals.css` (`.gv-dir`, `.gv-modes`) con `:has(:checked)`; el `<input type="radio">` nativo se conserva (teclado y lectores de pantalla). Sin cambios de lógica.
 - **Pendiente (visual):** claro/oscuro y ancho angosto.
+
+### 25. Capas de referencia en la vista pública y embebida (G7, R4)
+- **Qué:** en Compartir → «Qué ve quien abra el enlace», grupo «Mostrar capas de referencia»: una casilla por capa de «Referencia» (con su nombre y número de elementos). Las marcadas se dibujan en `/p/<token>` y `/p/<token>/embed` con el estilo del dueño (G3: contorno, relleno, grosor), y cada lector puede apagarlas con casillas (panel lateral en la vista completa, junto a la leyenda en el embed). Sin capas marcadas no hay ni rastro.
+- **Datos (aditivo, sin migración):** `geo.publicRefs?: string[]` en el proyecto; `meta.showRefs` + `meta.refs[] = {name, color, fill?, fillOp?, weight, fc}` (+ `refsNote` si hubo recorte) en `geo_results.meta`, igual que puntos y zonas. No sube `v`; una publicación anterior no los trae y se ve igual. `public_geo_get` ya devuelve el meta completo, así que no se tocó ninguna función SQL.
+- **Privacidad:** solo geometría y nombre de la capa. `properties` siempre `{}`; los puntos sueltos no se publican; como mucho un MultiPolygon y un MultiLineString por capa (se pierde la identidad de cada elemento). Nunca capas de entrada. El aviso en Compartir nombra las capas y dice que quien tenga el enlace verá su forma.
+- **Tamaño:** `src/lib/geo/refPublic.ts` — tope de 6 capas, 4 000 vértices por capa, 12 000 en total y 350 KB de JSON; redondeo a 5 decimales (~1 m), Douglas-Peucker con tolerancia creciente (desde ~1 m) y, si aun así no cabe, se quitan los elementos más pequeños. Compartir avisa por capa («simplificada, 12 480 → 3 900 vértices, tolerancia ≈ 8 m», elementos sin publicar, capas que no caben) antes de publicar.
+- **Firma:** nueva parte `referencias` en `publishParts`/`changedParts` («las capas de referencia en la vista pública»). Sale de metadatos (archivo, nombre, color, relleno, grosor), no de la geometría, así que es estable mientras el FeatureCollection se descarga; con el interruptor apagado la firma es la de siempre. Publicar con una referencia aún descargando se rechaza con un mensaje.
+- **Limpieza:** borrar o reemplazar una capa la saca o la actualiza en `publicRefs` (`refsAfterDrop`/`refsAfterReplace`); claves huérfanas se ignoran.
+- **Lectura segura:** `publishedRefs(meta)` re-sanea todo lo que llega de la base (tipos, rango lon/lat, colores hex, grosor 0,5–8, tope de vértices y capas), porque el meta lo escribe el dueño y lo lee cualquiera.
+- **Verificación:** `scripts/check-geo-refpublic.ts` (registrado en `npm test` antes de `check-integration.ts`): simplificación, topes, privacidad, lectura saneada, selección, firma y avisos; typecheck, `npm test` y `test:excel`. No se ejecutó `next build` ni `next dev`.
+- **Riesgos / decisiones:** (1) hoy solo se persisten polígonos como «Referencia» (`polygonsOnly`); vías y ríos como líneas se descartan al subirlos. El publicador ya soporta líneas, pero habrá que ampliar la persistencia para usarlas (pendiente). (2) `geo_publish_result` limita `grid_b64` pero no el tamaño del meta: el tope de 350 KB es del cliente; reforzarlo en el servidor exigiría una migración nueva (no se creó). (3) Cada carga pública/embebida baja el meta con las referencias (hasta ~350 KB más). (4) Quien tenga el enlace puede copiar la geometría publicada.
+- **Pendiente (visual):** casillas por capa en Compartir (ancho angosto, oscuro); `/p` y `/embed` con 1–3 referencias (leyenda sobre el mapa, contraste del contorno sobre satélite/claro/oscuro, marcos de 320 px); aviso de recorte con una capa grande real; republicar y comprobar el aviso «cambios sin publicar».
