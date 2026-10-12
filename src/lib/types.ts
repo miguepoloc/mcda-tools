@@ -153,6 +153,9 @@ export type GeoConfig = {
   zonal?: { layer: string; nameField?: string; popLayer?: string; popField?: string };
   /** Publicar en la vista pública el resumen AGREGADO por zona (por defecto NO: nombres de zonas y cifras serían públicos). */
   publicZones?: boolean;
+  /** Claves de las capas de «Referencia» que se muestran en la vista pública (solo geometría simplificada y nombre; por defecto
+   * ninguna). Ver `lib/geo/refPublic.ts`. */
+  publicRefs?: string[];
   /** Escenarios con nombre guardados (máx. 5, ver `lib/geo/scenarios.ts`). Solo del propietario: no se publican. */
   scenarios?: GeoScenario[];
   /** Estilo por capa (color, rampa, opacidad, grosor, borde, visibilidad). Ausente = el de siempre. Ver `lib/geo/layerStyle.ts`. */

@@ -11,11 +11,12 @@ import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
 import { classHexOf, modelRampHex, paintResult, type PaletteKey } from '@/lib/geo/paint';
 import { decodePlanes, publishedPoints, publishedView, publishedZones } from '@/lib/geo/publish';
+import { publishedRefs } from '@/lib/geo/refPublic';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
 import { embedViews, resolvePanel, type EmbedBase, type EmbedPanel, type EmbedStyle } from '@/lib/embed';
-import GeoMap, { type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
+import GeoMap, { type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoPointsList, { type RankRow } from './GeoPointsList';
 import GeoZonesTable from './GeoZonesTable';
 import { BasemapChips, ResultLegend, StyleChips } from './GeoHud';
@@ -45,6 +46,11 @@ export default function EmbedGeoView({ data, token, initial }: { data: PublicGeo
   const pubPoints = useMemo(() => publishedPoints(meta), [meta]);
   const pubZones = useMemo(() => publishedZones(meta), [meta]);
   const views = useMemo(() => embedViews(meta), [meta]);
+  const pubRefs = useMemo(() => publishedRefs(meta), [meta]);
+  const [refOff, setRefOff] = useState<Record<number, boolean>>({});
+  const refVectors = useMemo<VectorOverlay[]>(() => (pubRefs ?? []).map((r, i) => ({
+    id: `pubref:${i}`, fc: r.fc, color: r.color, fillColor: r.fill ?? r.color, weight: r.weight, fillOpacity: r.fillOp ?? 0, visible: !refOff[i],
+  })), [pubRefs, refOff]);
   const [panel, setPanel] = useState<EmbedPanel>(() => resolvePanel(initial.panel, meta));
 
   useEffect(() => {
@@ -94,7 +100,7 @@ export default function EmbedGeoView({ data, token, initial }: { data: PublicGeo
   return (
     <div className="gv-wrap gv-embed" style={vars}>
       <div className="emb-stage gv-stage">
-        <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={[]} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint}
+        <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={refVectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint}
           onPointClick={(k) => { setSelPoint(k); }} draft={null} drawing={false}
           initialBounds={meta.bounds} onClick={onClick} onMove={() => {}} onDrawn={() => {}} />
         <div className="gv-hud gv-hud-tr">
@@ -107,7 +113,22 @@ export default function EmbedGeoView({ data, token, initial }: { data: PublicGeo
           </div>
         )}
         {!planes && <div className="gv-toast" role="status">Cargando el mapa…</div>}
-        {planes && panel === 'map' && <div className="gv-legends"><ResultLegend style={style} model={model} palette={palette} /></div>}
+        {planes && panel === 'map' && (
+          <div className="gv-legends">
+            <ResultLegend style={style} model={model} palette={palette} />
+            {pubRefs && (
+              <div className="gv-pubrefs" role="group" aria-label="Capas de referencia">
+                {pubRefs.map((r, i) => (
+                  <label key={i}>
+                    <input type="checkbox" checked={!refOff[i]} onChange={(e) => setRefOff((c) => ({ ...c, [i]: !e.target.checked }))} />
+                    <span className="sw" style={{ '--sw': r.color } as React.CSSProperties} aria-hidden="true" />
+                    <span>{r.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {panel === 'points' && rankRows.length > 0 && (
           <div className="emb-panel" role="region" aria-label="Puntos y ranking">
             <GeoPointsList rows={rankRows} heading={rankHeading(view.direction)} criticalLabel={T.critical} selectedKey={selPoint}

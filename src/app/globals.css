@@ -1714,3 +1714,9 @@ html{scroll-padding-top:84px}
 .gv-modes label.off{opacity:.5;cursor:not-allowed}.gv-modes label.off input{cursor:not-allowed}
 .gv-modes{gap:6px}
 @media (prefers-reduced-motion:reduce){.gv-dir label,.gv-modes label,.gv-dir input,.gv-modes input,.gv-dir input::before,.gv-modes input::before{transition:none}}
+
+/* Capas de referencia en la vista pública y embebida (lista con casillas; sigue los tokens de tema claro/oscuro). */
+.gv-pubrefs{display:grid;gap:4px}
+.gv-pubrefs label{display:flex;gap:8px;align-items:center;font-size:13px;min-height:28px;color:var(--ink)}
+.gv-pubrefs .sw{flex:none;width:18px;height:0;border-top:3px solid var(--sw,#22d3ee);border-radius:2px}
+.gv-legends .gv-pubrefs{width:100%;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 92%,transparent)}

@@ -9,7 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import QRCode from 'qrcode';
 import QrModal from './QrModal';
 import type { SigParts } from '@/lib/geo/publishSig';
-import { publicLink, publishView, viewerRows, type PublishedStatus } from '@/lib/geo/share';
+import { publicLink, publishView, viewerRows, type PublishedStatus, type RefShareRow } from '@/lib/geo/share';
 import { BASEMAPS } from './GeoMap';
 import { EMBED_BASES, EMBED_PRESETS, EMBED_SIZE, clampSize, embedUrl, iframeCode, type EmbedBase, type EmbedPanel, type EmbedStyle } from '@/lib/embed';
 import './geo-share.css';
@@ -28,6 +28,8 @@ type Props = {
   showPoints: boolean; onShowPoints: (on: boolean) => void; nPoints: number;
   showZones: boolean; onShowZones: (on: boolean) => void;
   zonesReady: boolean; hasPop: boolean;
+  /** Capas de «Referencia» del proyecto (una fila por capa, con su nombre), aviso de lo marcado y recortes. */
+  refLayers: RefShareRow[]; refWarn: string; refNotes: string[]; onToggleRef: (id: string, on: boolean) => void;
   /** «Otras formas de compartir». */
   onGoExperts: () => void; onPrioExcel: () => void;
   /** Solo docente/admin en un proyecto sin paquete: el panel del catálogo del curso (plegado). */
@@ -156,6 +158,27 @@ export default function GeoSharePanel(p: Props) {
             </div>
           ))}
         </div>
+        <fieldset className="gs-refs">
+          <legend>Mostrar capas de referencia</legend>
+          {p.refLayers.length === 0 ? (
+            <p className="gs-hint-s">Este mapa no tiene capas de referencia. En «Capas», sube un archivo de polígonos con el papel «Referencia» (vías, resguardos, ríos…) para poder mostrarlo.</p>
+          ) : (
+            <>
+              <p id={`${uid}-refs-d`} className="gs-hint-s">Elige qué capas de contexto se dibujan sobre el mapa público. Solo viaja la forma (simplificada) y el nombre de la capa; nunca sus atributos. No entran al cálculo.</p>
+              <div className="gs-rows">
+                {p.refLayers.map((r) => (
+                  <div className="gs-row" key={r.id}>
+                    <input id={`${uid}-ref-${r.id}`} type="checkbox" checked={r.checked} aria-describedby={`${uid}-refs-d`}
+                      onChange={(e) => p.onToggleRef(r.id, e.target.checked)} />
+                    <label htmlFor={`${uid}-ref-${r.id}`}><b>{r.label}</b> <span className="muted">· {r.count.toLocaleString('es-CO')} elemento(s)</span></label>
+                  </div>
+                ))}
+              </div>
+              {p.refWarn && <p className="gs-warn" role="status">{p.refWarn}</p>}
+              {p.refNotes.length > 0 && <ul className="gs-hint-s gs-refnotes">{p.refNotes.map((n) => <li key={n}>{n}</li>)}</ul>}
+            </>
+          )}
+        </fieldset>
       </section>
 
       <section className="card form gs-card" aria-labelledby={`${uid}-emb`}>

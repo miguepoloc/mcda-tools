@@ -9,10 +9,11 @@ import { toUrl } from '@/lib/geo/canvas';
 import { buildOverlayMap } from '@/lib/geo/overlay';
 import { PALETTES, classHexOf, modelRampHex, paintResult } from '@/lib/geo/paint';
 import { decodePlanes, publishedPoints, publishedView, publishedZones, type PublishedMeta } from '@/lib/geo/publish';
+import { publishedRefs } from '@/lib/geo/refPublic';
 import { DIR_TEXT } from '@/lib/geo/classes';
 import { MAX_PUBLISHED_BREAKDOWN, publishedRowsToPointRows, rankHeading, STATUS_LABEL } from '@/lib/geo/points';
 import { CLASS_EXCLUDED, CLASS_VETO, MASK_EXCLUDED, MASK_NODATA } from '@/lib/geo/suitability';
-import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay } from './GeoMap';
+import GeoMap, { type BasemapKey, type GeoMapHandle, type MapMarker, type PointMark, type RasterOverlay, type VectorOverlay } from './GeoMap';
 import GeoPointsList, { type RankRow } from './GeoPointsList';
 import PointFicha from './GeoPointFicha';
 import GeoZonesTable from './GeoZonesTable';
@@ -76,6 +77,12 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
   // Puntos con ranking: solo si el dueño los publicó (`showPoints`); publicaciones anteriores no los traen.
   const pubPoints = useMemo(() => publishedPoints(meta), [meta]);
   const pubZones = useMemo(() => publishedZones(meta), [meta]);
+  // Capas de referencia: solo si el dueño las publicó (`showRefs`); cada lector puede apagarlas.
+  const pubRefs = useMemo(() => publishedRefs(meta), [meta]);
+  const [refOff, setRefOff] = useState<Record<number, boolean>>({});
+  const refVectors = useMemo<VectorOverlay[]>(() => (pubRefs ?? []).map((r, i) => ({
+    id: `pubref:${i}`, fc: r.fc, color: r.color, fillColor: r.fill ?? r.color, weight: r.weight, fillOpacity: r.fillOp ?? 0, visible: !refOff[i],
+  })), [pubRefs, refOff]);
   const [selPoint, setSelPoint] = useState<string | null>(null);
   const rankRows = useMemo<RankRow[]>(() => (pubPoints ?? []).map((p, i) => {
     const ok = p.status === 'ok';
@@ -159,6 +166,21 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
                 <p className="gv-hint">Promedio del índice de las celdas evaluadas de cada zona{pubZones.layer ? ` («${pubZones.layer}»)` : ''}. Una zona sin celdas evaluadas se indica como «Sin área evaluada», no como 0 %.{pubZones.extremeName ? ' La población de cada polígono se asignó a la celda de su centroide.' : ''}</p>
               </section>
             )}
+            {pubRefs && (
+              <section className="gv-sec">
+                <header><h4>Capas de referencia</h4></header>
+                <div className="gv-pubrefs">
+                  {pubRefs.map((r, i) => (
+                    <label key={i}>
+                      <input type="checkbox" checked={!refOff[i]} onChange={(e) => setRefOff((c) => ({ ...c, [i]: !e.target.checked }))} />
+                      <span className="sw" style={{ '--sw': r.color } as React.CSSProperties} aria-hidden="true" />
+                      <span>{r.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="gv-hint">Contexto del mapa: no entran al cálculo.{meta.refsNote ? ` ${meta.refsNote}` : ''}</p>
+              </section>
+            )}
             <section className="gv-sec">
               <p className="gv-hint">Haz clic en el mapa (o, con el teclado, enfócalo, muévelo con las flechas y pulsa Intro) para ver el índice de {T.noun} de un punto. Es un <b>índice de 0 a 100</b> (suma ponderada de criterios), <b>no una probabilidad</b>.</p>
               <p className="gv-hint">Publicado el {new Date(data.updated_at).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}{meta.attribution ? ` · Datos: ${meta.attribution}` : ''}</p>
@@ -167,7 +189,7 @@ export default function PublicGeoView({ data }: { data: PublicGeo }) {
         </aside>
         <section className="gv-main">
           <div className="gv-stage">
-            <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={[]} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} onPointClick={setSelPoint} draft={null} drawing={false}
+            <GeoMap ref={mapRef} basemap={basemap} rasters={rasters} vectors={refVectors} markers={markers} pointMarks={pointMarks} selectedPointId={selPoint} onPointClick={setSelPoint} draft={null} drawing={false}
               initialBounds={meta.bounds} onClick={onClick} onMove={onMove} onDrawn={() => {}} />
             <div className="gv-hud gv-hud-tr">
               <BasemapChips value={basemap} onChange={setBasemap} />

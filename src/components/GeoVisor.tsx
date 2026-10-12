@@ -32,11 +32,12 @@ import { CAT_PREFIX, getCatalogRow, loadCatalogLayer } from '@/lib/geo/catalog';
 import { ahpSummary } from '@/lib/geo/ahpSummary';
 import { encodePlanes, type PublishedMeta } from '@/lib/geo/publish';
 import { publishParts } from '@/lib/geo/publishSig';
+import { activeRefIds, buildPublishedRefs, refsSpec, toggleRef, type RefInput } from '@/lib/geo/refPublic';
 import type { Example } from '@/lib/geo/examples';
 import GeoSharePanel from './GeoSharePanel';
 import { createPortal } from 'react-dom';
 import GeoCatalogPanel from './GeoCatalogPanel';
-import { exportGroups, type ExportGroup, type ExportKey, type ExportSpec } from '@/lib/geo/share';
+import { exportGroups, refShareRows, type ExportGroup, type ExportKey, type ExportSpec } from '@/lib/geo/share';
 import './geo-share.css';
 import GeoTour, { tourSeen, type TourStep } from './GeoTour';
 import {
@@ -842,13 +843,35 @@ export default function GeoVisor(props: Props) {
   const zonesSpec = useMemo(() => (geo.publicZones && zoneVec && zoneGrid
     ? [zoneVec.id, geo.layers?.[zoneVec.id]?.bytes ?? 0, geo.zonal?.nameField ?? '', popVec ? [popVec.id, geo.zonal?.popField ?? ''] : '', !!geo.publicPoints && points.length > 0]
     : null), [geo.publicZones, zoneVec, zoneGrid, popVec, geo.zonal, geo.layers, geo.publicPoints, points.length]);
+  // Capas de referencia públicas (G7/R4): elegidas por el dueño, una a una. Con ninguna elegida todo esto es null y no cambia
+  // ninguna firma. La firma sale de los METADATOS de la capa (archivo, estilo, nombre), no de la geometría: así es estable
+  // aunque el FeatureCollection aún se esté bajando.
+  const refPickIds = useMemo(() => activeRefIds(geo.publicRefs, Object.entries(geo.layers ?? {}).filter(([, l]) => l.role === 'reference').map(([k]) => k)), [geo.publicRefs, geo.layers]);
+  const refLook = useCallback((id: string) => {
+    const m = geo.layers?.[id];
+    return vectorLook(geo.styles?.[`v:${id}`], { color: m?.ref?.color ?? '#22D3EE', weight: m?.ref?.weight ?? 2, fillOpacity: 0 });
+  }, [geo.layers, geo.styles]);
+  const refSpecVal = useMemo(() => refsSpec(refPickIds.map((id) => {
+    const m = geo.layers![id], lk = refLook(id);
+    return { id, name: m.label, color: lk.stroke, fill: lk.fill, fillOp: lk.fillOpacity, weight: lk.weight, path: m.path, bytes: m.bytes };
+  })), [refPickIds, geo.layers, refLook]);
+  const refInputs = useMemo<RefInput[]>(() => refPickIds.flatMap((id) => {
+    const v = vecs.find((x) => x.ref && x.id === id);
+    if (!v) return [];
+    const lk = refLook(id);
+    return [{ id, name: geo.layers?.[id]?.label ?? v.name, fc: v.fc, color: lk.stroke, fill: lk.fill, fillOp: lk.fillOpacity, weight: lk.weight }];
+  }), [refPickIds, vecs, geo.layers, refLook]);
+  const refBuild = useMemo(() => (refInputs.length ? buildPublishedRefs(refInputs) : null), [refInputs]);
+  const refShare = useMemo(() => refShareRows(
+    vecs.filter((v) => v.ref && geo.layers?.[v.id]).map((v) => ({ id: v.id, label: geo.layers![v.id].label ?? v.name, count: v.fc.features.length })),
+    refPickIds, refBuild, true), [vecs, geo.layers, refPickIds, refBuild]);
   const resultSig = useMemo(() => {
     // Los puntos solo entran con el interruptor encendido: sin él la firma es la de siempre.
-    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : []), ...(zonesSpec ? [['zonas', zonesSpec]] : [])]);
+    const str = JSON.stringify([weightResult.agg.w.map((w) => Math.round(w * 1e6)), geo.rules, classSigValue(setup), layersSig, geo.packId ?? "", ...(geo.publicPoints ? [points.map((p) => [p.name, p.lat, p.lon])] : []), ...(zonesSpec ? [['zonas', zonesSpec]] : []), ...(refSpecVal ? [['refs', refSpecVal]] : [])]);
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
-  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points, zonesSpec]);
+  }, [weightResult, geo.rules, setup, layersSig, geo.packId, geo.publicPoints, points, zonesSpec, refSpecVal]);
 
   // Firma por partes de lo que produce el mapa (ver lib/geo/publishSig): permite avisar QUÉ cambió desde lo publicado.
   const sigParts = useMemo(() => {
@@ -861,11 +884,14 @@ export default function GeoVisor(props: Props) {
       packId: geo.packId, grid: data.grid,
       points: { show: !!geo.publicPoints, list: points },
       zones: { show: !!zonesSpec, spec: zonesSpec },
+      refs: { show: !!refSpecVal, spec: refSpecVal },
     });
-  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points, zonesSpec]);
+  }, [data, criteria, weightResult, geo.rules, geo.packId, setup, geo.publicPoints, points, zonesSpec, refSpecVal]);
 
   async function buildPublish() {
     if (!data || !ev || !stats || !gridBounds) throw new Error('No hay mapa que publicar.');
+    // Referencias elegidas: si alguna aún no terminó de bajar no se publica a medias.
+    if (refPickIds.length && (refInputs.length < refPickIds.length || !refBuild)) throw new Error('Las capas de referencia elegidas aún se están cargando: espera un momento y vuelve a publicar.');
     const b64 = await encodePlanes(ev.pct, ev.cls, data.mask);
     const meta: PublishedMeta = {
       v: 2, grid: data.grid, bounds: gridBounds,
@@ -886,6 +912,8 @@ export default function GeoVisor(props: Props) {
       // Con el interruptor apagado NO viaja ni la lista: el meta lo recibe cualquiera con el enlace.
       ...(geo.publicPoints ? { showPoints: true, points: toPublishedPoints(ranked, { nameOfKey: (k) => criteria.find((c) => geo.rules[c.id]?.layerKey === k)?.name }) } : {}),
       // Solo agregados por zona (nunca los polígonos de entrada ni la población por manzana).
+      // Solo geometría simplificada y nombre de las capas marcadas (nunca atributos ni capas de entrada).
+      ...(refBuild && refBuild.refs.length ? { showRefs: true, refs: refBuild.refs, ...(refBuild.report.some((r) => r.trimmed) ? { refsNote: 'Geometrías simplificadas para la web.' } : {}) } : {}),
       ...(zonesSpec && zoneStats && zoneVec ? { showZones: true, zones: toPublishedZones(zoneStats, { layer: geo.layers?.[zoneVec.id]?.label ?? zoneVec.name, withPoints: !!geo.publicPoints && points.length > 0, pop: popExp?.perZone, extremeName }) } : {}),
     };
     return { b64, meta };
@@ -1135,6 +1163,8 @@ export default function GeoVisor(props: Props) {
           isPublic={props.share.isPublic} token={props.share.token} onTogglePublic={props.share.onTogglePublic}
           ready={ready} exploring={exploring} sig={resultSig} parts={sigParts} build={buildPublish}
           showPoints={!!geo.publicPoints} nPoints={points.length} showZones={!!geo.publicZones} zonesReady={!!zoneVec} hasPop={!!popVec}
+          refLayers={refShare.rows} refWarn={refShare.warn} refNotes={refShare.notes}
+          onToggleRef={(id, on) => commit((g) => { const o = { ...g }; const n = toggleRef(g.publicRefs, id, on); if (n) o.publicRefs = n; else delete o.publicRefs; return o; })}
           onShowZones={(on) => commit((g) => { const o = { ...g }; if (on) o.publicZones = true; else delete o.publicZones; return o; })}
           onShowPoints={(on) => commit((g) => { const o = { ...g }; if (on) o.publicPoints = true; else delete o.publicPoints; return o; })}
           warn={expertIds.length > 0 && weightResult.agg.cr >= 0.1 ? `Los juicios de los expertos son inconsistentes (CR ${weightResult.agg.cr.toFixed(3)} ≥ 0.10): los pesos no son confiables. La vista pública mostrará el CR, pero conviene corregirlos antes de publicar.` : undefined}
