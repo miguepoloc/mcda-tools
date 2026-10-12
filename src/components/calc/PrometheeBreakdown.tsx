@@ -1,8 +1,9 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
-import { pref3, preferenceDetail, promethee, prometheeI, prometheeInputs, type PreferenceDetail, type PrometheeResult } from '@/lib/promethee';
-import type { Alternative, Criterion, DecisionMatrix, MatrixType } from '@/lib/types';
+import { preferenceDetail, promethee, prometheeI, prometheeInputs, type PreferenceDetail, type PrometheeResult } from '@/lib/promethee';
+import { curvePoints, describePref, PROMETHEE_FN_INFO, prefFn } from '@/lib/prometheeConfig';
+import type { Alternative, Criterion, DecisionMatrix, MatrixType, PrometheeFn } from '@/lib/types';
 import { withUnit } from '@/lib/units';
 import PrometheeFlows from '../PrometheeFlows';
 import { CalcMatrix, CalcSection, CalcStep, Reading, Worked, type CalcCell, type CalcMode } from './CalcKit';
@@ -22,28 +23,35 @@ export type PrometheeBreakdownProps = {
 
 const TIE = 1e-9;
 
-/** Curva P(d) de la función de preferencia Tipo III (q = 0, p = rango) de un criterio, con los d reales observados entre pares de
- * alternativas. Eje x: d = ventaja de a sobre b en la unidad del criterio (negativa = gana b); eje y: P(d) de 0 a 1. Círculo lleno = P > 0
- * (a es preferida en ese criterio); círculo hueco = P = 0. SVG propio, título, ejes y leyenda dentro del dibujo; solo variables CSS. */
-function PreferenceCurve({ title, unit, p, d, type }: { title: string; unit?: string; p: number; d: number[]; type: MatrixType }) {
+/** Curva P(d) de la función de preferencia de un criterio (cualquiera de las seis de Brans y Vincke), con los d reales observados
+ * entre pares de alternativas. Eje x: d = ventaja de a sobre b en la unidad del criterio (negativa = gana b); eje y: P(d) de 0 a 1.
+ * Círculo lleno = P > 0 (a es preferida en ese criterio); círculo hueco = P = 0. SVG propio, título, ejes y leyenda dentro del
+ * dibujo; solo variables CSS. */
+export function PreferenceCurve({ title, unit, fn, q, p, s, range, d, type }: { title: string; unit?: string; fn: PrometheeFn; q: number; p: number; s: number; range: number; d: number[]; type: MatrixType }) {
   const uid = useId().replace(/:/g, '');
   const W = 270, H = 190, L = 46, R = 14, T = 34, Bm = 50;
   const iw = W - L - R, ih = H - T - Bm;
-  const dom = p; // d observados caen siempre en [−p, p]
+  const info = PROMETHEE_FN_INFO[fn];
+  const dom = Math.max(range, info.p ? p : 0, info.q ? q : 0, 1e-9); // los d observados caen siempre en [−rango, rango]
   const x = (v: number) => L + ((Math.max(-dom, Math.min(dom, v)) + dom) / (2 * dom)) * iw;
   const y = (v: number) => T + (1 - v) * ih;
-  const path = `M${x(-dom)},${y(0)} L${x(0)},${y(0)} L${x(dom)},${y(1)}`;
+  const path = curvePoints(fn, q, p, s, dom).map(([dx, dy], k) => `${k === 0 ? 'M' : 'L'}${x(dx)},${y(dy)}`).join(' ');
   const uniq = Array.from(new Set(d.map((v) => Number(v.toPrecision(9))))).sort((a, b) => a - b);
   const pos = uniq.filter((v) => v > 0);
-  const summary = `Función de preferencia de ${title}: P(d) = 0 si d ≤ 0, d ÷ p si 0 < d < p y 1 si d ≥ p, con p = ${fmtVal(p)}${unit ? ' ' + unit : ''}. `
-    + (pos.length ? `Diferencias observadas a favor de una alternativa: ${pos.map((v) => `${fmtVal(v)} (P = ${pref3(v, 0, p).toFixed(2)})`).join(', ')}.` : 'No hay diferencias a favor de ninguna alternativa.');
+  const params = [info.q ? `q = ${fmtVal(q)}` : '', info.p ? `p = ${fmtVal(p)}` : '', info.s ? `σ = ${fmtVal(s)}` : ''].filter(Boolean).join(', ');
+  const summary = `Función de preferencia de ${title}: Tipo ${info.type}, ${info.label.toLowerCase()}${params ? ' (' + params + (unit ? ' ' + unit : '') + ')' : ''}. ${info.formula}. `
+    + (pos.length ? `Diferencias observadas a favor de una alternativa: ${pos.map((v) => `${fmtVal(v)} (P = ${prefFn(fn, v, q, p, s).toFixed(2)})`).join(', ')}.` : 'No hay diferencias a favor de ninguna alternativa.');
   const ticks = [0, 0.5, 1];
+  const xmarks: [number, string][] = [[-dom, `−${fmtVal(dom)}`], [0, '0'], [dom, fmtVal(dom)]];
+  const thresholds: [number, string][] = [];
+  if (info.q && q > 0 && q < dom) thresholds.push([q, 'q']);
+  if (info.p && p < dom && !(fn === 'vshape' && p === dom)) thresholds.push([p, 'p']);
   return (
     <div className="ob-curve">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby={`${uid}-t`}>
         <title id={`${uid}-t`}>{summary}</title>
         <text x={L} y={16} fontSize="13" fontWeight={700} fill="var(--ink)">{title.length > 34 ? title.slice(0, 33) + '…' : title}</text>
-        <text x={L} y={29} fontSize="12" fill="var(--muted)">{type === 'min' ? 'costo: d = x_b − x_a' : 'beneficio: d = x_a − x_b'}</text>
+        <text x={L} y={29} fontSize="12" fill="var(--muted)">{`${info.label}${params ? ' · ' + params : ''}`.slice(0, 40)}</text>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeDasharray={t === 0 ? undefined : '3 4'} />
@@ -52,15 +60,21 @@ function PreferenceCurve({ title, unit, p, d, type }: { title: string; unit?: st
         ))}
         <line x1={x(0)} x2={x(0)} y1={T} y2={T + ih} stroke="var(--muted)" strokeDasharray="2 3" />
         <line x1={L} x2={L} y1={T} y2={T + ih} stroke="var(--ink)" />
+        {thresholds.map(([v, lab]) => (
+          <g key={lab}>
+            <line x1={x(v)} x2={x(v)} y1={T} y2={T + ih} stroke="var(--muted)" strokeDasharray="1 4" />
+            <text x={x(v)} y={T + ih + 28} textAnchor="middle" fontSize="12" fill="var(--muted)">{lab}</text>
+          </g>
+        ))}
         <path d={path} fill="none" stroke="var(--m-promethee)" strokeWidth={2.6} strokeLinejoin="round" />
         {uniq.map((v) => {
-          const P = pref3(v, 0, p);
+          const P = prefFn(fn, v, q, p, s);
           return P > 0
             ? <circle key={v} cx={x(v)} cy={y(P)} r={4.5} fill="var(--m-promethee)" stroke="var(--ink)" strokeWidth={1.4} />
             : <circle key={v} cx={x(v)} cy={y(0)} r={4} fill="var(--surface)" stroke="var(--ink)" strokeWidth={1.4} />;
         })}
-        {[[-dom, `−${fmtVal(p)}`], [0, '0'], [dom, `p = ${fmtVal(p)}`]].map(([v, lab]) => (
-          <text key={String(lab)} x={x(v as number)} y={T + ih + 16} textAnchor={v === dom ? 'end' : v === -dom ? 'start' : 'middle'} fontSize="12" fill="var(--muted)">{lab as string}</text>
+        {xmarks.map(([v, lab]) => (
+          <text key={lab + v} x={x(v)} y={T + ih + 16} textAnchor={v === dom ? 'end' : v === -dom ? 'start' : 'middle'} fontSize="12" fill="var(--muted)">{lab}</text>
         ))}
         <text x={L + iw / 2} y={H - 8} textAnchor="middle" fontSize="12" fill="var(--ink)">d = ventaja de a sobre b{unit ? ` (${unit})` : ''}</text>
         <text transform={`translate(12 ${T + ih / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="var(--ink)">P(d)</text>
@@ -76,8 +90,8 @@ function PreferenceCurve({ title, unit, p, d, type }: { title: string; unit?: st
 export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, weights }: PrometheeBreakdownProps) {
   const names = useMemo(() => alternatives.map((a) => a.name), [alternatives]);
   const labels = useMemo(() => criteria.map((c) => withUnit(c)), [criteria]);
-  const { matrix, types } = useMemo(() => prometheeInputs(criteria, alternatives, dm), [criteria, alternatives, dm]);
-  const res = useMemo<PrometheeResult>(() => promethee(matrix, weights, types), [matrix, weights, types]);
+  const { matrix, types, cfg } = useMemo(() => prometheeInputs(criteria, alternatives, dm), [criteria, alternatives, dm]);
+  const res = useMemo<PrometheeResult>(() => promethee(matrix, weights, types, cfg), [matrix, weights, types, cfg]);
   const n = names.length, m = criteria.length;
   const [pair, setPair] = useState<[number, number] | null>(null);
   const p1 = useMemo(() => prometheeI(res.phiPlus, res.phiMinus), [res]);
@@ -109,8 +123,11 @@ export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, w
   const wMax = Math.max(...res.weights);
 
   const unitOf = (j: number) => criteria[j].unit?.trim() || '';
+  const fnInfo = (j: number) => PROMETHEE_FN_INFO[res.fn[j]];
+  const anyCustom = res.prefs.some((x) => x.custom);
+  const allIssues = res.prefs.flatMap((x, j) => x.issues.map((t) => `${labels[j]}: ${t}`));
   const critRows: CalcCell[][] = criteria.map((_, j) => [
-    'III · lineal (V)', '0', fmtVal(res.p[j]),
+    `${fnInfo(j).type} · ${fnInfo(j).label}`, fnInfo(j).q ? fmtVal(res.q[j]) : '—', fnInfo(j).p ? fmtVal(res.p[j]) : '—', fnInfo(j).s ? fmtVal(res.s[j]) : '—',
     types[j] === 'min' ? 'Costo: d = x_b − x_a' : 'Beneficio: d = x_a − x_b',
     unitOf(j) || '—',
   ]);
@@ -124,8 +141,8 @@ export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, w
     <CalcMatrix
       mode={mode} corner="Criterio" caption={`Preferencia agregada de ${names[d.a]} sobre ${names[d.b]}, criterio por criterio`}
       rows={labels} rowHint={types.map((t) => (t === 'min' ? 'costo: d = x_b − x_a' : 'beneficio: d = x_a − x_b'))}
-      cols={['Peso w_j', names[d.a], names[d.b], 'd = ventaja de a sobre b', 'Rango p_j', 'P(d) = d ÷ p (tope 1)', 'Aporta w × P']}
-      cells={d.rows.map((r) => [n4(r.w), fmtVal(r.xa), fmtVal(r.xb), r.d > 0 ? fmtVal(r.d) : `${fmtVal(r.d).replace('-', '−')} (no gana ${names[d.a]})`, fmtVal(r.p), n4(r.P), n4(r.contrib)])}
+      cols={['Peso w_j', names[d.a], names[d.b], 'd = ventaja de a sobre b', 'Umbral p_j', 'P(d) con la función del criterio', 'Aporta w × P']}
+      cells={d.rows.map((r) => [n4(r.w), fmtVal(r.xa), fmtVal(r.xb), r.d > 0 ? fmtVal(r.d) : `${fmtVal(r.d).replace('-', '−')} (no gana ${names[d.a]})`, PROMETHEE_FN_INFO[r.fn].p ? fmtVal(r.p) : '—', n4(r.P), n4(r.contrib)])}
       hl={(i, j) => (j === 6 && d.rows[i].contrib > 0 ? 'good' : undefined)}
       footer={[{ label: `π(${names[d.a]}, ${names[d.b]})`, hint: 'suma de aportes', cells: [n4(d.rows.reduce((s, r) => s + r.w, 0)), '', '', '', '', '', n4(d.pi)] }]}
       wide
@@ -174,9 +191,9 @@ export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, w
       intro="PROMETHEE no solo dice si A supera a B: mide QUÉ TANTO se prefiere A sobre B, con un número entre 0 y 1 por criterio. A diferencia de ELECTRE sí es compensatorio: un criterio muy favorable puede compensar uno desfavorable. Todo lo de abajo sale de tu matriz de decisión y de los pesos de tus criterios."
     >
       <CalcStep no={1} title="Matriz de decisión, tipo de cada criterio, pesos y rangos" mode={mode} defaultOpen
-        meaning="Los datos de partida. El tipo (beneficio o costo) fija en qué dirección se mide la ventaja; el peso dice cuánto pesa cada criterio; el rango p_j (máximo − mínimo) será el tope de la función de preferencia del paso 2."
-        formula={'p_j = máx_i x_ij − mín_i x_ij        (si p_j = 0 se usa 1)'}>
-        <InputsTable mode={mode} names={names} critLabels={labels} matrix={matrix} types={types} weights={res.weights} ranges={res.p} rangeName="Rango p_j" rangeMeaning="tope de la función de preferencia" />
+        meaning="Los datos de partida. El tipo (beneficio o costo) fija en qué dirección se mide la ventaja; el peso dice cuánto pesa cada criterio; el rango (máximo − mínimo) es la referencia de los umbrales por defecto de la función de preferencia del paso 2."
+        formula={'rango_j = máx_i x_ij − mín_i x_ij        (si es 0 se usa 1)\nvalor por defecto de p_j (Tipo III) = rango_j'}>
+        <InputsTable mode={mode} names={names} critLabels={labels} matrix={matrix} types={types} weights={res.weights} ranges={res.range} rangeName="Rango (máx − mín)" rangeMeaning="referencia de los umbrales por defecto" />
         <Reading>cada fila es una alternativa y cada columna un criterio; bajo el nombre del criterio están su tipo (↑ beneficio, ↓ costo) y su peso w. En negrita, el mejor valor de cada criterio.</Reading>
         <Reading title="Qué dice tu caso">
           tienes {n} alternativas ({listNames(names)}) en {m} criterios; el de más peso es «{labels[res.weights.indexOf(wMax)]}» ({n4(wMax)}).
@@ -185,31 +202,35 @@ export default function PrometheeBreakdown({ mode, criteria, alternatives, dm, w
       </CalcStep>
 
       <CalcStep no={2} title="Función de preferencia por criterio: de la diferencia d a un grado de preferencia P" mode={mode}
-        meaning="Cada criterio necesita una regla que convierta «A le gana a B por esta cantidad» en «qué tanto prefiero A sobre B», un número P entre 0 y 1. Si A no es mejor que B, P = 0 sin importar qué tan mal le vaya. Si es un poco mejor, P crece en proporción a la ventaja. Si es mucho mejor (el rango completo o más), P = 1: más ventaja ya no aumenta la preferencia."
-        formula={'P_j(a, b) = 0            si d ≤ 0\nP_j(a, b) = d ÷ p_j      si 0 < d < p_j\nP_j(a, b) = 1            si d ≥ p_j\nd = ventaja de a sobre b:  beneficio x_aj − x_bj,  costo x_bj − x_aj'}>
+        meaning="Cada criterio necesita una regla que convierta «A le gana a B por esta cantidad» en «qué tanto prefiero A sobre B», un número P entre 0 y 1. Si A no es mejor que B, P = 0 sin importar qué tan mal le vaya. Si es mejor, P crece con la ventaja según la función elegida (Brans y Vincke, 1985), y nunca pasa de 1."
+        formula={[...new Set(res.fn)].map((f) => `Tipo ${PROMETHEE_FN_INFO[f].type} · ${PROMETHEE_FN_INFO[f].label}:  ${PROMETHEE_FN_INFO[f].formula}`).join('\n') + '\nd = ventaja de a sobre b:  beneficio x_aj − x_bj,  costo x_bj − x_aj'}>
         <dl className="ob-legend">
           <dt>P_j(a, b)</dt><dd>grado de preferencia de a sobre b en el criterio j, entre 0 y 1</dd>
           <dt>d</dt><dd>la ventaja de a sobre b en ese criterio (positiva solo si a es mejor)</dd>
-          <dt>p_j</dt><dd>umbral de preferencia: aquí, el rango del criterio (máx − mín); es el tope de la función</dd>
-          <dt>q_j</dt><dd>umbral de indiferencia: aquí q = 0 (cualquier ventaja positiva cuenta)</dd>
+          <dt>q_j</dt><dd>umbral de indiferencia: ventajas hasta q no cuentan (en las funciones que lo usan; 0 si no)</dd>
+          <dt>p_j</dt><dd>umbral de preferencia: desde p la preferencia es total; por defecto, el rango del criterio</dd>
+          <dt>σ_j</dt><dd>escala de la función gaussiana (solo en ese tipo)</dd>
         </dl>
         <CalcMatrix
           mode={mode} corner="Criterio" caption="Función de preferencia usada en cada criterio"
-          rows={labels} cols={['Tipo', 'q (indiferencia)', 'p (preferencia)', 'Dirección de d', 'Unidad']}
+          rows={labels} cols={['Función', 'q (indiferencia)', 'p (preferencia)', 'σ (gaussiana)', 'Dirección de d', 'Unidad']}
           cells={critRows} wide
         />
-        <Note title="Simplificación del curso">
-          la plataforma usa siempre el Tipo III (lineal, «V») con q = 0 y p = rango del criterio, la misma convención del notebook de referencia (P = rangos). En la práctica p, q (y σ en el tipo gaussiano) se negocian con quien decide, y PROMETHEE define seis tipos de función (usual, en U, en V, por niveles, lineal con indiferencia y gaussiana; Brans &amp; Vincke, 1985). Elegir otros tipos con sus q, p o σ es una mejora aparte que la plataforma todavía no ofrece.
+        <Note title={anyCustom ? 'Funciones elegidas' : 'Valor por defecto del curso'}>
+          {anyCustom
+            ? `la función y los umbrales se eligieron por criterio (${res.prefs.map((x, j) => `${labels[j]}: ${describePref(x, fmtVal)}`).join('; ')}). No salen de los datos: los fija quien decide y con otros valores el ranking puede cambiar; revisa la sensibilidad.`
+            : 'ningún criterio tiene función propia: se usa el Tipo III (lineal, «V») con q = 0 y p = rango del criterio, la misma convención del notebook de referencia (P = rangos). En la práctica p, q y σ se negocian con quien decide; puedes elegir cualquiera de las seis funciones (usual, en U, en V, por niveles, lineal con indiferencia y gaussiana; Brans y Vincke, 1985) en el panel «Funciones de preferencia».'}
         </Note>
+        {allIssues.length > 0 && <Note title="Umbrales corregidos">{allIssues.join('; ')}.</Note>}
         <div className="ob-curves" role="group" aria-label="Curvas de la función de preferencia de cada criterio">
-          {criteria.map((_, j) => <PreferenceCurve key={j} title={labels[j]} unit={unitOf(j)} p={res.p[j]} d={observed(j)} type={types[j]} />)}
+          {criteria.map((_, j) => <PreferenceCurve key={j} title={labels[j]} unit={unitOf(j)} fn={res.fn[j]} q={res.q[j]} p={res.p[j]} s={res.s[j]} range={res.range[j]} d={observed(j)} type={types[j]} />)}
         </div>
-        <p className="ob-cap"><b>Cómo leer las curvas: </b>la línea es P(d); cada círculo es una diferencia d real entre dos de tus alternativas (lleno = a es preferida, P &gt; 0; hueco = P = 0 porque a no es mejor). El eje horizontal va de −p a p; a la derecha de 0 la preferencia sube hasta 1 en p.</p>
+        <p className="ob-cap"><b>Cómo leer las curvas: </b>la línea es P(d); cada círculo es una diferencia d real entre dos de tus alternativas (lleno = a es preferida, P &gt; 0; hueco = P = 0 porque a no es mejor). El eje horizontal va de −rango a rango; a la derecha de 0 la preferencia sube según la función hasta 1. Las marcas q y p señalan los umbrales.</p>
         <Reading title="Qué dice tu caso">
           {(() => {
             const j = 0;
             const others = observed(j).filter((v) => v > 0);
-            return others.length ? `por ejemplo, en «${labels[j]}» una ventaja de ${fmtVal(Math.max(...others))} equivale a P = ${pref3(Math.max(...others), 0, res.p[j]).toFixed(2)}, y una ventaja igual a la mitad del rango (${fmtVal(res.p[j] / 2)}) equivale a P = 0.50.` : `en «${labels[j]}» ninguna alternativa le gana a otra.`;
+            return others.length ? `por ejemplo, en «${labels[j]}» (${describePref(res.prefs[j], fmtVal)}) una ventaja de ${fmtVal(Math.max(...others))} equivale a P = ${prefFn(res.fn[j], Math.max(...others), res.q[j], res.p[j], res.s[j]).toFixed(2)}.` : `en «${labels[j]}» ninguna alternativa le gana a otra.`;
           })()}
         </Reading>
       </CalcStep>

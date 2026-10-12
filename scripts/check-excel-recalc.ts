@@ -21,6 +21,7 @@ import { sawSynthesis } from '../src/lib/saw.ts';
 import { fuzzyTopsisSynthesis } from '../src/lib/fuzzy_topsis.ts';
 import { vikorSynthesis } from '../src/lib/vikor.ts';
 import { electreSynthesis } from '../src/lib/electre.ts';
+import { promethee, prometheeI, prometheeSynthesis } from '../src/lib/promethee.ts';
 import { criticWeights, entropyWeights } from '../src/lib/weights.ts';
 import { defuzzifyMatrix } from '../src/lib/fuzzy_topsis.ts';
 import type { DecisionMatrix as DM, Method } from '../src/lib/types.ts';
@@ -281,6 +282,69 @@ for (const caso of ['iot', 'viaje', 'solar'] as const) {
     });
   }
   ok(exp.relations.length > 2, `ELECTRE con c*=0.30/d*=0.90 da más relaciones que el default 0.65/0.30 (da ${exp.relations.length})`);
+}
+
+// ---- PROMETHEE: seis funciones de preferencia por criterio (grillas de celdas reales) y PROMETHEE I ----
+// Config mixta (lineal, U, nivel, gaussiana) y otra con las 6 funciones usadas en 6 criterios. Se arruinan los valores
+// cacheados numéricos Y los de texto (relaciones de PROMETHEE I) y LibreOffice recalcula de verdad.
+for (const caso of ['mixta', 'seis'] as const) {
+  const names = caso === 'mixta' ? ['Alcance', 'Autonomía', 'Infraestructura', 'Madurez'] : ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+  const criteria = names.map((name, i) => ({ id: 'k' + i, name, hint: '' }));
+  const alternatives = ['LoRaWAN', 'GSM/GPRS', 'Sigfox', 'Zigbee'].map((name, i) => ({ id: 'a' + i, name }));
+  const base = [[10, 8, 2, 5], [10.5, 0.5, 3, 2], [40, 2, 5, 2], [0.07, 1.5, 2, 4]];
+  const dataset = base.map((row) => (caso === 'mixta' ? row : [...row, row[0] / 3, 10 - row[1]]));
+  let dm: DecisionMatrix = blankMatrix();
+  alternatives.forEach((a, i) => criteria.forEach((c, j) => { dm = setCell(dm, a.id, c.id, dataset[i][j]); }));
+  criteria.forEach((c, j) => { dm = setType(dm, c.id, caso === 'seis' && j === 5 ? 'min' : 'max'); });
+  dm = {
+    ...dm,
+    prometheeConfig: caso === 'mixta'
+      ? { k0: { fn: 'linear', q: 2, p: 20 }, k1: { fn: 'ushape', q: 1 }, k2: { fn: 'level', q: 0.5, p: 1.5 }, k3: { fn: 'gaussian', s: 1 } }
+      : { k0: { fn: 'usual' }, k1: { fn: 'ushape' }, k2: { fn: 'vshape' }, k3: { fn: 'level' }, k4: { fn: 'linear', q: 1, p: 8 }, k5: { fn: 'gaussian' } },
+  };
+  const experts = [{ id: 'e0', name: 'Experto 1', role_desc: 'Ingeniero de redes' }];
+  const rows: { expert_id: string; sheet: string; pair_key: string; value: number }[] = [];
+  pairsOf(criteria.length).forEach(([i, j], n) => rows.push({ expert_id: 'e0', sheet: 'crit', pair_key: `k${i}-k${j}`, value: ((n * 3) % 7) - 3 }));
+  const study = {
+    title: 'Proyecto PROMETHEE de prueba', objective: 'Elegir', criteria, alternatives, experts,
+    idx: indexJudgments(rows), prio: normalizePrio(blankPrio()), method: 'promethee' as const, decisionMatrix: dm,
+  };
+  const wb = buildWorkbook(XLSX, study);
+  let nCorrupted = corruptCachedValues(wb, 'PROMETHEE') + corruptCachedValues(wb, 'Criterios') + corruptCachedValues(wb, 'Matriz de decisión');
+  for (const addr of Object.keys(wb.Sheets['PROMETHEE'])) {
+    const cell = wb.Sheets['PROMETHEE'][addr];
+    if (!addr.startsWith('!') && cell && cell.f && cell.t === 's') { cell.v = 'XXX'; nCorrupted++; }
+  }
+  const corruptPath = path.join(tmpdir(), `plataforma_recalc_promethee_${caso}.xlsx`);
+  writeFileSync(corruptPath, XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }));
+  console.log(`PROMETHEE (${caso}): ${nCorrupted} celdas con fórmula arruinadas a propósito, recalculando en LibreOffice…`);
+  const recalced = recalcViaLibreOffice(soffice, corruptPath, path.join(tmpdir(), `plataforma_recalc_out_promethee_${caso}`));
+  const ws = XLSX.read(readFileSync(recalced), { type: 'buffer' }).Sheets['PROMETHEE'];
+  const weights = analyze(aggMatrix(criteria, [Object.fromEntries(rows.filter((r) => r.sheet === 'crit').map((r) => [r.pair_key, r.value]))])).w;
+  const exp = prometheeSynthesis(criteria, alternatives, dm, weights);
+  const res = promethee(alternatives.map((a) => criteria.map((c) => dataset[alternatives.indexOf(a)][criteria.indexOf(c)])), weights, criteria.map((_, j) => dm.types[criteria[j].id] as 'max' | 'min'), criteria.map((c) => dm.prometheeConfig?.[c.id]));
+  const n = alternatives.length;
+  const rPi0 = 5 + n + 2, cPhi = colL(n + 3), cRk = colL(n + 4), cPlus = colL(n + 1), cMinus = colL(n + 2);
+  alternatives.forEach((a, i) => {
+    const r = rPi0 + i;
+    ok(!!ws[cPhi + r] && cerca(ws[cPhi + r].v, exp.rows[i].phi, 1e-9), `[LibreOffice recalculó] PROMETHEE (${caso}) Phi(${a.name}) = ${ws[cPhi + r]?.v?.toFixed?.(6)} (esperado ${exp.rows[i].phi.toFixed(6)})`);
+    ok(ws[cRk + r]?.v === exp.rows[i].rank, `[LibreOffice recalculó] PROMETHEE (${caso}) Ranking(${a.name}) = ${ws[cRk + r]?.v} (esperado ${exp.rows[i].rank})`);
+    ok(cerca(ws[cPlus + r]?.v, res.phiPlus[i], 1e-9) && cerca(ws[cMinus + r]?.v, res.phiMinus[i], 1e-9), `[LibreOffice recalculó] PROMETHEE (${caso}) Phi+/Phi-(${a.name})`);
+  });
+  // PROMETHEE I: relaciones recalculadas (texto) frente a prometheeI()
+  const rGan = rPi0 + n + 1, rRange = rGan + 2 + 5, rI0 = rRange + 2 + 2;
+  const p1 = prometheeI(res.phiPlus, res.phiMinus);
+  const REL: Record<string, string> = { precedes: 'precede', preceded: 'es precedida', indifferent: 'indiferentes', incomparable: 'incomparables' };
+  let relOk = true;
+  alternatives.forEach((_, i) => alternatives.forEach((__, k) => {
+    if (i === k) return;
+    if (ws[colL(1 + k) + (rI0 + i)]?.v !== REL[p1.rel[i][k]]) relOk = false;
+  }));
+  ok(relOk, `[LibreOffice recalculó] PROMETHEE I (${caso}): las ${n * (n - 1)} relaciones coinciden con prometheeI()`);
+  alternatives.forEach((a, i) => {
+    const prec = alternatives.filter((_, k) => k !== i && p1.rel[i][k] === 'precedes').length;
+    ok(ws[colL(n + 1) + (rI0 + i)]?.v === prec, `[LibreOffice recalculó] PROMETHEE I (${caso}) «${a.name}» precede a ${ws[colL(n + 1) + (rI0 + i)]?.v} (esperado ${prec})`);
+  });
 }
 
 // ---- Pesos objetivos CRITIC / Entropía (hoja Criterios con fórmulas vivas) ----

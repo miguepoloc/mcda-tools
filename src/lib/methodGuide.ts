@@ -61,7 +61,7 @@ export const METHOD_GUIDE: Record<Method, MethodGuide> = {
     what: 'Compara cada par de alternativas directamente, criterio por criterio, y arma el ranking con las preferencias netas (flujos Φ).',
     input: 'Matriz de decisión numérica.',
     when: 'Quieres que una diferencia pequeña pese poco y una grande pese mucho, en vez de comparar solo «gana / pierde».',
-    watch: 'La plataforma usa PROMETHEE II con la función de preferencia lineal (tipo III) y el rango de cada criterio como umbral, como en el curso.',
+    watch: 'Por defecto usa la función lineal (tipo III) con el rango de cada criterio como umbral, como en el curso; puedes elegir otra de las seis funciones por criterio, y sus umbrales los fijas tú. Muestra PROMETHEE II (flujo neto) y PROMETHEE I (orden parcial).',
     result: 'Ranking completo por flujo neto Φ.',
   },
   electre: {

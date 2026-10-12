@@ -62,5 +62,28 @@ ok(!!imp, 'la hoja _datos es un respaldo v2 válido');
 ok(imp?.method === 'promethee', `method reimportado = ${imp?.method} (esperado promethee)`);
 ok(JSON.stringify(imp?.decisionMatrix?.values) === JSON.stringify(dm.values), 'decision_matrix.values sobrevive el viaje de ida y vuelta');
 
+// ---- Seis funciones: configuración por criterio (lineal, U, nivel, gaussiana), PROMETHEE I y viaje por _datos ----
+{
+  const dmC: DecisionMatrix = { ...dm, prometheeConfig: { k0: { fn: 'linear', q: 2, p: 20 }, k1: { fn: 'ushape', q: 1 }, k2: { fn: 'level', q: 0.5, p: 1.5 }, k3: { fn: 'gaussian', s: 1 } } };
+  const wbC = buildWorkbook(XLSX, { ...study, decisionMatrix: dmC });
+  const wsC = wbC.Sheets['PROMETHEE'];
+  const expC = prometheeSynthesis(criteria, alternatives, dmC, weights);
+  alternatives.forEach((a, i) => {
+    const c = wsC[cPhi + (rPi0 + i)];
+    ok(!!c && cerca(c.v, expC.rows[i].phi, 1e-9), `config mixta: Phi(${a.name}) cacheado = ${c?.v?.toFixed?.(6)} (prometheeSynthesis ${expC.rows[i].phi.toFixed(6)}; vs pyDecision en check-promethee-functions.ts)`);
+  });
+  const nonPi = Object.keys(wsC).filter((k) => !k.startsWith('!') && wsC[k].f);
+  ok(!nonPi.some((k) => /SUMPRODUCT|MEDIAN/.test(wsC[k].f)), 'ninguna fórmula usa SUMPRODUCT ni MEDIAN (celdas reales, sin expresiones-arreglo)');
+  ok(nonPi.some((k) => /EXP\(/.test(wsC[k].f) && /"Lineal"/.test(wsC[k].f)), 'la preferencia por criterio es una fórmula escalar con IF anidado y EXP');
+  const txt = Object.keys(wsC).filter((k) => !k.startsWith('!')).map((k) => String(wsC[k].v));
+  ok(['Lineal', 'U', 'Nivel', 'Gaussiana'].every((f) => txt.includes(f)), 'la hoja muestra la función de cada criterio (Lineal, U, Nivel, Gaussiana)');
+  ok(txt.includes('PROMETHEE I — orden parcial') && txt.some((t) => t === 'precede'), 'la hoja trae el bloque PROMETHEE I con relaciones');
+  const wbC2 = XLSX.read(XLSX.write(wbC, { bookType: 'xlsx', type: 'array' }), { type: 'array' });
+  let tt = ''; for (let r = 1; wbC2.Sheets['_datos']['A' + r]; r++) tt += wbC2.Sheets['_datos']['A' + r].v;
+  const stC = JSON.parse(tt);
+  const impC = isLegacy(stC) ? fromLegacy(stC) : null;
+  ok(JSON.stringify(impC?.decisionMatrix?.prometheeConfig) === JSON.stringify(dmC.prometheeConfig), 'prometheeConfig sobrevive el viaje de ida y vuelta por _datos');
+}
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodas las pruebas pasaron');
 process.exit(fallos ? 1 : 0);

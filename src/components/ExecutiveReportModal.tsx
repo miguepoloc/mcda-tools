@@ -152,6 +152,10 @@ interface ExecutiveReportModalProps {
   rankingRows: { name: string; score: number; rank: number }[];
   /** Solo VIKOR: v usado (se declara en el informe, no sale de los datos). */
   vikorV?: number;
+  /** Solo PROMETHEE: función de preferencia y umbrales de cada criterio (se declaran en el informe; no salen de los datos). */
+  prometheeFns?: { name: string; text: string }[];
+  /** Solo PROMETHEE: false = ningún criterio se apartó del Tipo III con q = 0 y p = rango (lo del curso). */
+  prometheeCustom?: boolean;
   /** Solo VIKOR: conjunto de compromiso cuando NO hay ganador único (falla C1 o C2 de Opricovic & Tzeng 2004). */
   compromiseSet?: string[];
   /** Solo VIKOR: datos de la gráfica Q vs v (rectas en v = 0 y v = 1) y los v donde cambia el 1er lugar. Sin él no se dibuja. */
@@ -182,6 +186,8 @@ export default function ExecutiveReportModal({
   exampleData = false,
   rankingRows,
   vikorV,
+  prometheeFns,
+  prometheeCustom,
   compromiseSet,
   vikorChart,
   charts,
@@ -515,6 +521,16 @@ export default function ExecutiveReportModal({
           {vikorV != null && (
             <p style={{ fontSize: 12.5, color: '#475569', margin: 0 }}>
               <b>Parámetro v de VIKOR = {vikorV.toFixed(2)}.</b> No se deriva de los datos: lo fija quien decide (0.5 = «consenso», convención). El ranking puede cambiar con otros valores de v; ver la sección de sensibilidad de este informe.
+            </p>
+          )}
+
+          {prometheeFns && prometheeFns.length > 0 && (
+            <p style={{ fontSize: 12.5, color: '#475569', margin: 0 }}>
+              <b>{prometheeCustom ? 'Funciones de preferencia de PROMETHEE por criterio' : 'Función de preferencia de PROMETHEE'}: </b>
+              {prometheeCustom
+                ? prometheeFns.map((x) => `${x.name}: ${x.text}`).join('; ') + '. '
+                : 'Tipo III (lineal, en V) con q = 0 y p = rango de cada criterio, la convención del curso. '}
+              La función y los umbrales no se derivan de los datos: los fija quien decide (Brans y Vincke, 1985), y con otros valores el ranking puede cambiar. Se indican el flujo neto φ (PROMETHEE II) y, en el desglose, el orden parcial de PROMETHEE I con sus pares incomparables.
             </p>
           )}
 

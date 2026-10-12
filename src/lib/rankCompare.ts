@@ -163,12 +163,15 @@ export function electreCompareInfo(syn: ElectreSynth): ElectreCompareInfo {
 }
 
 /** Parámetros (no salen de los datos) que cada método usó, en texto llano, para declararlos en el informe. */
-export function describeMethodParams(key: string, o: { vikorV?: number; cStar?: number; dStar?: number } = {}): string {
+export function describeMethodParams(key: string, o: { vikorV?: number; cStar?: number; dStar?: number; promethee?: { custom: boolean; items: { name: string; text: string }[] } } = {}): string {
   switch (key) {
     case 'ahp': return 'Juicios por pares en la escala de Saaty; pesos = eigenvector principal (o promedio de columnas si así se eligió).';
     case 'topsis': return 'Normalización vectorial; distancia euclidiana al ideal y al anti-ideal. Sin parámetros a elegir.';
     case 'vikor': return `v = ${(o.vikorV ?? 0.5).toFixed(2)} (peso de la utilidad de grupo; lo elige quien decide, no sale de los datos). Normalización por rango.`;
-    case 'promethee': return 'Función de preferencia Tipo III (lineal): q = 0 y p = rango de cada criterio; la plataforma no ofrece otra función.';
+    case 'promethee':
+      return o.promethee?.custom
+        ? `Función de preferencia por criterio (Brans y Vincke, 1985; los umbrales los fija quien decide): ${o.promethee.items.map((x) => `${x.name}: ${x.text}`).join('; ')}.`
+        : 'Función de preferencia Tipo III (lineal, en V): q = 0 y p = rango de cada criterio (valor por defecto del curso; se puede elegir otra de las seis funciones por criterio).';
     case 'saw': return 'Normalización mín–máx; puntaje = suma ponderada. Sin parámetros a elegir.';
     case 'fuzzy_topsis': return 'Etiquetas lingüísticas convertidas a números triangulares difusos; distancia entre vértices.';
     case 'electre': return `c* = ${(o.cStar ?? 0.65).toFixed(2)} (concordancia mínima) y d* = ${(o.dStar ?? 0.3).toFixed(2)} (discordancia máxima); los elige quien decide.`;

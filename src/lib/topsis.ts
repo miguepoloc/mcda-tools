@@ -4,6 +4,7 @@
 // de AHP, ver ahp.ts) en vez de derivarlos: es la diferencia de fondo con AHP que motiva que esto
 // viva en un módulo aparte, no una variante de ahp.ts.
 import type { Alternative, Criterion, DecisionMatrix, MatrixKind, MatrixType, TargetSpec } from './types.ts';
+import { sanitizePrometheeConfig } from './prometheeConfig.ts';
 
 export type { DecisionMatrix, MatrixKind, MatrixType, TargetSpec };
 
@@ -30,6 +31,9 @@ export function normalizeMatrix(x: unknown): DecisionMatrix {
   // c*/d* de ELECTRE: mismo criterio de validación que vikorV (número finito en [0, 1], si no se ignora).
   if (typeof s.electreCStar === 'number' && Number.isFinite(s.electreCStar) && s.electreCStar >= 0 && s.electreCStar <= 1) out.electreCStar = s.electreCStar;
   if (typeof s.electreDStar === 'number' && Number.isFinite(s.electreDStar) && s.electreDStar >= 0 && s.electreDStar <= 1) out.electreDStar = s.electreDStar;
+  // Función y umbrales de PROMETHEE por criterio: aditivo y opcional; se descartan funciones desconocidas y umbrales inválidos.
+  const pc = sanitizePrometheeConfig(s.prometheeConfig);
+  if (pc) out.prometheeConfig = pc;
   return out;
 }
 

@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**26 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 29). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**27 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 30). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -168,7 +168,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | G14 | Gestión de capas | ◐ | duplicados y borrado confirmado sí; renombrar/reordenar/agrupar no |
 | G15 | Sensibilidad espacial de pesos | ✅ | entrada 21 |
 | M1 | Orden agregado Borda/Copeland | ✅ | entrada 7 |
-| M2 | PROMETHEE con 6 funciones y umbrales | ⬜ | |
+| M2 | PROMETHEE con 6 funciones y umbrales | ✅ | entrada 30 (también PROMETHEE I en panel y Excel) |
 | M3 | ELECTRE TRI | ⬜ | esfuerzo alto |
 | M4 | Umbral crítico de cada peso | ✅ | entrada 7 |
 | M5 | Subcriterios (2 niveles) | ⬜ | esfuerzo alto; contradice límite R10 declarado |
@@ -308,3 +308,12 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Decisión / riesgos (revisables):** (1) `zoom` CSS no es de las propiedades más antiguas: en Firefox < 126 no amplía (queda el contraste, el foco y la letra base calculada con `--pz`, que sí hace efecto). (2) Los motores difieren en si `vh/vw` se amplían con `zoom`; las cotas dividen por el factor y en el peor caso quedan más chicas (con scroll). (3) A 1280×720 el área efectiva es ~1024 px CSS: topbar y Geovisor envuelven; revisar. (4) `.gv-stage` con `zoom` inverso: comprobar clic, arrastre y zoom del mapa (Leaflet) y que el panel lateral no pierda altura. (5) Ocultar `.gv-hint` quita instrucciones de los paneles del Geovisor; se vuelven a ver apagando el modo. (6) No hay conmutador de tema claro/oscuro en la interfaz (sigue al sistema): el modo presentación respeta esa preferencia, no la fuerza.
 - **Verificación:** typecheck, `npm test` y `test:excel`; sin `next build`/`next dev`.
 - **Pendiente (visual):** proyector real; 1280×720 y 320 px en Geovisor, Resultados y vista pública; leyenda con 6–8 clases y ticks; etiquetas de puntos sobre OSM/satélite; modales (informe, composición) y menús; recarga con el modo guardado sin parpadeo; Safari.
+
+### 30. PROMETHEE con las seis funciones de preferencia, umbrales por criterio y PROMETHEE I (M2, H12)
+- **Qué:** cada criterio elige una de las seis funciones de Brans y Vincke (1985): usual (I), en U (II, q), en V (III, p), por niveles (IV, q y p), lineal con indiferencia (V, q y p) y gaussiana (VI, σ). Umbrales q, p y σ editables, en la unidad del criterio, con valores por defecto sensatos (fracciones del rango: V y lineal p = rango; nivel q = 10 % y p = 50 %; U q = 25 %; gaussiana σ = 50 %) y validación (q ≥ 0, p y σ > 0, q ≤ p; un valor inválido se corrige y se avisa). PROMETHEE I (flujos φ⁺ y φ⁻, orden parcial con precede / indiferentes / incomparables) ya estaba en el desglose; ahora también va en el panel de Resultados y en la hoja de Excel, junto al flujo neto de PROMETHEE II.
+- **Compatibilidad (decisión central):** el valor por defecto es el que se usaba (Tipo III, q = 0, p = rango, el del notebook 05, `pyDecision t5` con Q = 0 y P = rangos). Un proyecto sin configuración da pi y φ idénticos bit a bit (la prueba lo compara con `JSON.stringify`). La configuración es aditiva y opcional: `decision_matrix.prometheeConfig?: Record<critId, {fn, q?, p?, s?}>`, saneada en `normalizeMatrix`; viaja por el respaldo `.json`/`_datos` y por `public_get`/`expert_get` sin migración.
+- **Código:** `src/lib/prometheeConfig.ts` (funciones, defaults, validación, saneado, puntos de la curva), `src/lib/promethee.ts` (`promethee(matrix, w, types, cfg?)`, `prometheeConfigSummary`), `src/components/PrometheePanel.tsx` (editor accesible: select por criterio, campos con `aria-invalid`/`aria-describedby`, restablecer, curvas, tabla PROMETHEE I/II), desglose paso a paso con la función real de cada criterio, informe ejecutivo, párrafo de metodología (es/en), comparativa de métodos, ficha científica y guía de métodos.
+- **Excel:** la hoja PROMETHEE ya no usa SUMPRODUCT: por criterio hay una grilla de celdas reales con una fórmula escalar (IF anidado + EXP en la gaussiana) que lee celdas editables de función (Usual, U, V, Nivel, Lineal, Gaussiana), q, p y σ; π suma w × P de esas celdas; PROMETHEE I son celdas con COUNTIF. Las filas de arriba no se movieron.
+- **Verificación:** `scripts/check-promethee-functions.ts` (en `npm test` antes de `check-integration.ts`) contra `pyDecision.preference_degree` (10 configuraciones, φ⁺, φ⁻ y φ con 1e-9), compatibilidad exacta, bordes de cada función, validación, saneado y persistencia; `check-excel-promethee.ts` ampliado; `check-excel-recalc.ts` con dos casos (mixta y las seis funciones en seis criterios) donde LibreOffice recalcula con los valores numéricos y de texto arruinados a propósito. typecheck, `npm test` y `test:excel` en verde; sin `next build`/`next dev`.
+- **Riesgos / decisiones:** (1) en Excel, cambiar «Función» no reajusta q, p ni σ ya fijados; solo los valores por defecto son fórmulas. (2) La función y los umbrales cambian el ranking: se declaran en informe y metodología, pero la sensibilidad a los umbrales (no solo a los pesos) no se calcula aún. (3) Con la función «Usual», diferencias de ruido de punto flotante cuentan como preferencia total; los datos reales rara vez las producen. (4) La vista pública puede mover funciones y umbrales solo en su pantalla.
+- **Pendiente (visual):** panel «Funciones de preferencia» en ancho angosto y modo oscuro (tabla con select y tres campos por fila); mensajes de validación; curvas con las seis funciones y umbrales fuera del rango; tabla PROMETHEE I con 6–8 alternativas; lectura con teclado y lector de pantalla; hoja de Excel en Excel real (no solo LibreOffice).

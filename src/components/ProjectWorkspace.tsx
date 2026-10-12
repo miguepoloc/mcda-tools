@@ -3,7 +3,7 @@
 import { tablistKeys } from '@/lib/tabKeys';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { hexToken, uid, type Alternative, type Criterion, type ExpertRow, type GeoConfig, type JudgmentRow, type Method, type WeightingMethod, type ProjectRow } from '@/lib/types';
+import { hexToken, uid, type Alternative, type Criterion, type ExpertRow, type GeoConfig, type JudgmentRow, type Method, type PrometheeCriterionConfig, type WeightingMethod, type ProjectRow } from '@/lib/types';
 import { indexJudgments, type JMap } from '@/lib/ahp';
 import { finalists, normalizePrio, type PrioState } from '@/lib/prio';
 import { downloadExcel, downloadPrioExcel } from '@/lib/excel';
@@ -305,6 +305,12 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
   }
   function setElectreDStar(d: number) {
     patch({ decision_matrix: { ...dm, electreDStar: d } });
+  }
+  /** Función de preferencia y umbrales de PROMETHEE por criterio (sin migración, dentro de decision_matrix). Vacío = la del curso. */
+  function setPrometheeConfig(cfg: Record<string, PrometheeCriterionConfig> | undefined) {
+    const { prometheeConfig: _drop, ...rest } = dm;
+    void _drop;
+    patch({ decision_matrix: cfg ? { ...rest, prometheeConfig: cfg } : rest });
   }
 
   const studyExport = () => ({
@@ -731,6 +737,7 @@ export default function ProjectWorkspace({ initialProject, initialExperts, initi
             onChangeV={setVikorV}
             onChangeCStar={setElectreCStar}
             onChangeDStar={setElectreDStar}
+            onChangePrometheeConfig={setPrometheeConfig}
             prio={prio}
             onGoExperts={objectiveWeighting ? undefined : () => goTab('Expertos')}
             onGoProject={() => goTab('Proyecto')}
