@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import Logo from './Logo';
 import UserMenu from './UserMenu';
+import PresentToggle from './PresentToggle';
 import { APP_VERSION, APP_RELEASE_TAG } from '@/lib/version';
 
 const NAV_LINKS = [
@@ -76,6 +77,7 @@ export default function Topbar({
 
         <div className="topbar-actions">
           {children}
+          <PresentToggle />
           {!hideAuthAction && (loggedIn ? (
             <div className="user">
               {pathname !== '/dashboard' && <Link className="btn sm" href="/dashboard">Mis proyectos</Link>}

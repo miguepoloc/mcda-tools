@@ -313,5 +313,64 @@ for (const [tok, val] of [['--pa', '#4F46E5'], ['--field-line', '#7B8BA1'], ['--
 }
 if (fails === b5) ok(`contraste de ${pairs.length} pares de tokens`);
 
+// ---- Modo presentación (U4): contraste ≥ 7:1 en texto y ≥ 3:1 en bordes, en claro y oscuro, leído de present.css ----
+{
+  const bP = fails;
+  const presentFile = join(ROOT, 'app/present.css');
+  const pcss = readFileSync(presentFile, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+  const layoutSrc = readFileSync(join(ROOT, 'app/layout.tsx'), 'utf8');
+  if (!/import\s+['"]\.\/present\.css['"]/.test(layoutSrc)) fail('presente', 'src/app/layout.tsx', 1, 'el layout no importa present.css');
+  if (!/PRESENT_BOOT_SCRIPT/.test(layoutSrc) || !/suppressHydrationWarning/.test(layoutSrc)) fail('presente', 'src/app/layout.tsx', 1, 'falta el script de arranque o suppressHydrationWarning en <html>');
+  const tokensOf = (selector: string): Record<string, string> => {
+    const out: Record<string, string> = {};
+    const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(?:^|[}\\s])${esc}\\s*\\{([^{}]*)\\}`, 'g');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(pcss))) for (const t of m[1].matchAll(/(--[\w-]+)\s*:\s*(#[0-9A-Fa-f]{6})\b/g)) out[t[1]] = t[2];
+    return out;
+  };
+  const scopes: [string, Record<string, string>, Record<string, string>][] = [
+    ['claro', tokensOf(':root[data-present="1"]'), tokensOf(':root[data-present="1"] .gv-wrap')],
+    ['oscuro (sistema)', tokensOf(':root[data-present="1"]:not([data-theme="light"])'), tokensOf(':root[data-present="1"]:not([data-theme="light"]) .gv-wrap')],
+    ['oscuro (forzado)', tokensOf(':root[data-present="1"][data-theme="dark"]'), tokensOf(':root[data-present="1"][data-theme="dark"] .gv-wrap')],
+  ];
+  // Los dos bloques oscuros deben decir lo mismo (no hay forma de compartirlos en CSS).
+  for (const k of new Set([...Object.keys(scopes[1][1]), ...Object.keys(scopes[2][1])])) {
+    if (scopes[1][1][k] !== scopes[2][1][k]) fail('presente', presentFile, 1, `${k}: el bloque oscuro del sistema y el forzado difieren`);
+  }
+  const BG = ['--bg', '--surface', '--surface2', '--pa-soft', '--pb-soft', '--pass-soft', '--warn-soft', '--geo-accent-soft'];
+  const TEXT = ['--ink', '--muted', '--pa', '--pb', '--pass-text', '--warn-text', '--warn-t', '--pass-t',
+    '--mt-ahp', '--mt-topsis', '--mt-vikor', '--mt-promethee', '--mt-electre', '--mt-saw', '--mt-fuzzy'];
+  let nPairs = 0;
+  for (const [name, t, g] of scopes) {
+    for (const k of [...BG, ...TEXT, '--line', '--field-line', '--pa-ink', '--pb-ink', '--on-warn-text', '--warn', '--pass']) {
+      if (!t[k]) fail('presente', presentFile, 1, `${name}: falta el token ${k}`);
+    }
+    for (const k of ['--gv-accent-strong', '--gv-warn-ink', '--gv-focus', '--gv-ok-bg', '--gv-ok-fg']) {
+      if (!g[k]) fail('presente', presentFile, 1, `${name}: falta ${k} en .gv-wrap`);
+    }
+    const chk = (label: string, fg?: string, bg?: string, min = 7) => {
+      if (!fg || !bg) return;
+      nPairs++;
+      const r = ratio(fg, bg);
+      if (r < min) fail('contraste-presentacion', presentFile, 1, `${name}: ${label} ${r.toFixed(2)}:1 < ${min}:1 (${fg} sobre ${bg})`);
+    };
+    for (const k of TEXT) for (const b of BG) chk(`${k} / ${b}`, t[k], t[b]);
+    for (const k of ['--gv-accent-strong', '--gv-warn-ink']) for (const b of BG) chk(`${k} / ${b}`, g[k], t[b]);
+    chk('--gv-focus / --bg (3:1)', g['--gv-focus'], t['--bg'], 3);
+    chk('--gv-ok-fg / --gv-ok-bg', g['--gv-ok-fg'], g['--gv-ok-bg']);
+    chk('texto del botón A', t['--pa-ink'], t['--pa']);
+    chk('texto del botón B', t['--pb-ink'], t['--pb']);
+    chk('texto del botón de aviso', t['--on-warn-text'], t['--warn-text']);
+    for (const k of ['--line', '--field-line', '--warn', '--pass']) { chk(`${k} / --bg (3:1)`, t[k], t['--bg'], 3); chk(`${k} / --surface2 (3:1)`, t[k], t['--surface2'], 3); }
+    chk('--field-line / --surface2 (4.5:1)', t['--field-line'], t['--surface2'], 4.5);
+  }
+  // La escala base no puede bajar de ~125 % ni el foco de 4 px.
+  if (!/--pz:1\.25\b/.test(pcss) || !/calc\(15px \* 1\.25 \/ var\(--pz\)\)/.test(pcss)) fail('presente', presentFile, 1, 'la escala base debe llegar a 125 %');
+  if (!/:focus-visible\{outline:4px solid/.test(pcss.replace(/\s+/g, ' ').replace(/\s*\{\s*/g, '{'))) fail('presente', presentFile, 1, 'el foco del modo presentación debe ser de 4 px');
+  if (!/\.gv-hint:not\(\.warn\)/.test(pcss) || /\.gv-hint\.warn[^{]*\{[^}]*display\s*:\s*none/.test(pcss)) fail('presente', presentFile, 1, 'los avisos .warn no deben ocultarse');
+  if (fails === bP) ok(`modo presentación: ${nPairs} pares ≥ 7:1 / 3:1 en claro y oscuro, escala, foco y avisos conservados`);
+}
+
 console.log(`${checks} grupos de verificación, ${fails} fallas`);
 if (fails) process.exit(1);

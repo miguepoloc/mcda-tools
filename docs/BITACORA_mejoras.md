@@ -148,7 +148,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 
 ## Estado frente a la propuesta de Ronaldo (corte 10 oct 2026)
 
-**25 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 28). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
+**26 de 40 mejoras hechas** (10 de 16 hallazgos H cerrados del todo, 3 parcialmente; actualizado tras la entrada 29). Leyenda: ✅ hecha · ◐ parcial · ⬜ pendiente.
 
 | Código | Propuesta | Estado | Dónde / nota |
 | --- | --- | --- | --- |
@@ -185,7 +185,7 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 | U1 | Pegar matriz desde hoja de cálculo | ✅ | entrada 5 |
 | U2 | Interfaz en inglés | ⬜ | ya en el plan §6 |
 | U3 | Auditoría WCAG 2.2 AA | ◐ | entradas 1, 23 y 27; `docs/AUDITORIA_accesibilidad.md`; sin nada crítico en código, falta lector de pantalla real, zoom/reflujo y contraste sobre el mapa (verificación renderizada) |
-| U4 | Modo presentación | ⬜ | |
+| U4 | Modo presentación | ✅ | entrada 29; falta verificación visual (proyector, 1280×720 y 320 px) |
 | U5 | Historial de versiones del proyecto | ⬜ | |
 | P1 | Versión y DOI alineados | ✅ | entrada 5 |
 | P2 | Reportar un problema | ✅ | entrada 5 |
@@ -298,3 +298,13 @@ Integrado en `main` local (sin push): primera ola + G1/G2 + puntos con ranking. 
 - **Riesgos / decisiones:** (1) los lados son arcos geodésicos: un «rectángulo» grande dibujado con 4 vértices se abomba hacia el polo y mide ~1 % más que uno sobre los paralelos (a escala de parcela es despreciable); (2) un polígono que rodea un polo no se mide bien; (3) la medición no se guarda ni se exporta (solo sale en el PNG del mapa, porque es una capa vectorial más); (4) el área de un polígono con lados cruzados es neta y se avisa; (5) mientras mide, el clic sobre un punto del ranking sigue seleccionándolo.
 - **Pendiente (visual):** botón y panel en claro/oscuro, ancho de 320 px y sobre satélite (amarillo del trazo); superposición con zoom de Leaflet y con la barra «Agregar punto»; la lista con 20+ vértices; teclado real (Tab, Intro en el mapa, Escape) y lector de pantalla con el aviso del resultado.
 
+
+### 29. Modo presentación (U4): letra grande y alto contraste para proyectar
+- **Qué:** botón «Modo presentación» en el Topbar (junto a Mis proyectos/cuenta; aparece en todas las páginas que usan Topbar, incluida la vista pública `/p/<token>`). Pone `data-present="1"` en `<html>`, `aria-pressed` y se recuerda en `localStorage` (`mcda_present`, siempre con try/catch). Un script de arranque en `<head>` lo aplica antes del primer pintado (sin parpadeo; `suppressHydrationWarning` en `<html>`). También rige en `/p/.../embed` (que no tiene Topbar) si la preferencia ya estaba guardada en ese origen.
+- **Qué cambia (todo en `src/app/present.css`, importado después de `globals.css`):** (1) tokens de color con texto ≥ 7:1 sobre fondo, superficies y fondos suaves, en claro, oscuro por sistema y `data-theme="dark"` (incluye `--mt-*`, `--warn-text`, `--pass-text`, `--gv-*`, botones y bordes ≥ 3:1); (2) escala: `zoom` del `body` por ancho de ventana (1.25 a ≥ 1200 px, 1.15, 1.1 y 1 a ≤ 699 px) + `font-size` para que el texto base llegue a ~125 % en todos los anchos; (3) controles ≥ 44 px, bordes de 2 px y foco de 4 px; (4) se ocultan `.gv-hint` sin `.warn`/`role`/`id`, `.gv-pf-note`, la pista de la rueda y `#tip` (avisos y estados se conservan); (5) Geovisor: leyenda, ticks, cortes, etiquetas de puntos, controles de zoom y chips con tamaños explícitos; el mapa (`.gv-stage`) queda sin zoom neto para no desajustar Leaflet; (6) cotas de `vh/vw/dvh` divididas por el zoom.
+- **Lógica pura:** `src/lib/present.ts` (`readPresent`, `writePresent`, `applyPresent`, `isPresentApplied`, `PRESENT_BOOT_SCRIPT`; almacenamiento y raíz inyectables). Componente `PresentToggle.tsx`; cambio mínimo en `Topbar.tsx` y `layout.tsx`. No se tocó `GeoVisor.tsx` ni `globals.css`.
+- **Movimiento y accesibilidad:** no añade animaciones ni transiciones (la regla global `prefers-reduced-motion` sigue vigente); foco visible, forced-colors con `Highlight` a 4 px; no hay cambio en la semántica.
+- **Pruebas:** `scripts/check-present.ts` (nuevo, en `npm test` antes de `check-integration.ts`: lectura/escritura con almacenamiento que lanza, atributo, script de arranque) y `scripts/check-a11y-static.ts` suma un grupo que lee `present.css` y comprueba 450 pares (texto ≥ 7:1, bordes ≥ 3:1, botones, coherencia entre los dos bloques oscuros, escala, foco 4 px y avisos sin ocultar).
+- **Decisión / riesgos (revisables):** (1) `zoom` CSS no es de las propiedades más antiguas: en Firefox < 126 no amplía (queda el contraste, el foco y la letra base calculada con `--pz`, que sí hace efecto). (2) Los motores difieren en si `vh/vw` se amplían con `zoom`; las cotas dividen por el factor y en el peor caso quedan más chicas (con scroll). (3) A 1280×720 el área efectiva es ~1024 px CSS: topbar y Geovisor envuelven; revisar. (4) `.gv-stage` con `zoom` inverso: comprobar clic, arrastre y zoom del mapa (Leaflet) y que el panel lateral no pierda altura. (5) Ocultar `.gv-hint` quita instrucciones de los paneles del Geovisor; se vuelven a ver apagando el modo. (6) No hay conmutador de tema claro/oscuro en la interfaz (sigue al sistema): el modo presentación respeta esa preferencia, no la fuerza.
+- **Verificación:** typecheck, `npm test` y `test:excel`; sin `next build`/`next dev`.
+- **Pendiente (visual):** proyector real; 1280×720 y 320 px en Geovisor, Resultados y vista pública; leyenda con 6–8 clases y ticks; etiquetas de puntos sobre OSM/satélite; modales (informe, composición) y menús; recarga con el modo guardado sin parpadeo; Safari.
